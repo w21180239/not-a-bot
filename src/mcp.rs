@@ -1,5 +1,4 @@
 use crate::core::error::{Error, Result};
-use crate::core::types::{TranslateRequest, TranslateResponse};
 use serde_json::Value;
 
 pub async fn serve() -> Result<()> {

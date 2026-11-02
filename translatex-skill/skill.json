@@ -1,0 +1,113 @@
+{
+  "name": "translatex",
+  "version": "0.1.0",
+  "description": "Agent-first translation CLI & MCP server with provider fallback, key rotation, and structured output",
+  "author": "w21180239",
+  "license": "MIT OR Apache-2.0",
+  "repository": "https://github.com/w21180239/translatex",
+  "keywords": ["translation", "cli", "mcp", "agent", "i18n"],
+  "bin": "translatex",
+  "commands": {
+    "translate": {
+      "description": "Translate text with provider fallback and key rotation",
+      "input": {
+        "type": "object",
+        "properties": {
+          "text": {"type": "string", "description": "Text to translate"},
+          "target_lang": {"type": "string", "description": "Target language code (ISO 639-1)"},
+          "source_lang": {"type": "string", "default": "auto", "description": "Source language code or 'auto'"},
+          "provider": {"type": "string", "default": "auto", "description": "Specific provider or 'auto' for fallback chain"},
+          "fallback_chain": {"type": "array", "items": {"type": "string"}, "description": "Explicit fallback provider list"},
+          "preserve": {"type": "array", "items": {"type": "string"}, "description": "Regex patterns to preserve untranslated"},
+          "timeout_ms": {"type": "integer", "description": "Request timeout in milliseconds"},
+          "idempotency_key": {"type": "string", "description": "Correlation ID for deduplication"}
+        },
+        "required": ["text", "target_lang"]
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "text": {"type": "string"},
+          "detected_source": {"type": "string"},
+          "target_lang": {"type": "string"},
+          "provider": {"type": "string"},
+          "engine": {"type": "string"},
+          "latency_ms": {"type": "integer"},
+          "request_id": {"type": "string"},
+          "chars": {"type": "integer"},
+          "warnings": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": ["text", "detected_source", "target_lang", "provider", "engine", "latency_ms", "request_id", "target_lang", "warnings"]
+      }
+    },
+    "providers": {
+      "description": "List all providers with capabilities and credential status",
+      "input": {"type": "object", "properties": {}},
+      "output": {
+        "type": "object",
+        "properties": {
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "display_name": {"type": "string"},
+                "kind": {"type": "string", "enum": ["free", "keyed", "llm"]},
+                "needs_key": {"type": "boolean"},
+                "max_chars": {"type": "integer"},
+                "auto_detect": {"type": "boolean"},
+                "languages": {"type": "array", "items": {"type": "string"}},
+                "free_tier": {"type": "string"},
+                "configured": {"type": "boolean"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "languages": {
+      "description": "List supported language codes",
+      "input": {
+        "type": "object",
+        "properties": {
+          "provider": {"type": "string", "description": "Provider name or 'all'"}
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "provider": {"type": "string"},
+          "languages": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "health": {
+      "description": "Probe all configured providers",
+      "input": {"type": "object", "properties": {}},
+      "output": {
+        "type": "object",
+        "properties": {
+          "healthy": {"type": "boolean"},
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {"type": "string"},
+                "configured": {"type": "boolean"},
+                "healthy": {"type": "boolean"},
+                "latency_ms": {"type": "integer"},
+                "error": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "mcp": {
+    "transport": "stdio",
+    "tools": ["translate", "providers", "languages", "health"]
+  }
+}

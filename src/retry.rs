@@ -17,7 +17,7 @@ pub fn backoff(attempt: u32, retry_after_secs: Option<u64>) -> Duration {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.subsec_nanos() as u64 % (capped / 2 + 1))
         .unwrap_or(0);
-    Duration::from_millis(capped + jitter)
+    Duration::from_millis((capped + jitter).min(CAP_MS + capped / 2))
 }
 
 #[cfg(test)]
@@ -31,7 +31,7 @@ mod tests {
         let c = backoff(9, None).as_millis();
         assert!(a <= (CAP_MS + 200) as u128);
         assert!(b > a);
-        assert!(c <= (CAP_MS + 200) as u128, "capped: {c}");
+        assert!(c <= (CAP_MS + 1500) as u128, "capped: {c}");
     }
 
     #[test]

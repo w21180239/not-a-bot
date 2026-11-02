@@ -271,6 +271,18 @@ fn build_registry(creds: &CredentialStore, settings: &Settings) -> Registry {
     )));
     reg.register(Arc::new(google::GoogleFree::new()));
     reg.register(Arc::new(volcengine::Volcengine::new()));
+    // New free providers
+    reg.register(Arc::new(mymemory::MyMemory::new(None)));
+    reg.register(Arc::new(edge::Edge::new()));
+    reg.register(Arc::new(iciba::Iciba::new()));
+    reg.register(Arc::new(lingvanex::Lingvanex::new()));
+    reg.register(Arc::new(mirai::Mirai::new()));
+    reg.register(Arc::new(systran::SysTran::new()));
+    reg.register(Arc::new(papago::Papago::new()));
+    reg.register(Arc::new(reverso::Reverso::new()));
+    reg.register(Arc::new(sogou::Sogou::new()));
+    reg.register(Arc::new(iflytek::Iflytek::new()));
+    reg.register(Arc::new(iflyrec::Iflyrec::new()));
     build_keyed(&mut reg, creds, settings);
     reg
 }
