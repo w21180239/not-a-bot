@@ -1,0 +1,189 @@
+//! Settings: config file, env overrides, defaults.
+
+use crate::core::error::{Error, Result};
+use serde::Deserialize;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
+/// Default `auto` chain. Ordered by measured quality and reliability, keyed
+/// providers before free web endpoints, billing providers last.
+pub const DEFAULT_AUTO_CHAIN: &[&str] = &[
+    "deepl",
+    "azure",
+    "googlecloud",
+    "youdao",
+    "caiyun",
+    "aliyun",
+    "volcengine",
+    "baidu",
+    "tencent",
+    "niutrans",
+    "google",
+    "libretranslate",
+    "openai",
+    "anthropic",
+];
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct Settings {
+    /// Overrides the `auto` expansion.
+    pub chain: Option<Vec<String>>,
+    pub default_target: Option<String>,
+    pub timeout_ms: Option<u64>,
+    pub retries: Option<u32>,
+    pub concurrency: Option<usize>,
+    pub log: Option<String>,
+    /// provider -> extra knobs (base_url, model, instance, ...).
+    pub provider: BTreeMap<String, ProviderSettings>,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+pub struct ProviderSettings {
+    pub base_url: Option<String>,
+    pub model: Option<String>,
+    pub region: Option<String>,
+    pub instance: Option<String>,
+    pub tier: Option<String>,
+}
+
+impl Settings {
+    pub fn load(path: Option<PathBuf>) -> Result<Self> {
+        let mut settings = Settings::default();
+        let Some(file) = path.or_else(default_path) else {
+            return Ok(settings.apply_env());
+        };
+        if file.exists() {
+            let text = std::fs::read_to_string(&file)
+                .map_err(|e| Error::Config(format!("{}: {e}", file.display())))?;
+            settings = toml::from_str::<Settings>(&text)
+                .map_err(|e| Error::Config(format!("{}: {e}", file.display())))?;
+        }
+        Ok(settings.apply_env())
+    }
+
+    fn apply_env(mut self) -> Self {
+        if let Ok(v) = std::env::var("TRANSLATEX_CHAIN") {
+            let chain: Vec<String> = v
+                .split(',')
+                .map(|s| s.trim().to_lowercase())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if !chain.is_empty() {
+                self.chain = Some(chain);
+            }
+        }
+        if let Ok(v) = std::env::var("TRANSLATEX_TIMEOUT_MS") {
+            if let Ok(ms) = v.parse() {
+                self.timeout_ms = Some(ms);
+            }
+        }
+        if let Ok(v) = std::env::var("TRANSLATEX_LOG") {
+            self.log = Some(v);
+        }
+        self
+    }
+
+    pub fn chain(&self) -> Vec<String> {
+        self.chain.clone().unwrap_or_else(|| {
+            DEFAULT_AUTO_CHAIN
+                .iter()
+                .map(|s| s.to_string())
+                .collect()
+        })
+    }
+
+    pub fn timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_millis(self.timeout_ms.unwrap_or(20_000))
+    }
+
+    pub fn retries(&self) -> u32 {
+        self.retries.unwrap_or(2)
+    }
+
+    pub fn provider(&self, name: &str) -> ProviderSettings {
+        self.provider.get(name).cloned().unwrap_or_default()
+    }
+}
+
+pub fn default_path() -> Option<PathBuf> {
+    if let Ok(p) = std::env::var("TRANSLATEX_CONFIG") {
+        return Some(PathBuf::from(p));
+    }
+    base_dir().map(|d| d.join("config.toml"))
+}
+
+pub fn cache_dir() -> Option<PathBuf> {
+    let dir = base_dir()?;
+    let cache = dir.join("cache");
+    let _ = std::fs::create_dir_all(&cache);
+    Some(cache)
+}
+
+/// `~/.config/translatex`, honouring `XDG_CONFIG_HOME`.
+fn base_dir() -> Option<PathBuf> {
+    if let Ok(dir) = std::env::var("TRANSLATEX_HOME") {
+        return Some(PathBuf::from(dir));
+    }
+    if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
+        return Some(PathBuf::from(xdg).join("translatex"));
+    }
+    directories::BaseDirs::new().map(|d| d.home_dir().join(".config").join("translatex"))
+}
+
+pub const CONFIG_TEMPLATE: &str = r#"# translatex config
+# chain expands `--provider auto`; keyed providers are used only when configured.
+# chain = ["deepl", "azure", "google", "googlecloud", "baidu", "libretranslate"]
+# default_target = "zh"
+# timeout_ms = 20000
+# retries = 2
+# log = "warn"
+
+# [provider.googlecloud]
+# region = "global"
+
+# [provider.llm]
+# base_url = "https://api.openai.com/v1"
+# model = "gpt-4o-mini"
+"#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn defaults_produce_a_chain() {
+        let s = Settings::default();
+        let chain = s.chain();
+        assert!(chain.contains(&"deepl".to_string()));
+        assert_eq!(s.retries(), 2);
+        assert_eq!(s.timeout(), std::time::Duration::from_millis(20_000));
+    }
+
+    #[test]
+    fn file_and_env_override() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(&path, "chain = [\"google\"]\ntimeout_ms = 1234\n").unwrap();
+        let s = Settings::load(Some(path)).unwrap();
+        assert_eq!(s.chain(), vec!["google".to_string()]);
+        assert_eq!(s.timeout_ms, Some(1234));
+    }
+
+    #[test]
+    fn unknown_key_is_a_config_error() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(&path, "bogus = 1\n").unwrap();
+        let err = Settings::load(Some(path)).unwrap_err();
+        assert_eq!(err.code(), "CONFIG_ERROR");
+    }
+
+    #[test]
+    fn missing_file_falls_back_to_defaults() {
+        let s = Settings::load(Some(PathBuf::from("/nope/none.toml"))).unwrap_or_default();
+        assert!(!s.chain().is_empty());
+    }
+}
