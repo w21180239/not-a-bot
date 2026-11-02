@@ -262,7 +262,7 @@ struct Ctx {
     registry: Arc<Registry>,
 }
 
-fn build_registry(creds: &CredentialStore, settings: &Settings) -> Registry {
+pub fn build_registry(creds: &CredentialStore, settings: &Settings) -> Registry {
     use crate::providers::*;
     let mut reg = Registry::new();
 
