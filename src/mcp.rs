@@ -17,6 +17,9 @@ pub async fn serve() -> Result<()> {
             continue;
         }
 
+        // Strip BOM if present
+        let trimmed = trimmed.trim_start_matches('\u{FEFF}');
+
         if let Ok(req) = serde_json::from_str::<Value>(trimmed) {
             let method = req.get("method").and_then(|m| m.as_str()).unwrap_or("");
             let id = req.get("id").cloned();
