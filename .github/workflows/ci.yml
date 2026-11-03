@@ -89,6 +89,29 @@ jobs:
 
       - run: node --check npm/bin/translatex.js
 
+      - name: Check the platform manifests are wired together
+        working-directory: npm
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const path = require("node:path");
+            const main = require("./package.json");
+            const names = [];
+            for (const dir of fs.readdirSync("platforms")) {
+              const pkg = JSON.parse(fs.readFileSync(path.join("platforms", dir, "package.json"), "utf8"));
+              names.push(pkg.name);
+              const pinned = main.optionalDependencies[pkg.name];
+              if (!pinned) throw new Error(`${pkg.name} is missing from optionalDependencies`);
+              if (pinned !== pkg.version) {
+                throw new Error(`${pkg.name} is pinned to ${pinned}, its manifest says ${pkg.version}`);
+              }
+            }
+            for (const dep of Object.keys(main.optionalDependencies)) {
+              if (!names.includes(dep)) throw new Error(`${dep} has no platform directory`);
+            }
+            console.log(`ok: ${names.length} platform packages match the shim manifest`);
+          '
+
       - name: Pack the shim
         working-directory: npm
         run: npm pack --dry-run
