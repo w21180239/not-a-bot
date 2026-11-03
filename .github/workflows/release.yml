@@ -67,6 +67,9 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
+    env:
+      # Step-level `if` cannot read `secrets`, so hoist it to job env and test that.
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -99,8 +102,9 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
 
       - name: Publish to npm
-        if: ${{ secrets.NPM_TOKEN != '' }}
+        # Skipped until the repository has an NPM_TOKEN secret.
+        if: env.NPM_TOKEN != ''
         working-directory: npm
         run: npm publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
