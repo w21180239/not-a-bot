@@ -29,6 +29,12 @@ GitHub release, and `bin/translatex.js` execs it. Offline installs can set
 | VS Code / Copilot | Workspace MCP server | [`integrations/vscode/`](../../../integrations/vscode/README.md) |
 | Any other MCP client | JSON-RPC over stdio | [`integrations/generic/`](../../../integrations/generic/README.md) |
 
+Verified with the real CLIs: Claude Code 2.1.317 (`claude mcp list` →
+Connected; plugin market install → 1 skill + 1 MCP server), Codex 0.164.0
+(`codex mcp get` → stdio transport) and OpenCode 2.2.5 (`opencode mcp list` →
+connected, five tools). Cursor and VS Code were not installed on the test
+machine, so their configs follow the published schema without a live check.
+
 Skills for harnesses that read `SKILL.md` (Claude Code, OpenCode):
 [`integrations/skill/SKILL.md`](../../../integrations/skill/SKILL.md).
 

@@ -13,6 +13,21 @@ the CLI for scripts.
 | [VS Code / Copilot](vscode/README.md) | Workspace MCP server | `.vscode/mcp.json` |
 | [Anything else](generic/README.md) | JSON-RPC over stdio | — |
 
+## Verified against
+
+Configs were checked with the real CLIs, not only parsed as JSON:
+
+| Harness | Version | Check | Result |
+| --- | --- | --- | --- |
+| Claude Code | 2.1.317 | `claude mcp add --scope user` then `claude mcp list` | `✔ Connected` |
+| Claude Code | 2.1.317 | `claude plugin marketplace add` + `claude plugin install translatex@translatex` | installed; 1 skill, 1 MCP server, ~84 always-on tokens |
+| Codex | 0.164.0 | `codex mcp add` / `list` / `get` | enabled, transport stdio, TOML shape as documented |
+| OpenCode | 2.2.5 | `opencode mcp add` then `opencode mcp list` | `✓ translatex connected`, 5 tools discovered |
+| Cursor, VS Code | — | not installed on this machine | JSON validated; config follows each client's published schema |
+
+The OpenCode entry in the schema is `mcp.servers.<name>`; the flat
+`mcp.<name>` form is still accepted for older configs.
+
 ## Install the binary first
 
 ```bash

@@ -12,14 +12,19 @@ Merge this into `opencode.json`:
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "translatex": {
-      "type": "local",
-      "command": ["translatex", "mcp"],
-      "enabled": true
+    "servers": {
+      "translatex": {
+        "type": "local",
+        "command": ["translatex", "mcp"]
+      }
     }
   }
 }
 ```
+
+That is the shape `opencode mcp add` writes. `opencode mcp list` should then
+show `✓ translatex connected`. Older configs that put the server directly under
+`mcp` (`"mcp": { "translatex": { … } }`) still parse; the schema accepts both.
 
 Restart OpenCode, then ask for a translation. The tools appear as
 `translatex_translate`, `translatex_roundtrip`, `translatex_providers`,
@@ -50,11 +55,12 @@ If you want different provider order or racing per project, put a
 ```json
 {
   "mcp": {
-    "translatex": {
-      "type": "local",
-      "command": ["translatex", "mcp"],
-      "environment": { "TRANSLATEX_CONFIG": "./translatex.toml" },
-      "enabled": true
+    "servers": {
+      "translatex": {
+        "type": "local",
+        "command": ["translatex", "mcp"],
+        "environment": { "TRANSLATEX_CONFIG": "./translatex.toml" }
+      }
     }
   }
 }

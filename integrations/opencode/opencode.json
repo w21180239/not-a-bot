@@ -1,10 +1,11 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "translatex": {
-      "type": "local",
-      "command": ["translatex", "mcp"],
-      "enabled": true
+    "servers": {
+      "translatex": {
+        "type": "local",
+        "command": ["translatex", "mcp"]
+      }
     }
   }
 }

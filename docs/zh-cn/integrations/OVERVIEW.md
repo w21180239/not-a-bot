@@ -25,6 +25,8 @@ npm 包本身只是壳：`postinstall` 从对应 GitHub Release 下载压缩包�
 | VS Code / Copilot | 工作区 MCP 服务 | [`integrations/vscode/`](../../../integrations/vscode/README.md) |
 | 其它 MCP 客户端 | stdio JSON-RPC | [`integrations/generic/`](../../../integrations/generic/README.md) |
 
+已用真实 CLI 验证：Claude Code 2.1.317（`claude mcp list` → Connected；插件市场安装 → 1 个 skill + 1 个 MCP 服务）、Codex 0.164.0（`codex mcp get` → stdio）、OpenCode 2.2.5（`opencode mcp list` → connected，发现 5 个工具）。Cursor 与 VS Code 未安装，其配置按官方 schema 编写，未做实机验证。
+
 读取 `SKILL.md` 的 harness（Claude Code、OpenCode）：[`integrations/skill/SKILL.md`](../../../integrations/skill/SKILL.md)。
 
 ## 用哪个入口
