@@ -323,7 +323,7 @@ Full reference: [docs/en/api/OVERVIEW.md](./docs/en/api/OVERVIEW.md).
 ## Development
 
 ```bash
-cargo test                # 253 tests
+cargo test                # 243 tests
 cargo build --release     # ~5 min with LTO
 cargo clippy --all-targets
 ```

@@ -3,12 +3,12 @@ name = "translatex"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.80"
-description = "Agent-first translation CLI and MCP server. Free web endpoints first, official APIs as fallback, with provider fallback chains, key rotation and structured JSON output."
+description = "Agent-first translation CLI. Free web endpoints first, official APIs as fallback, with provider fallback chains, parallel racing, key rotation and structured JSON output."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/w21180239/translatex"
 homepage = "https://github.com/w21180239/translatex"
 documentation = "https://github.com/w21180239/translatex#readme"
-keywords = ["translation", "cli", "mcp", "agent", "i18n"]
+keywords = ["translation", "cli", "agent", "i18n"]
 categories = ["command-line-utilities", "web-programming", "text-processing"]
 readme = "README.md"
 

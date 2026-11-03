@@ -4,7 +4,6 @@ pub mod core;
 pub mod providers;
 
 pub mod cli;
-pub mod mcp;
 pub mod retry;
 
 pub use core::{

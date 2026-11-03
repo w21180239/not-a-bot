@@ -309,7 +309,7 @@ api_key = "..."
 ## 开发
 
 ```bash
-cargo test                # 253 个测试
+cargo test                # 243 个测试
 cargo build --release     # 开 LTO 约 5 分钟
 cargo clippy --all-targets
 ```

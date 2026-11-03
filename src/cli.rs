@@ -188,10 +188,6 @@ pub enum Command {
     /// Print the tool manifest for agent discovery.
     Manifest,
 
-    /// Run as an MCP server over stdio. Hidden: the integration surface is the CLI.
-    #[command(hide = true)]
-    Mcp,
-
     /// Print or write the default config file template.
     Init {
         /// Write to this path instead of stdout.
@@ -279,7 +275,6 @@ async fn dispatch(cli: &Cli) -> Result<()> {
             );
             Ok(())
         }
-        Command::Mcp => crate::mcp::serve().await,
         other => {
             let ctx = Ctx::build(cli)?;
             match other {

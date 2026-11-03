@@ -1,4 +1,4 @@
-//! Wire types shared by CLI, MCP and providers. Serde shapes are the public contract.
+//! Wire types shared by the CLI and providers. Serde shapes are the public contract.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -95,7 +95,7 @@ pub struct TranslateResponse {
     pub warnings: Vec<String>,
 }
 
-/// Per-hop record emitted with `--verbose` and in MCP logs.
+/// Per-hop record emitted with `--verbose` and in batch logs.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AttemptRecord {
