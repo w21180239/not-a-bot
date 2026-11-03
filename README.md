@@ -2,11 +2,19 @@
 
 # translatex
 
-**Web-first translation for agents.** One static binary that scrapes free translation endpoints first, falls back to official APIs when you have keys, and answers every request with structured JSON.
+**Free translation for your agent — one command, no API key, no signup, no config.**
+
+A single 6 MB binary with 26 translation engines, raced in parallel. JSON out, typed errors in, and one skill file that 24 coding agents can install with a copy.
+
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![Tests](https://img.shields.io/badge/tests-245-brightgreen.svg)](#development)
+[![Providers](https://img.shields.io/badge/providers-26-blueviolet.svg)](#provider-matrix)
+[![Binary](https://img.shields.io/badge/binary-6%20MB-lightgrey.svg)](#install)
+[![Agent-native](https://img.shields.io/badge/agent--native-JSON-purple.svg)](#supported-harnesses)
+
+`translatex translate "Hello world" -t zh`
 
 [English](./README.md) · [简体中文](./README.zh-cn.md) · [Русский](./README.ru.md) · [Docs](./docs/README.md)
-
-`translate "…" -t zh` · `roundtrip "…" --from en` · `translatex manifest --format json`
 
 </div>
 
@@ -14,7 +22,7 @@
 
 ## Contents
 
-- [Why web-first](#why-web-first)
+- [Why translatex](#why-translatex)
 - [Features](#features)
 - [Install](#install)
 - [Quick start](#quick-start)
@@ -28,17 +36,31 @@
 - [Documentation](#documentation)
 - [Development](#development)
 
-## Why web-first
+## Why translatex
 
-A keyed translation API costs money, needs signup, and fails closed when the invoice is late. The public web endpoints behind Google Translate, Bing, iFlytek, Papago, Reverso and friends already answer the same questions for free, at the same quality, without a quota sheet. `translatex` treats those endpoints as the primary path and keeps the paid APIs as the fallback for the cases where they matter: guaranteed uptime, SLA-backed latency, and languages the free endpoints refuse.
+| Why it gets picked | What that means |
+| --- | --- |
+| **Free, not a trial** | 14 public endpoints — Google Translate, Bing/Edge, Papago, Reverso, Sogou and more — need no key, no account and no quota sheet. |
+| **Zero config** | Install and translate. Config files exist for pinning providers and adding keys, not for getting started. |
+| **Fast by construction** | Up to three providers race; the first good answer wins and the rest are cancelled, so a hung endpoint cannot stall the request. |
+| **Agent-native** | JSON or NDJSON on stdout, logs on stderr, exit codes, typed errors with `retryable` and `suggestedAction`, and a `manifest` that lists every operation. |
+| **No MCP server** | The integration is the CLI plus one skill document: no process, no port, no protocol handshake, nothing to keep in sync. |
+| **De-AI prose** | `roundtrip` sends text out through a pivot language and back, so stock machine phrasing cannot survive the trip. |
+| **Grows with your keys** | Add DeepL, Azure, Google Cloud, Baidu, Tencent and four more when you need an SLA; keys rotate and cool down on their own. |
+| **Nothing to host** | One static binary, 6 MB, no runtime, no Docker, no database. Laptop, CI runner or container. |
+| **Code survives** | Regex spans — code, identifiers, URLs, version strings — are masked before translation and restored after; a corrupted restore fails the hop instead of shipping. |
+
+Drop-in for shell scripts, CI pipelines and coding agents. If you were about to sign up for a translation API, start here.
+
+### How the chain works
 
 ```
-request ─▶ priority 1-12  free web endpoints        (no keys, no signup)
+request ─▶ priority 1-12  free public endpoints     (no keys, no signup)
         ─▶ priority 20-27 official APIs             (only if credentials exist)
         ─▶ priority 40-42 LLM providers             (last resort, opt-in)
 ```
 
-Lower priority number means tried earlier. Every hop is recorded, so a failure tells you exactly which engines were consulted and why each one declined.
+Lower number means tried earlier. Every hop is recorded, so a failure names the engines that were consulted and why each one declined.
 
 ## Features
 

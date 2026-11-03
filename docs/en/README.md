@@ -2,7 +2,7 @@
 
 # translatex — Documentation
 
-`translatex` is an agent-first translation CLI. It tries free web endpoints before official APIs, rotates credentials, and answers in structured JSON.
+`translatex` is a free translation CLI for agents: no API key, no signup, no config. It walks 26 providers, rotates credentials, and answers in structured JSON.
 
 ## Start here
 

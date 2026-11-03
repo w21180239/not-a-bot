@@ -2,11 +2,19 @@
 
 # translatex
 
-**面向 Agent 的网页优先翻译工具。** 一个静态二进制：先打免费网页接口，有 Key 时再回退到官方 API，所有请求都以结构化 JSON 返回。
+**给 Agent 的免费翻译：一条命令，不用 API Key，不用注册，不用配置。**
+
+一个 6 MB 的静态二进制，内置 26 个翻译引擎，并发竞速。输出 JSON，错误带类型，24 家编码 Agent 复制一份 skill 就能用。
+
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#许可)
+[![Tests](https://img.shields.io/badge/tests-245-brightgreen.svg)](#开发)
+[![Providers](https://img.shields.io/badge/providers-26-blueviolet.svg)](#provider-一览)
+[![Binary](https://img.shields.io/badge/binary-6%20MB-lightgrey.svg)](#安装)
+[![Agent-native](https://img.shields.io/badge/agent--native-JSON-purple.svg)](#支持的-harness)
+
+`translatex translate "Hello world" -t zh`
 
 [English](./README.md) · [简体中文](./README.zh-cn.md) · [Русский](./README.ru.md) · [文档](./docs/README.md)
-
-`translate "…" -t zh` · `roundtrip "…" --from en` · `translatex manifest --format json`
 
 </div>
 
@@ -14,7 +22,7 @@
 
 ## 目录
 
-- [为什么网页优先](#为什么网页优先)
+- [为什么选 translatex](#为什么选-translatex)
 - [能力](#能力)
 - [安装](#安装)
 - [快速开始](#快速开始)
@@ -28,17 +36,31 @@
 - [文档](#文档)
 - [开发](#开发)
 
-## 为什么网页优先
+## 为什么选 translatex
 
-官方翻译 API 要付费、要注册，账单晚一天就整体不可用。而 Google 翻译、必应、讯飞、Papago、Reverso 背后的公开网页接口，本来就在免费回答同样的问题，质量相同，也没有配额表。`translatex` 把这些接口当主路径，把付费 API 当兜底：需要 SLA 时、需要免费接口不支持的语言时，才轮到它们。
+| 为什么会被选 | 意味着什么 |
+| --- | --- |
+| **免费，不是试用** | 14 个公开接口 —— Google 翻译、必应/Edge、Papago、Reverso、搜狗等，无需 Key、无需账号、没有配额表。 |
+| **零配置** | 装完就能翻。配置文件是用来固定 Provider、加 Key 的，不是启动门槛。 |
+| **天生快** | 最多三个 Provider 同时竞速，先答者胜出，其余取消；慢接口拖不住请求。 |
+| **Agent 原生** | stdout 出 JSON/NDJSON，日志走 stderr，退出码可分支，错误带 `retryable` 与 `suggestedAction`，`manifest` 列出全部操作。 |
+| **不走 MCP** | 接入就是 CLI 加一份 skill 文档：没有进程、没有端口、没有协议握手，也没有要同步的配置。 |
+| **去 AI 味** | `roundtrip` 经中转语言翻出再翻回，套话在往返里活不下来。 |
+| **Key 越多越稳** | 需要 SLA 时接 DeepL、Azure、Google Cloud、百度、腾讯等 9 家官方 API；Key 自动轮换、自动冷却。 |
+| **不用部署** | 一个 6 MB 静态二进制，无运行时、无 Docker、无数据库。笔记本、CI、容器都能跑。 |
+| **代码原样保留** | 代码、标识符、URL、版本号按正则打码再还原；还原失败直接判定该跳失败。 |
+
+脚本、CI、编码 Agent 都能直接用。本来准备去注册一个翻译 API 的话，从这里开始。
+
+### 链路怎么排
 
 ```
-请求 ─▶ 优先级 1-12   免费网页接口      （无 Key、无需注册）
-     ─▶ 优先级 20-27  官方 API         （仅在已配置凭据时）
-     ─▶ 优先级 40-42  LLM             （最后手段，需显式配置）
+请求 ─▶ 优先级 1-12   免费公开接口      （无 Key、无需注册）
+     ─▶ 优先级 20-27  官方 API          （仅在已配置凭据时）
+     ─▶ 优先级 40-42  LLM              （最后手段，需显式配置）
 ```
 
-数字越小越先尝试。每一跳都会记录，失败时能直接看出查询过哪些引擎、各自为什么拒绝。
+数字越小越先试。每一跳都有记录，失败时能看出查过哪些引擎、各自为什么退场。
 
 ## 能力
 

@@ -3,12 +3,12 @@ name = "translatex"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.80"
-description = "Agent-first translation CLI. Free web endpoints first, official APIs as fallback, with provider fallback chains, parallel racing, key rotation and structured JSON output."
+description = "Free translation CLI for AI agents: no API key, no signup, no config. 26 providers raced in parallel, structured JSON, key rotation, de-AI rewriting."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/w21180239/translatex"
 homepage = "https://github.com/w21180239/translatex"
 documentation = "https://github.com/w21180239/translatex#readme"
-keywords = ["translation", "cli", "agent", "i18n"]
+keywords = ["translation", "cli", "agent", "i18n", "free"]
 categories = ["command-line-utilities", "web-programming", "text-processing"]
 readme = "README.md"
 

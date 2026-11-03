@@ -2,7 +2,7 @@
 
 # translatex — 文档
 
-`translatex` 是面向 Agent 的翻译 CLI：先走免费网页接口，有凭据时回退到官方 API，密钥自动轮换，输出结构化 JSON。
+`translatex` 是面向 Agent 的免费翻译 CLI：不用 API Key、不用注册、不用配置。走 26 个 Provider，自动轮换凭据，输出结构化 JSON。
 
 ## 从这里开始
 

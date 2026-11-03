@@ -1,8 +1,11 @@
-# translatex (npm)
+# translatex
 
-Installs the `translatex` binary and exposes it on `PATH`. The package itself
-is a shim; the download happens once at install time from the matching GitHub
-release.
+**Free translation for your agent — no API key, no signup, no config.**
+
+`npm install -g translatex` puts a 6 MB static binary on `PATH`. 26 translation
+providers raced in parallel, structured JSON out, one skill file for 24 coding
+agents. The package itself is a shim: the binary is downloaded once from the
+matching GitHub release.
 
 ```bash
 npm install -g translatex

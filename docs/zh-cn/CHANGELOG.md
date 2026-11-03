@@ -7,7 +7,7 @@
 ### 新增
 
 - 中英文完整文档树：概览、安装、CLI、Provider、API、环境变量、架构、故障排查、往返翻译、集成。
-- 根 README 按“网页优先”架构重写，覆盖中、英、俄三种语言。
+- 根 README 覆盖中、英、俄三种语言，首屏按收益与读者会搜的词来写，Provider 链路放到后面解释。
 - 两套测试：`tests/contract`（线格式与 Provider 目录不变量）、`tests/integration`（对 mock 服务器的 Provider 往返）。合计 245 个。
 - Provider 并发竞速：`race_width`（默认 3）让最多三个尝试同时在飞，第一个成功者胜出，失败的空位由链中下一个补上。`--race N` 与 `race_width = 1` 恢复严格串行。
 - `translatex roundtrip`（别名 `polish`）：经中转语言翻出再翻回，去掉机器味。默认中转为非中文用中文、中文用英文，经实测选定；`roundtrip_pivot`（配置）、`TRANSLATEX_ROUNDTRIP_PIVOT` 与 `--pivot` 可覆盖。
