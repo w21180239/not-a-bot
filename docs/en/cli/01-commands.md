@@ -28,6 +28,33 @@ Semantics worth knowing:
 - `--preserve` runs before the chain. A restore failure counts as a failed attempt and moves to the next provider.
 - `--from auto` requires the provider to support detection. Providers with `autoDetect: false` are skipped; pinning one returns `AUTO_DETECT_UNSUPPORTED`.
 
+## `roundtrip`
+
+```bash
+translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
+translatex polish draft.md --pivot ja
+```
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `TEXT` | stdin | Text to round-trip |
+| `-s, --from` | `auto` | Source language |
+| `--pivot` | `auto` | Bridge language |
+| `-p, --provider` | `auto` | Pin one provider for both hops |
+| `--fallback` | empty | Providers tried after the pinned one |
+| `--preserve` | empty | Regex spans kept verbatim |
+| `--timeout-ms` | config | Per-hop budget |
+| `--request-id` | generated | Correlation id |
+| `--json` | — | Full `RoundtripRequest`; replaces the other flags |
+
+The result is always in the source language. `pivot: auto` uses Chinese for
+non-Chinese input and English for Chinese input; `--pivot ja` is the documented
+alternative for technical English. See
+[roundtrip/01-pivot-choice.md](../roundtrip/01-pivot-choice.md).
+
+A pivot equal to the source language is replaced with the other half of the
+pair, so `--from en --pivot en` becomes `en -> zh -> en` instead of a no-op.
+
 ## `batch`
 
 ```bash

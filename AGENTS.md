@@ -12,6 +12,7 @@ An agent should never parse human-oriented output or guess a retry strategy. Rea
 
 ```bash
 translatex translate "Hello world" -t zh --format json
+translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
 translatex batch --file jobs.ndjson --parallel 4
 translatex providers --format json
 translatex languages --provider google --format json
@@ -82,6 +83,7 @@ translatex mcp
 | Tool | Input | Output |
 | --- | --- | --- |
 | `translate` | `TranslateRequest` | `TranslateResponse` |
+| `roundtrip` | `RoundtripRequest` | `RoundtripResponse` |
 | `providers` | `{}` | `{providers: ProviderInfo[]}` |
 | `languages` | `{provider?: string}` | `{provider, languages: string[]}` |
 | `health` | `{}` | `{healthy, providers: HealthRecord[]}` |
@@ -131,6 +133,8 @@ translatex health --format json
 
 `reverso` is registered but excluded from the automatic chain: its endpoint rejects this client's TLS fingerprint, so an automatic request would always pay for a failed attempt. Pin it with `--provider reverso`, list it in `--fallback`, or name it in `chain` to try it anyway.
 
+Up to `race_width` providers (default 3) run concurrently: the first success wins and the rest are cancelled. A pinned provider always runs alone. Set `race_width = 1` (config) or `--race 1` for strict sequencing.
+
 ## Credential resolution
 
 Later wins:
@@ -163,14 +167,27 @@ Full list: `translatex languages --format json`.
 
 `preserve` takes Rust `regex` patterns. Matched spans are masked before translation and restored afterwards. A provider that drops or duplicates a token fails the attempt and the chain moves on — that is deliberate, so corrupted output never reaches the caller.
 
+## Round trips
+
+`roundtrip` translates out through a pivot language and back. Use it when the
+user wants prose that reads less like a model wrote it. The result is in the
+source language and the response carries `pivotLang` and `pivotText`.
+
+- Default pivot: Chinese for non-Chinese input, English for Chinese input.
+- `--pivot ja` rewrites as strongly and keeps more grammar; use it for technical English.
+- Never round-trip legal text, API reference, configuration or anything whose numbers and names must survive: the second hop paraphrases.
+- Two provider calls minimum, three when Chinese input was guessed as the pivot.
+
 ## Installation
 
 ```bash
+npm install -g translatex
 cargo install translatex
 # or: https://github.com/w21180239/translatex/releases/latest
 ```
 
-Single binary, no runtime dependencies.
+Single binary, no runtime dependencies. Per-harness MCP and skill setup:
+[`integrations/`](./integrations/README.md).
 
 ## Testing an integration
 

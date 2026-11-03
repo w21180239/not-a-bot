@@ -6,9 +6,12 @@
 
 ### 新增
 
-- 中英文完整文档树：概览、安装、CLI、Provider、API、MCP、环境变量、架构、故障排查。
+- 中英文完整文档树：概览、安装、CLI、Provider、API、MCP、环境变量、架构、故障排查、往返翻译、集成。
 - 根 README 按“网页优先”架构重写，覆盖中、英、俄三种语言。
-- 三套测试：`tests/contract`（线格式与 Provider 目录不变量）、`tests/integration`（对 mock 服务器的 Provider 往返）、`tests/mcp`（对真实二进制的 stdio JSON-RPC）。合计 243 个。
+- 三套测试：`tests/contract`（线格式与 Provider 目录不变量）、`tests/integration`（对 mock 服务器的 Provider 往返）、`tests/mcp`（对真实二进制的 stdio JSON-RPC）。合计 253 个。
+- Provider 并发竞速：`race_width`（默认 3）让这么多次尝试同时在飞，第一个成功者胜出，失败的槽位从链里补人。`--race N` 与 `race_width = 1` 恢复严格串行。
+- `translatex roundtrip`（别名 `polish`）及对应的 MCP 工具：经中转语言翻出再翻回，去掉机器味。默认中转为非中文用中文、中文用英文，经实测选定；`roundtrip_pivot` 与 `--pivot` 可覆盖。
+- npm 包（`npm install -g translatex`）按平台下载预编译二进制、覆盖五个目标的 tag 发布流水线，以及 Claude Code（插件与 MCP）、OpenCode、Codex、Cursor、VS Code 和通用 MCP 客户端的接入文档。
 
 ### 调整
 

@@ -1,0 +1,13 @@
+{
+  "name": "translatex",
+  "owner": {
+    "name": "w21180239"
+  },
+  "plugins": [
+    {
+      "name": "translatex",
+      "source": "./integrations/claude-code/plugin",
+      "description": "Translate text and rewrite machine-flavoured prose through a pivot language, using translation providers over MCP."
+    }
+  ]
+}

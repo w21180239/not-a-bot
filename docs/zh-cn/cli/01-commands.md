@@ -28,6 +28,29 @@ echo "Hello" | translatex translate -t ja
 - `--preserve` 在链之前执行。还原失败记为一次失败尝试，继续下一个 Provider。
 - `--from auto` 要求 Provider 支持检测。`autoDetect: false` 的 Provider 会被跳过；强行指定则返回 `AUTO_DETECT_UNSUPPORTED`。
 
+## `roundtrip`
+
+```bash
+translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
+translatex polish draft.md --pivot ja
+```
+
+| 参数 | 默认 | 说明 |
+| --- | --- | --- |
+| `TEXT` | stdin | 待往返的文本 |
+| `-s, --from` | `auto` | 源语言 |
+| `--pivot` | `auto` | 中转语言 |
+| `-p, --provider` | `auto` | 两跳都用指定 Provider |
+| `--fallback` | 空 | 指定 Provider 之后尝试的列表 |
+| `--preserve` | 空 | 需要原样保留的正则 |
+| `--timeout-ms` | 配置值 | 每跳预算 |
+| `--request-id` | 自动生成 | 关联 id |
+| `--json` | — | 完整 `RoundtripRequest`，覆盖其它参数 |
+
+结果永远回到源语言。`pivot: auto` 对非中文用中文、对中文用英文；技术类英文的官方备选是 `--pivot ja`，见 [roundtrip/01-pivot-choice.md](../roundtrip/01-pivot-choice.md)。
+
+中转语言等于源语言时会自动换成另一侧，因此 `--from en --pivot en` 实际是 `en -> zh -> en`，不会变成空操作。
+
 ## `batch`
 
 ```bash

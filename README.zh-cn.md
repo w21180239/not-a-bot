@@ -23,18 +23,20 @@
 | 能力 | 说明 |
 | --- | --- |
 | **26 个 Provider** | 14 个免费网页接口、9 个官方 API、3 个 LLM。LibreTranslate 通过 `base_url` 按需启用。 |
-| **回退链** | 按优先级排序；`--fallback` 的顺序原样保留；指定 provider 后仍会降级到 fallback。 |
+| **回退链** | 按优先级排序；默认最多三个 Provider 同时在飞，慢接口拖不住后面健康的通道。`--fallback` 顺序原样保留。 |
+| **往返改写** | `roundtrip` 经中转语言翻出再翻回，逼出改写，去掉机器味。中转语言经实测选定：非中文用 `zh`，中文用 `en`。 |
 | **密钥轮换** | 单 Provider 多密钥轮询，冷却状态跨进程共享于 `~/.config/translatex/cache/`。 |
 | **结构化输出** | stdout 只输出 JSON / NDJSON，日志走 stderr，退出码可直接分支。 |
 | **保护片段** | 正则匹配的代码、变量、URL 在翻译前打码，翻译后还原；还原失败会触发回退。 |
-| **MCP 服务** | `translatex mcp` 通过 stdio 暴露 `translate`、`providers`、`languages`、`health`。 |
+| **MCP 服务** | `translatex mcp` 通过 stdio 暴露 `translate`、`roundtrip`、`providers`、`languages`、`health`。 |
 | **真实超时** | 请求里的 `timeoutMs`（或配置里的 `timeout_ms`）限制整个 Provider 调用，不只是一次读。 |
 | **诚实的错误** | 每个失败都带 `code`、`retryable`、`retryAfterSecs`、`suggestedAction`。 |
 
 ## 安装
 
 ```bash
-cargo install translatex                 # Rust 1.80+ 的任意平台
+npm install -g translatex                 # 按平台下载预编译二进制
+cargo install translatex                 # 或源码构建，Rust 1.80+
 # 或直接取预编译二进制
 # https://github.com/w21180239/translatex/releases/latest
 ```
@@ -66,6 +68,9 @@ translatex batch --file examples/batch.ndjson --parallel 4
 
 # 不做翻译的代码片段
 translatex translate 'Run `make test` before pushing.' -t zh --preserve '`[^`]*`'
+
+# 去机器味：经中文翻出再翻回英文
+translatex roundtrip "In today's fast-paced landscape, it's important to note that …" --from en
 ```
 
 成功响应：
@@ -115,9 +120,36 @@ MCP 服务读取与 CLI 相同的 `config.toml` 和 `credentials.toml`，CLI 配
 | 工具 | 入参 | 返回 |
 | --- | --- | --- |
 | `translate` | `TranslateRequest` | `TranslateResponse` |
+| `roundtrip` | `RoundtripRequest` | `RoundtripResponse` |
 | `providers` | `{}` | `{providers: ProviderInfo[]}` |
 | `languages` | `{provider?: string}` | `{provider, languages: string[]}` |
 | `health` | `{}` | `{healthy, providers: HealthRecord[]}` |
+
+各 harness 的接入（Claude Code 插件、OpenCode、Codex、Cursor、VS Code）：[integrations/](./integrations/README.md)。
+
+## 往返改写：去 AI 味
+
+翻到一个语法结构完全不同的语言，再翻回来，原文措辞无法照搬，只能重建 —— 机器味就是在这个过程中被洗掉的。一条命令，不用提示词：
+
+```bash
+translatex roundtrip "Our comprehensive solution leverages cutting-edge technology to empower teams." --from en --format json
+```
+
+```json
+{
+  "text": "Our integrated solutions use cutting-edge technology to give teams more power.",
+  "detectedSource": "en",
+  "pivotLang": "zh",
+  "pivotText": "我们综合的解决方案利用尖端技术来增强团队的能力。",
+  "provider": "google",
+  "providers": ["google", "edge"],
+  "latencyMs": 612,
+  "requestId": "…",
+  "chars": 82
+}
+```
+
+默认中转：非中文用中文，中文用英文。这个组合是实测出来的 —— 德语、法语、西班牙语往返后几乎原样返回；日文改写强度与中文相当；俄文改写最多但漂移也最大。技术类英文要保精确时用 `--pivot ja`；合同、API 文档、带数字且无法核对的内容不要用。方法与数据见 [docs/zh-cn/roundtrip/01-pivot-choice.md](./docs/zh-cn/roundtrip/01-pivot-choice.md)。
 
 ## Provider 一览
 
@@ -191,6 +223,7 @@ chain = ["edge", "google", "iciba", "deepl", "openai"]
 default_target = "zh"
 timeout_ms = 20000
 retries = 1
+race_width = 3
 log = "warn"
 
 [provider.libretranslate]
@@ -223,6 +256,7 @@ api_key = "..."
 | 命令 | 用途 |
 | --- | --- |
 | `translate [TEXT]` | 单条翻译；省略文本时读 stdin |
+| `roundtrip [TEXT]` | 经中转语言往返，去掉机器味 |
 | `batch` | NDJSON 进、NDJSON 出，顺序保持不变 |
 | `providers` | 各 Provider 的能力与配置状态 |
 | `languages` | 规范语言码，或某个 Provider 声明的集合 |
@@ -234,7 +268,7 @@ api_key = "..."
 | `init` | 写出配置模板 |
 | `completions SHELL` | Bash/zsh/fish/PowerShell 补全 |
 
-全局参数：`--format json|text`、`--quiet`、`--verbose`、`--config`、`--credentials`、`--log`。
+全局参数：`--format json|text`、`--quiet`、`--verbose`、`--race N`、`--config`、`--credentials`、`--log`。
 
 退出码：`0` 成功、`1` 请求错误、`2` 配置错误、`3` 链耗尽、`4` 网络错误。
 
@@ -263,12 +297,14 @@ api_key = "..."
 | --- | --- |
 | English | [docs/en/OVERVIEW.md](./docs/en/OVERVIEW.md) |
 | 简体中文 | [docs/zh-cn/OVERVIEW.md](./docs/zh-cn/OVERVIEW.md) |
+| 往返改写与选型 | [docs/zh-cn/roundtrip/OVERVIEW.md](./docs/zh-cn/roundtrip/OVERVIEW.md) |
+| Harness 接入 | [integrations/README.md](./integrations/README.md) |
 | Agent 集成 | [AGENTS.md](./AGENTS.md) |
 
 ## 开发
 
 ```bash
-cargo test                # 243 个：217 单元、11 契约、8 集成、7 MCP
+cargo test                # 253 个：226 单元、11 契约、8 集成、8 MCP
 cargo build --release     # 开 LTO 约 5 分钟
 cargo clippy --all-targets
 ```

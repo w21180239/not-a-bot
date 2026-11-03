@@ -61,6 +61,17 @@ impl Server {
                     "annotations": { "readOnlyHint": true, "idempotentHint": true }
                 },
                 {
+                    "name": "roundtrip",
+                    "description": "Translate through a pivot language and back into the source language. The double hop rewrites the phrasing, which removes machine-flavoured cadence without changing the meaning.",
+                    "inputSchema": serde_json::to_value(schemars::schema_for!(
+                        crate::core::types::RoundtripRequest
+                    )).unwrap_or_else(|_| json!({ "type": "object" })),
+                    "outputSchema": serde_json::to_value(schemars::schema_for!(
+                        crate::core::types::RoundtripResponse
+                    )).unwrap_or_else(|_| json!({ "type": "object" })),
+                    "annotations": { "readOnlyHint": true, "idempotentHint": true }
+                },
+                {
                     "name": "providers",
                     "description": "List translation providers with kind, priority, language support and whether credentials are configured.",
                     "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
@@ -98,6 +109,12 @@ impl Server {
                 let req: TranslateRequest = serde_json::from_value(args)
                     .map_err(|e| Error::InvalidInput(format!("arguments: {e}")))?;
                 let out = self.engine.translate(&req).await?;
+                Ok(serde_json::to_value(&out.response).unwrap_or(Value::Null))
+            }
+            "roundtrip" => {
+                let req: crate::core::types::RoundtripRequest = serde_json::from_value(args)
+                    .map_err(|e| Error::InvalidInput(format!("arguments: {e}")))?;
+                let out = self.engine.roundtrip(&req).await?;
                 Ok(serde_json::to_value(&out.response).unwrap_or(Value::Null))
             }
             "providers" => Ok(json!({ "providers": self.registry.describe() })),
@@ -292,7 +309,7 @@ mod tests {
     fn tool_catalogue_is_spec_shaped() {
         let doc = Server::tools();
         let tools = doc["tools"].as_array().expect("tools array");
-        assert_eq!(tools.len(), 4);
+        assert_eq!(tools.len(), 5);
         for tool in tools {
             assert!(tool.get("name").and_then(|n| n.as_str()).is_some());
             let schema = tool.get("inputSchema").expect("inputSchema");

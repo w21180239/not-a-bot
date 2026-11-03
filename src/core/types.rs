@@ -31,6 +31,54 @@ fn default_auto() -> String {
     "auto".into()
 }
 
+/// Round trip through a pivot language: source -> pivot -> source. The second
+/// hop is what strips machine-flavoured phrasing, because the pivot forces the
+/// text through a different syntax instead of paraphrasing in place.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RoundtripRequest {
+    pub text: String,
+    #[serde(default = "default_auto")]
+    pub source_lang: String,
+    /// Bridge language. `auto` uses the recommended pair for the source
+    /// (English for Chinese, Chinese for everything else).
+    #[serde(default = "default_auto")]
+    pub pivot: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fallback_chain: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub preserve: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idempotency_key: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub metadata: BTreeMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RoundtripResponse {
+    /// Final text, back in the detected source language.
+    pub text: String,
+    pub detected_source: String,
+    pub pivot_lang: String,
+    /// The intermediate translation, kept so a caller can audit the hop.
+    pub pivot_text: String,
+    /// Provider that served the final hop.
+    pub provider: String,
+    /// One entry per hop, in order.
+    pub providers: Vec<String>,
+    pub latency_ms: u64,
+    pub request_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chars: Option<usize>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TranslateResponse {

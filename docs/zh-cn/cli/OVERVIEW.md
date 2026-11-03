@@ -9,6 +9,7 @@ stdout 只承载机器可读输出；日志、警告、进度都走 stderr，所
 | 命令 | 作用 | 详情 |
 | --- | --- | --- |
 | `translate` | 单条翻译，参数或 stdin | [01-commands.md](01-commands.md) |
+| `roundtrip` | 经中转语言往返，去掉机器味 | [01-commands.md](01-commands.md) |
 | `batch` | NDJSON 进、NDJSON 出 | [01-commands.md](01-commands.md) |
 | `providers` | 能力与配置状态 | [01-commands.md](01-commands.md) |
 | `languages` | 规范语言码或单个 Provider 的集合 | [01-commands.md](01-commands.md) |
@@ -27,6 +28,7 @@ stdout 只承载机器可读输出；日志、警告、进度都走 stderr，所
 | `--format json\|text` | JSON 对象（默认）或纯译文 |
 | `--quiet` | 输出紧凑单行 JSON |
 | `--verbose` | 结果中附带逐跳尝试轨迹 |
+| `--race N` | `auto` 下同时保持的 Provider 数（默认 3，`1` 为串行） |
 | `--config PATH` | 指定配置路径（环境变量 `TRANSLATEX_CONFIG`） |
 | `--credentials PATH` | 指定凭据路径（环境变量 `TRANSLATEX_CREDENTIALS`） |
 | `--log LEVEL` | stderr 日志级别：`error`、`warn`、`info`、`debug` |

@@ -44,6 +44,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub verbose: bool,
 
+    /// Provider attempts to keep in flight for `auto` (1 = strictly sequential).
+    #[arg(long, global = true, value_name = "N")]
+    pub race: Option<usize>,
+
     /// Override the config file path.
     #[arg(long, global = true, env = "TRANSLATEX_CONFIG")]
     pub config: Option<String>,
@@ -98,6 +102,45 @@ pub enum Command {
         timeout_ms: Option<u64>,
 
         /// Caller-supplied id; echoed back and used to key cooldowns.
+        #[arg(long)]
+        request_id: Option<String>,
+
+        /// Full request as a JSON object; replaces the other flags.
+        #[arg(long)]
+        json: Option<String>,
+    },
+
+    /// Translate out through a pivot language and back, to strip machine-flavoured phrasing.
+    #[command(alias = "polish")]
+    Roundtrip {
+        /// Text to round-trip. Omit to read stdin.
+        text: Option<String>,
+
+        /// Source language code, or auto.
+        #[arg(short = 's', long, default_value = "auto")]
+        from: String,
+
+        /// Bridge language, or auto for the recommended pair.
+        #[arg(long, default_value = "auto")]
+        pivot: String,
+
+        /// Provider name, or auto to walk the fallback chain.
+        #[arg(short, long, default_value = "auto")]
+        provider: String,
+
+        /// Comma-separated provider list to try before the default chain.
+        #[arg(long, value_delimiter = ',')]
+        fallback: Vec<String>,
+
+        /// Regex for spans that must not be translated. Repeatable.
+        #[arg(long)]
+        preserve: Vec<String>,
+
+        /// Per-hop timeout in milliseconds.
+        #[arg(long)]
+        timeout_ms: Option<u64>,
+
+        /// Caller-supplied id; echoed back.
         #[arg(long)]
         request_id: Option<String>,
 
@@ -240,6 +283,7 @@ async fn dispatch(cli: &Cli) -> Result<()> {
             let ctx = Ctx::build(cli)?;
             match other {
                 Command::Translate { .. } => cmd_translate(cli, &ctx).await,
+                Command::Roundtrip { .. } => cmd_roundtrip(cli, &ctx).await,
                 Command::Batch { .. } => cmd_batch(cli, &ctx).await,
                 Command::Providers => cmd_providers(cli, &ctx),
                 Command::Languages { provider } => cmd_languages(cli, &ctx, provider),
@@ -338,7 +382,10 @@ fn build_keyed(reg: &mut Registry, creds: &CredentialStore, settings: &Settings)
 
 impl Ctx {
     fn build(cli: &Cli) -> Result<Self> {
-        let settings = Settings::load(cli.config.as_ref().map(std::path::PathBuf::from))?;
+        let mut settings = Settings::load(cli.config.as_ref().map(std::path::PathBuf::from))?;
+        if let Some(width) = cli.race {
+            settings.race_width = Some(width);
+        }
         let creds = CredentialStore::load(
             cli.credentials.as_ref().map(std::path::PathBuf::from),
         )?;
@@ -424,6 +471,57 @@ fn normalize_provider(name: &str) -> Option<String> {
         "" | "auto" => None,
         other => Some(other.to_string()),
     }
+}
+
+async fn cmd_roundtrip(cli: &Cli, ctx: &Ctx) -> Result<()> {
+    use crate::core::types::RoundtripRequest;
+
+    let Command::Roundtrip {
+        text,
+        from,
+        pivot,
+        provider,
+        fallback,
+        preserve,
+        timeout_ms,
+        request_id,
+        json,
+    } = &cli.command
+    else {
+        unreachable!()
+    };
+
+    let req: RoundtripRequest = match json {
+        Some(raw) => serde_json::from_str(raw)
+            .map_err(|e| Error::InvalidInput(format!("--json: {e}")))?,
+        None => RoundtripRequest {
+            text: text.clone().map(Ok).unwrap_or_else(read_stdin_text)?,
+            source_lang: from.clone(),
+            pivot: pivot.clone(),
+            provider: normalize_provider(provider),
+            fallback_chain: fallback.clone(),
+            preserve: preserve.clone(),
+            timeout_ms: *timeout_ms,
+            idempotency_key: request_id.clone(),
+            metadata: Default::default(),
+        },
+    };
+
+    let out = ctx.engine.roundtrip(&req).await?;
+    if cli.format == Format::Text {
+        println!("{}", out.response.text);
+        return Ok(());
+    }
+    let mut root = serde_json::to_value(&out.response).unwrap_or_default();
+    if cli.verbose {
+        if let Some(obj) = root.as_object_mut() {
+            obj.insert(
+                "attempts".into(),
+                serde_json::to_value(&out.attempts).unwrap_or_default(),
+            );
+        }
+    }
+    emit_json(cli, &root)
 }
 
 fn render_success(cli: &Cli, out: &crate::core::engine::Outcome) -> serde_json::Value {
@@ -710,6 +808,16 @@ pub fn schema_document() -> Result<serde_json::Value> {
             serde_json::to_value(schema_for!(crate::core::types::AttemptRecord))
                 .map_err(|e| Error::Internal(e.to_string()))?,
         ),
+        (
+            "RoundtripRequest",
+            serde_json::to_value(schema_for!(crate::core::types::RoundtripRequest))
+                .map_err(|e| Error::Internal(e.to_string()))?,
+        ),
+        (
+            "RoundtripResponse",
+            serde_json::to_value(schema_for!(crate::core::types::RoundtripResponse))
+                .map_err(|e| Error::Internal(e.to_string()))?,
+        ),
     ] {
         defs.insert(name.to_string(), value);
     }
@@ -740,12 +848,18 @@ fn schema_types() -> &'static [&'static str] {
         "ProviderInfo",
         "HealthRecord",
         "AttemptRecord",
+        "RoundtripRequest",
+        "RoundtripResponse",
     ]
 }
 
 pub fn manifest_document() -> Result<serde_json::Value> {
     let translate_schema = serde_json::to_value(schemars::schema_for!(TranslateRequest))
         .map_err(|e| Error::Internal(e.to_string()))?;
+    let roundtrip_schema = serde_json::to_value(schemars::schema_for!(
+        crate::core::types::RoundtripRequest
+    ))
+    .map_err(|e| Error::Internal(e.to_string()))?;
     Ok(serde_json::json!({
         "name": "translatex",
         "version": crate::core::types::VERSION,
@@ -757,6 +871,12 @@ pub fn manifest_document() -> Result<serde_json::Value> {
                 "name": "translate",
                 "description": "Translate text between languages. Falls back across providers and rotates API keys automatically.",
                 "inputSchema": translate_schema,
+                "annotations": { "readOnlyHint": true, "idempotentHint": true }
+            },
+            {
+                "name": "roundtrip",
+                "description": "Translate through a pivot language and back into the source language, which rewrites the phrasing and strips machine-flavoured cadence.",
+                "inputSchema": roundtrip_schema,
                 "annotations": { "readOnlyHint": true, "idempotentHint": true }
             },
             {

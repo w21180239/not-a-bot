@@ -13,7 +13,8 @@ pub use core::{
 pub use error::{Error, Result};
 pub use providers::{Provider, Registry};
 pub use types::{
-    AttemptRecord, HealthRecord, ProviderInfo, ProviderKind, TranslateRequest, TranslateResponse,
+    AttemptRecord, HealthRecord, ProviderInfo, ProviderKind, RoundtripRequest, RoundtripResponse,
+    TranslateRequest, TranslateResponse,
 };
 
 pub use core::{Settings, DEFAULT_AUTO_CHAIN};

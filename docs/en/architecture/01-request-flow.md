@@ -7,9 +7,26 @@
 1. **Normalise** — `source_lang` and `target_lang` go through `lang::normalize`. Unknown targets are `INVALID_INPUT`; equal source and target is also rejected.
 2. **Mask** — every `preserve` pattern is compiled once. Matches are replaced with opaque placeholders before any provider sees the text.
 3. **Build the chain** — `Registry::chain` applies the fallback list, the configured chain, then the remaining registry entries by priority. Providers that cannot serve the pair, or cannot detect the source, are dropped.
-4. **Attempt** — for each provider, the engine picks a credential, applies the budget, calls `translate_once`, records an `AttemptRecord`.
+4. **Attempt** — providers run in a sliding window of `race_width` (default 3). Each one picks a credential, applies the budget, calls `translate_once` and records an `AttemptRecord`; the first success wins and the remaining attempts are cancelled.
 5. **Restore** — on success, the preserver puts the masked spans back. A restore failure is treated as a failed attempt.
 6. **Return** — `Outcome { response, attempts }`, or the most specific error the chain produced.
+
+## Concurrency
+
+`race_width` (default 3) is how many providers may be in flight at once. With
+`1` the chain is strictly sequential; with `3` the first three start together,
+the first success wins, and the rest are dropped without an attempt record.
+
+A pinned provider always runs alone — `--provider deepl --fallback google` must
+not return Google while DeepL was about to answer.
+
+The window refills as providers fail, so a chain whose first three providers are
+broken still reaches the fourth immediately instead of waiting out three
+timeouts in sequence.
+
+The trade-off is up to `race_width` upstream calls per request, and the losing
+calls may still be counted by the provider. Set `race_width = 1` for the frugal
+behaviour; the response is unchanged either way.
 
 ## Timeouts
 

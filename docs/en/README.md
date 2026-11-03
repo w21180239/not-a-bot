@@ -22,6 +22,8 @@
 | [install/](install/OVERVIEW.md) | Cargo, prebuilt binaries, first request, shell completion |
 | [cli/](cli/OVERVIEW.md) | Commands, flags, exit codes, config and credential files |
 | [providers/](providers/OVERVIEW.md) | Provider catalogue, priority scheme, fallback semantics, adding a provider |
+| [roundtrip/](roundtrip/OVERVIEW.md) | De-AI rewriting via a pivot language; measured pivot choice |
+| [integrations/](integrations/OVERVIEW.md) | npm, release archives, per-harness MCP and skill setup |
 | [api/](api/OVERVIEW.md) | JSON and NDJSON shapes, error taxonomy, agent decision rules |
 | [mcp/](mcp/OVERVIEW.md) | stdio transport, tool schemas, client configuration |
 | [env/](env/OVERVIEW.md) | Environment variables and their precedence |

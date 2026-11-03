@@ -11,13 +11,15 @@ use translatex::core::types::{ProviderKind, TranslateRequest, TranslateResponse}
 use translatex::providers::KNOWN_PROVIDERS;
 use translatex::{Error, Registry};
 
-const WIRE_TYPES: [&str; 6] = [
+const WIRE_TYPES: [&str; 8] = [
     "TranslateRequest",
     "TranslateResponse",
     "ErrorResponse",
     "ProviderInfo",
     "HealthRecord",
     "AttemptRecord",
+    "RoundtripRequest",
+    "RoundtripResponse",
 ];
 
 fn default_registry() -> Registry {
@@ -243,7 +245,7 @@ fn manifest_and_mcp_advertise_the_same_tools() {
     assert_eq!(manifest_names, mcp_names);
     assert_eq!(
         manifest_names,
-        vec!["health", "languages", "providers", "translate"]
+        vec!["health", "languages", "providers", "roundtrip", "translate"]
     );
 
     for tool in manifest["tools"].as_array().expect("tools array") {

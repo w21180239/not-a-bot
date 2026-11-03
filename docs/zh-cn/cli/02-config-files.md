@@ -21,6 +21,8 @@ chain = ["edge", "google", "iciba", "deepl", "openai"]
 default_target = "zh"
 timeout_ms = 20000     # 单次 Provider 调用的整体预算
 retries = 1            # 可重试错误的额外尝试次数（超时不重试）
+race_width = 3         # 同时在飞的 Provider 数；1 为严格串行
+roundtrip_pivot = "zh" # `translatex roundtrip` 的默认中转语言
 concurrency = 4        # 预留：批次并发
 log = "warn"
 
@@ -40,6 +42,8 @@ region = "eastasia"
 - 开启了 `deny_unknown_fields`。拼错字段会直接得到 `CONFIG_ERROR`，不会被静默忽略。
 - `chain` 中的 Provider 按书写顺序排到最前；其余已注册的按优先级升序追加，因此网页接口仍然排在官方 API 之前。
 - `timeout_ms`、`retries` 是请求默认值；请求里的 `timeoutMs` 覆盖超时。
+- `race_width` 控制同时在飞的 Provider 数；`1` 恢复严格串行。`--race` 参数覆盖单次调用。
+- 请求里写 `"pivot": "auto"` 时，`roundtrip_pivot` 就是默认中转语言。
 - `[provider.<name>]` 只接受 `base_url`、`model`、`region`、`instance`、`tier`，其他键同样会被拒绝。
 
 ## `credentials.toml`

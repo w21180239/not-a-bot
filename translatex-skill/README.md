@@ -5,6 +5,7 @@ An agent skill for the `translatex` CLI and MCP server: web-first translation wi
 ## Install
 
 ```bash
+npm install -g translatex
 cargo install translatex
 # or: https://github.com/w21180239/translatex/releases/latest
 
@@ -26,6 +27,7 @@ translatex providers --format text
 translatex translate "Hello world" -t zh --format json
 translatex translate "Deploy failed" -t ja --provider deepl --fallback google,edge
 translatex translate 'Run `make test` first.' -t zh --preserve '`[^`]*`'
+translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
 translatex batch --file jobs.ndjson --parallel 4
 translatex providers --format json
 translatex health --format json
@@ -54,7 +56,7 @@ Client configuration:
 
 The server loads the same `config.toml` and `credentials.toml` as the CLI and builds its engine once at startup. Restart it after adding a key.
 
-Tools: `translate`, `providers`, `languages`, `health`. Results carry `content` (one text block) and `structuredContent` (the same JSON); failures set `isError: true`.
+Tools: `translate`, `roundtrip`, `providers`, `languages`, `health`. Results carry `content` (one text block) and `structuredContent` (the same JSON); failures set `isError: true`.
 
 ## Tool schemas
 
@@ -89,6 +91,42 @@ Output:
   "chars": 33
 }
 ```
+
+### `roundtrip`
+
+Input:
+
+```json
+{
+  "text": "string",
+  "sourceLang": "string (default: auto)",
+  "pivot": "string (default: auto = zh for non-Chinese, en for Chinese)",
+  "provider": "string (omit to walk the chain)",
+  "fallbackChain": ["string"],
+  "preserve": ["regex"],
+  "timeoutMs": 20000,
+  "idempotencyKey": "string"
+}
+```
+
+Output:
+
+```json
+{
+  "text": "rewritten text, back in the source language",
+  "detectedSource": "en",
+  "pivotLang": "zh",
+  "pivotText": "intermediate translation",
+  "provider": "edge",
+  "providers": ["edge", "edge"],
+  "latencyMs": 612,
+  "requestId": "uuid",
+  "chars": 82
+}
+```
+
+Two provider calls, three for Chinese input under `pivot: "auto"`. Use it for
+prose, not for text whose numbers or exact wording must survive.
 
 ### `providers`
 
@@ -156,7 +194,7 @@ Act on `suggestedAction`:
 
 ## Provider order
 
-Free web endpoints (priorities 1-12) are always available; official APIs (20-27) only when credentials exist; LLM (40-42) last. Inspect the live set with `translatex providers --format json`.
+Free web endpoints (priorities 1-12) are always available; official APIs (20-27) only when credentials exist; LLM (40-42) last. Up to three providers run concurrently by default and the first success wins; `--race 1` restores the sequential walk. Inspect the live set with `translatex providers --format json`.
 
 ## License
 

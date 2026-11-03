@@ -34,6 +34,39 @@
 
 失败时置 `isError`，`error` 载荷遵循[错误契约](../api/02-errors.md)。
 
+## `roundtrip`
+
+入参是 `RoundtripRequest`：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `text` | string | 是 | 空文本返回 `INVALID_INPUT` |
+| `sourceLang` | string | 否 | 默认 `auto` |
+| `pivot` | string | 否 | 中转语言；`auto` 使用推荐语言对 |
+| `provider` | string | 否 | 两跳都用指定 Provider |
+| `fallbackChain` | string[] | 否 | 指定 Provider 之后尝试 |
+| `preserve` | string[] | 否 | 原样保留的正则片段 |
+| `timeoutMs` | integer | 否 | 每跳预算 |
+| `idempotencyKey` | string | 否 | 作为 `requestId` 回显 |
+
+返回 `RoundtripResponse`：
+
+```json
+{
+  "text": "…",
+  "detectedSource": "en",
+  "pivotLang": "zh",
+  "pivotText": "…",
+  "provider": "google",
+  "providers": ["google", "edge"],
+  "latencyMs": 612,
+  "requestId": "…",
+  "chars": 126
+}
+```
+
+两次 Provider 调用；中文输入在 `pivot: "auto"` 下偶尔三次。适合"读起来像机器写的"正文，不要用于数字、人名或措辞必须原样保留的文本。详见 [roundtrip/OVERVIEW.md](../roundtrip/OVERVIEW.md)。
+
 ## `providers`
 
 无参数。返回与 `translatex providers --format json` 相同的目录，仅限本机已注册的 Provider。

@@ -1,0 +1,43 @@
+{
+  "name": "translatex",
+  "version": "0.1.0",
+  "description": "Agent-first translation CLI and MCP server: free web endpoints first, official APIs as fallback, key rotation, parallel provider racing and round-trip de-AI rewriting.",
+  "license": "MIT OR Apache-2.0",
+  "author": "w21180239",
+  "homepage": "https://github.com/w21180239/translatex",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/w21180239/translatex.git"
+  },
+  "bugs": {
+    "url": "https://github.com/w21180239/translatex/issues"
+  },
+  "keywords": [
+    "translation",
+    "translate",
+    "cli",
+    "mcp",
+    "mcp-server",
+    "agent",
+    "llm",
+    "i18n",
+    "humanize"
+  ],
+  "bin": {
+    "translatex": "bin/translatex.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "files": [
+    "bin/translatex.js",
+    "scripts/install.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -9,6 +9,7 @@ stdout carries machine-readable output only. Logs, warnings, and progress go to 
 | Command | Scope | Detail |
 | --- | --- | --- |
 | `translate` | One request, text argument or stdin | [01-commands.md](01-commands.md) |
+| `roundtrip` | Out through a pivot language and back; strips machine cadence | [01-commands.md](01-commands.md) |
 | `batch` | NDJSON in, NDJSON out | [01-commands.md](01-commands.md) |
 | `providers` | Capability and configuration state | [01-commands.md](01-commands.md) |
 | `languages` | Canonical codes or one provider's set | [01-commands.md](01-commands.md) |
@@ -27,6 +28,7 @@ stdout carries machine-readable output only. Logs, warnings, and progress go to 
 | `--format json\|text` | JSON object (default) or bare translation |
 | `--quiet` | Compact single-line JSON instead of pretty output |
 | `--verbose` | Include the per-attempt trail in the result |
+| `--race N` | Providers kept in flight for `auto` (default 3, `1` = sequential) |
 | `--config PATH` | Override the config path (env `TRANSLATEX_CONFIG`) |
 | `--credentials PATH` | Override the credentials path (env `TRANSLATEX_CREDENTIALS`) |
 | `--log LEVEL` | stderr log level: `error`, `warn`, `info`, `debug` |

@@ -23,7 +23,8 @@
 | Возможность | Что даёт |
 | --- | --- |
 | **26 провайдеров** | 14 бесплатных веб-эндпоинтов, 9 официальных API, 3 LLM. LibreTranslate включается через `base_url`. |
-| **Цепочка резерва** | Сортировка по приоритету; порядок `--fallback` сохраняется; закреплённый провайдер всё равно уходит в fallback. |
+| **Цепочка резерва** | Сортировка по приоритету; до трёх провайдеров одновременно, поэтому зависший эндпоинт не скрывает здоровые. Порядок `--fallback` сохраняется. |
+| **Обратный перевод** | `roundtrip` переводит через промежуточный язык и обратно, переписывая машинную речь. Промежуточный язык выбран замерами. |
 | **Ротация ключей** | Несколько ключей на провайдера, round-robin, состояние cooldown общее для процессов в `~/.config/translatex/cache/`. |
 | **Структурированный вывод** | JSON/NDJSON в stdout, логи в stderr, коды возврата для ветвления в агенте. |
 | **Защита фрагментов** | Код, переменные и URL маскируются до перевода и восстанавливаются после; сбой восстановления запускает fallback. |
@@ -34,7 +35,8 @@
 ## Установка
 
 ```bash
-cargo install translatex                 # Rust 1.80+
+npm install -g translatex                 # готовый бинарник для платформы
+cargo install translatex                 # или сборка из исходников, Rust 1.80+
 # или готовый бинарник:
 # https://github.com/w21180239/translatex/releases/latest
 ```
@@ -110,6 +112,7 @@ translatex translate 'Run `make test` before pushing.' -t zh --preserve '`[^`]*`
 | Инструмент | Вход | Выход |
 | --- | --- | --- |
 | `translate` | `TranslateRequest` | `TranslateResponse` |
+| `roundtrip` | `RoundtripRequest` | `RoundtripResponse` |
 | `providers` | `{}` | `{providers: ProviderInfo[]}` |
 | `languages` | `{provider?: string}` | `{provider, languages: string[]}` |
 | `health` | `{}` | `{healthy, providers: HealthRecord[]}` |
@@ -188,6 +191,7 @@ api_key = "..."
 | Команда | Назначение |
 | --- | --- |
 | `translate [TEXT]` | Один запрос, при отсутствии текста читает stdin |
+| `roundtrip [TEXT]` | Перевод через промежуточный язык и обратно |
 | `batch` | NDJSON на входе и выходе, порядок сохраняется |
 | `providers` | Возможности и состояние конфигурации |
 | `languages` | Языковые коды |

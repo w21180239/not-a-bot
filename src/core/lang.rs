@@ -124,6 +124,33 @@ pub fn name_of(code: &str) -> Option<&'static str> {
     LANGUAGES.iter().find(|(c, _)| *c == code).map(|(_, n)| *n)
 }
 
+/// Chinese covers Simplified, Traditional and Cantonese; all three share the
+/// property that matters here, a syntax far from English.
+pub fn is_chinese(code: &str) -> bool {
+    matches!(code, "zh" | "zh-TW" | "yue")
+}
+
+/// Recommended bridge language for a round trip. Chinese input goes out through
+/// English; everything else goes out through Chinese, which rewrites word order
+/// and drops the filler that makes model output read like model output.
+pub fn default_pivot(source: &str) -> &'static str {
+    if is_chinese(source) {
+        "en"
+    } else {
+        "zh"
+    }
+}
+
+/// The other half of the recommended pair, used when the first pivot turns out
+/// to be the source language.
+pub fn alternate_pivot(pivot: &str) -> &'static str {
+    if is_chinese(pivot) {
+        "en"
+    } else {
+        "zh"
+    }
+}
+
 /// Per-provider override table builder: `map(&[("zh","zh-CN"), ...])`.
 pub fn map(entries: &[(&'static str, &'static str)]) -> HashMap<&'static str, &'static str> {
     entries.iter().copied().collect()

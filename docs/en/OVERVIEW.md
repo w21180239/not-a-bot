@@ -8,6 +8,8 @@
 
 - Translates text through 26 providers: 14 free web endpoints, 9 official APIs, 3 LLM providers.
 - Rotates API keys and cools failing ones down across processes.
+- Keeps up to three providers in flight, so a hung endpoint cannot hide the healthy ones.
+- Round-trips text through a pivot language to strip machine-flavoured phrasing.
 - Emits JSON, NDJSON, or bare text on stdout; diagnostics go to stderr.
 - Masks regex-defined spans before translation and restores them afterwards.
 - Serves the same engine over MCP stdio for agent clients.

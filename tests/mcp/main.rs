@@ -115,7 +115,10 @@ fn tools_list_is_spec_shaped() {
         .map(|t| t["name"].as_str().expect("name"))
         .collect();
     names.sort_unstable();
-    assert_eq!(names, vec!["health", "languages", "providers", "translate"]);
+    assert_eq!(
+        names,
+        vec!["health", "languages", "providers", "roundtrip", "translate"]
+    );
 
     for tool in tools {
         let schema = tool
@@ -164,6 +167,25 @@ fn translate_tool_rejects_empty_text_with_a_typed_error() {
         result["structuredContent"]["error"]["suggestedAction"],
         "fix_input"
     );
+}
+
+#[test]
+fn roundtrip_tool_rejects_an_unknown_pivot() {
+    let replies = exchange(&[
+        initialize(1),
+        rpc(
+            2,
+            "tools/call",
+            serde_json::json!({
+                "name": "roundtrip",
+                "arguments": { "text": "hello", "pivot": "klingon" }
+            }),
+        ),
+    ]);
+
+    let result = &by_id(&replies, 2)["result"];
+    assert_eq!(result["isError"], true);
+    assert_eq!(result["structuredContent"]["error"]["code"], "INVALID_INPUT");
 }
 
 #[test]

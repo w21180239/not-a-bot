@@ -21,6 +21,8 @@ chain = ["edge", "google", "iciba", "deepl", "openai"]
 default_target = "zh"
 timeout_ms = 20000     # whole-call budget per provider attempt
 retries = 1            # extra attempts for retryable errors (not timeouts)
+race_width = 3         # providers in flight at once; 1 is strictly sequential
+roundtrip_pivot = "zh" # default bridge language for `translatex roundtrip`
 concurrency = 4        # reserved for batch sizing
 log = "warn"
 
@@ -40,6 +42,8 @@ Rules:
 - `deny_unknown_fields` is on. A typo is a `CONFIG_ERROR`, not a silently ignored line.
 - Providers named in `chain` move to the front in exactly that order. Anything else registered is appended by ascending priority, so web endpoints still run before keyed APIs.
 - `timeout_ms` and `retries` set request defaults; `timeoutMs` in a request overrides the timeout.
+- `race_width` sets how many providers may be in flight; `1` restores the strict sequential walk. The `--race` flag overrides it for one invocation.
+- `roundtrip_pivot` is the default bridge for `roundtrip` when the request says `"pivot": "auto"`.
 - `[provider.<name>]` accepts `base_url`, `model`, `region`, `instance`, `tier`. Unknown keys there are rejected too.
 
 ## `credentials.toml`

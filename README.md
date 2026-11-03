@@ -23,18 +23,20 @@ Lower priority number means tried earlier. Every hop is recorded, so a failure t
 | Capability | What you get |
 | --- | --- |
 | **26 providers** | 14 free web endpoints, 9 official APIs, 3 LLM providers. LibreTranslate is opt-in via `base_url`. |
-| **Fallback chain** | Ordered by priority; explicit `--fallback` order is preserved, and a pinned provider still degrades to its fallback list. |
+| **Fallback chain** | Ordered by priority; up to three providers in flight at once, so a hung endpoint cannot hide the healthy ones behind it. Explicit `--fallback` order is preserved. |
+| **Round trip** | `roundtrip` translates out through a pivot language and back, which rewrites machine-flavoured prose. Pivot measured, defaults to zh for non-Chinese and en for Chinese. |
 | **Key rotation** | Several credentials per provider, round-robin, with cooldowns shared across processes through `~/.config/translatex/cache/`. |
 | **Structured output** | JSON or NDJSON on stdout, logs on stderr, exit codes an agent can branch on. |
 | **Preserve patterns** | Regex spans (code, variables, URLs) are masked before translation and restored after; a corrupted restore triggers fallback. |
-| **MCP server** | `translatex mcp` speaks MCP over stdio with `translate`, `providers`, `languages`, `health`. |
+| **MCP server** | `translatex mcp` speaks MCP over stdio with `translate`, `roundtrip`, `providers`, `languages`, `health`. |
 | **Timeouts that hold** | `timeoutMs` from the request (or `timeout_ms` in config) caps the whole provider call, not just the socket read. |
 | **Honest errors** | `code`, `retryable`, `retryAfterSecs`, `suggestedAction` on every failure. |
 
 ## Install
 
 ```bash
-cargo install translatex                 # any platform with Rust 1.80+
+npm install -g translatex                 # prebuilt binary for this platform
+cargo install translatex                 # or build from source, Rust 1.80+
 # or grab a prebuilt binary
 # https://github.com/w21180239/translatex/releases/latest
 ```
@@ -66,6 +68,9 @@ translatex batch --file examples/batch.ndjson --parallel 4
 
 # Keep code spans intact
 translatex translate 'Run `make test` before pushing.' -t zh --preserve '`[^`]*`'
+
+# Strip the machine cadence: out through Chinese, back to English
+translatex roundtrip "In today's fast-paced landscape, it's important to note that …" --from en
 ```
 
 Successful response:
@@ -115,9 +120,44 @@ The server loads the same `config.toml` and `credentials.toml` as the CLI, so ke
 | Tool | Input | Returns |
 | --- | --- | --- |
 | `translate` | `TranslateRequest` | `TranslateResponse` |
+| `roundtrip` | `RoundtripRequest` | `RoundtripResponse` |
 | `providers` | `{}` | `{providers: ProviderInfo[]}` |
 | `languages` | `{provider?: string}` | `{provider, languages: string[]}` |
 | `health` | `{}` | `{healthy, providers: HealthRecord[]}` |
+
+Per-harness setup (Claude Code plugin, OpenCode, Codex, Cursor, VS Code):
+[integrations/](./integrations/README.md).
+
+## Round trip: de-AI prose
+
+Translating out through a language with different syntax and back forces the text
+to be rebuilt, so the result loses the stock phrasing that makes model output
+recognisable. It is one command, not a prompt:
+
+```bash
+translatex roundtrip "Our comprehensive solution leverages cutting-edge technology to empower teams." --from en --format json
+```
+
+```json
+{
+  "text": "Our integrated solutions use cutting-edge technology to give teams more power.",
+  "detectedSource": "en",
+  "pivotLang": "zh",
+  "pivotText": "我们综合的解决方案利用尖端技术来增强团队的能力。",
+  "provider": "google",
+  "providers": ["google", "edge"],
+  "latencyMs": 612,
+  "requestId": "…",
+  "chars": 82
+}
+```
+
+The default pivot is Chinese for non-Chinese text and English for Chinese text.
+That pair was chosen by measurement: German, French and Spanish round-trip
+almost verbatim, Japanese rewrites as strongly as Chinese, and Russian rewrites
+the most but drifts the most. Use `--pivot ja` for technical English that has to
+stay precise, and never round-trip legal text, API docs or anything with numbers
+you cannot verify. Evidence and method: [docs/en/roundtrip/01-pivot-choice.md](./docs/en/roundtrip/01-pivot-choice.md).
 
 ## Provider matrix
 
@@ -192,6 +232,7 @@ chain = ["edge", "google", "iciba", "deepl", "openai"]
 default_target = "zh"
 timeout_ms = 20000
 retries = 1
+race_width = 3
 log = "warn"
 
 [provider.libretranslate]
@@ -224,6 +265,7 @@ Resolution order: environment (`TRANSLATEX_<PROVIDER>_<FIELD>`) → credentials 
 | Command | Purpose |
 | --- | --- |
 | `translate [TEXT]` | One request; reads stdin when text is omitted |
+| `roundtrip [TEXT]` | Out through a pivot language and back; strips machine cadence |
 | `batch` | NDJSON in, NDJSON out, order preserved |
 | `providers` | Capability and configuration state per provider |
 | `languages` | Canonical codes, or one provider's advertised set |
@@ -235,7 +277,7 @@ Resolution order: environment (`TRANSLATEX_<PROVIDER>_<FIELD>`) → credentials 
 | `init` | Write a config template |
 | `completions SHELL` | Bash/zsh/fish/PowerShell completion |
 
-Global flags: `--format json|text`, `--quiet`, `--verbose`, `--config`, `--credentials`, `--log`.
+Global flags: `--format json|text`, `--quiet`, `--verbose`, `--race N`, `--config`, `--credentials`, `--log`.
 
 Exit codes: `0` success, `1` request error, `2` config error, `3` chain exhausted, `4` network error.
 
@@ -264,12 +306,14 @@ Full reference: [docs/en/api/OVERVIEW.md](./docs/en/api/OVERVIEW.md).
 | --- | --- |
 | English | [docs/en/OVERVIEW.md](./docs/en/OVERVIEW.md) |
 | 简体中文 | [docs/zh-cn/OVERVIEW.md](./docs/zh-cn/OVERVIEW.md) |
+| Round trip and pivot choice | [docs/en/roundtrip/OVERVIEW.md](./docs/en/roundtrip/OVERVIEW.md) |
+| Harness setup | [integrations/README.md](./integrations/README.md) |
 | Agent integration | [AGENTS.md](./AGENTS.md) |
 
 ## Development
 
 ```bash
-cargo test                # 243: 217 unit, 11 contract, 8 integration, 7 MCP
+cargo test                # 253: 226 unit, 11 contract, 8 integration, 8 MCP
 cargo build --release     # ~5 min with LTO
 cargo clippy --all-targets
 ```

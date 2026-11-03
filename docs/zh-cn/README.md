@@ -22,6 +22,8 @@
 | [install/](install/OVERVIEW.md) | Cargo、预编译包、首次请求、命令补全 |
 | [cli/](cli/OVERVIEW.md) | 命令、参数、退出码、配置与凭据文件 |
 | [providers/](providers/OVERVIEW.md) | Provider 目录、优先级方案、回退语义、新增 Provider |
+| [roundtrip/](roundtrip/OVERVIEW.md) | 经中转语言的去 AI 味改写；中转语言实测选型 |
+| [integrations/](integrations/OVERVIEW.md) | npm、发布包、各 harness 的 MCP 与 skill 接入 |
 | [api/](api/OVERVIEW.md) | JSON 与 NDJSON 结构、错误分类、Agent 决策规则 |
 | [mcp/](mcp/OVERVIEW.md) | stdio 传输、工具 schema、客户端配置 |
 | [env/](env/OVERVIEW.md) | 环境变量与优先级 |

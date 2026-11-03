@@ -4,3 +4,9 @@
 Thumbs.db
 .idea/
 .vscode/
+node_modules/
+
+# npm package: the downloaded binary and packed tarballs are build artifacts
+npm/bin/translatex
+npm/bin/translatex.exe
+npm/*.tgz

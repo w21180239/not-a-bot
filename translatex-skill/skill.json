@@ -88,6 +88,41 @@
         }
       }
     },
+    "roundtrip": {
+      "description": "Translate through a pivot language and back into the source language, which rewrites machine-flavoured phrasing",
+      "command": "translatex roundtrip --json '{request}'",
+      "input": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "description": "Text to round-trip" },
+          "sourceLang": { "type": "string", "default": "auto", "description": "Source language or 'auto'" },
+          "pivot": { "type": "string", "default": "auto", "description": "Bridge language; 'auto' uses zh for non-Chinese and en for Chinese" },
+          "provider": { "type": "string", "description": "Pin one provider for both hops" },
+          "fallbackChain": { "type": "array", "items": { "type": "string" } },
+          "preserve": { "type": "array", "items": { "type": "string" } },
+          "timeoutMs": { "type": "integer", "description": "Per-hop budget in milliseconds" },
+          "idempotencyKey": { "type": "string" }
+        },
+        "required": ["text"],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string" },
+          "detectedSource": { "type": "string" },
+          "pivotLang": { "type": "string" },
+          "pivotText": { "type": "string" },
+          "provider": { "type": "string" },
+          "providers": { "type": "array", "items": { "type": "string" } },
+          "latencyMs": { "type": "integer" },
+          "requestId": { "type": "string" },
+          "chars": { "type": "integer" },
+          "warnings": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["text", "detectedSource", "pivotLang", "pivotText", "provider", "providers", "latencyMs", "requestId"]
+      }
+    },
     "health": {
       "description": "Probe every registered provider",
       "command": "translatex health --format json",
@@ -131,6 +166,6 @@
   "mcp": {
     "transport": "stdio",
     "command": ["translatex", "mcp"],
-    "tools": ["translate", "providers", "languages", "health"]
+    "tools": ["translate", "roundtrip", "providers", "languages", "health"]
   }
 }

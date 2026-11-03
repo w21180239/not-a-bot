@@ -34,6 +34,41 @@ Returns `TranslateResponse`:
 
 Failure sets `isError` with an `error` payload that follows [the error contract](../api/02-errors.md).
 
+## `roundtrip`
+
+Input is `RoundtripRequest`:
+
+| Argument | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `text` | string | yes | Empty text is `INVALID_INPUT` |
+| `sourceLang` | string | no | Defaults to `auto` |
+| `pivot` | string | no | Bridge language; `auto` picks the recommended pair |
+| `provider` | string | no | Pin one provider for both hops |
+| `fallbackChain` | string[] | no | Tried after the pinned provider |
+| `preserve` | string[] | no | Regex spans kept verbatim |
+| `timeoutMs` | integer | no | Per-hop budget |
+| `idempotencyKey` | string | no | Echoed back as `requestId` |
+
+Returns `RoundtripResponse`:
+
+```json
+{
+  "text": "…",
+  "detectedSource": "en",
+  "pivotLang": "zh",
+  "pivotText": "…",
+  "provider": "google",
+  "providers": ["google", "edge"],
+  "latencyMs": 612,
+  "requestId": "…",
+  "chars": 126
+}
+```
+
+Two provider calls, sometimes three for Chinese input under `pivot: "auto"`. Use
+it for prose that reads machine-generated; do not use it on text where numbers,
+names or exact wording must survive. See [roundtrip/OVERVIEW.md](../roundtrip/OVERVIEW.md).
+
 ## `providers`
 
 No arguments. Returns the same catalogue as `translatex providers --format json`, filtered to what is registered on this machine.
