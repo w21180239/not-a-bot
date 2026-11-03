@@ -50,9 +50,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # macOS is not here on purpose: the hosted arm64 pool currently fails to
+        # hand out runners, and the job is killed after 15 minutes with zero
+        # steps. macOS compilation and linking still run in release.yml.
         os:
           - ubuntu-latest
-          - macos-latest
           - windows-latest
     steps:
       - uses: actions/checkout@v7
