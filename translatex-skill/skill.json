@@ -1,7 +1,7 @@
 {
   "name": "translatex",
   "version": "0.1.0",
-  "description": "Agent-first translation CLI & MCP server with provider fallback, key rotation, and structured output",
+  "description": "Web-first translation CLI and MCP server: free endpoints first, official APIs as fallback, key rotation, structured JSON output",
   "author": "w21180239",
   "license": "MIT OR Apache-2.0",
   "repository": "https://github.com/w21180239/translatex",
@@ -9,40 +9,43 @@
   "bin": "translatex",
   "commands": {
     "translate": {
-      "description": "Translate text with provider fallback and key rotation",
+      "description": "Translate text, walking the provider fallback chain",
+      "command": "translatex translate --json '{request}'",
       "input": {
         "type": "object",
         "properties": {
-          "text": {"type": "string", "description": "Text to translate"},
-          "target_lang": {"type": "string", "description": "Target language code (ISO 639-1)"},
-          "source_lang": {"type": "string", "default": "auto", "description": "Source language code or 'auto'"},
-          "provider": {"type": "string", "default": "auto", "description": "Specific provider or 'auto' for fallback chain"},
-          "fallback_chain": {"type": "array", "items": {"type": "string"}, "description": "Explicit fallback provider list"},
-          "preserve": {"type": "array", "items": {"type": "string"}, "description": "Regex patterns to preserve untranslated"},
-          "timeout_ms": {"type": "integer", "description": "Request timeout in milliseconds"},
-          "idempotency_key": {"type": "string", "description": "Correlation ID for deduplication"}
+          "text": { "type": "string", "description": "Text to translate" },
+          "targetLang": { "type": "string", "description": "Target language code (ISO 639-1)" },
+          "sourceLang": { "type": "string", "default": "auto", "description": "Source language code or 'auto'" },
+          "provider": { "type": "string", "description": "Pin one provider; omit to walk the chain" },
+          "fallbackChain": { "type": "array", "items": { "type": "string" }, "description": "Providers tried after the pinned one" },
+          "preserve": { "type": "array", "items": { "type": "string" }, "description": "Regex spans kept verbatim" },
+          "timeoutMs": { "type": "integer", "description": "Whole-call budget in milliseconds" },
+          "idempotencyKey": { "type": "string", "description": "Correlation id, echoed as requestId" }
         },
-        "required": ["text", "target_lang"]
+        "required": ["text", "targetLang"],
+        "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
-          "text": {"type": "string"},
-          "detected_source": {"type": "string"},
-          "target_lang": {"type": "string"},
-          "provider": {"type": "string"},
-          "engine": {"type": "string"},
-          "latency_ms": {"type": "integer"},
-          "request_id": {"type": "string"},
-          "chars": {"type": "integer"},
-          "warnings": {"type": "array", "items": {"type": "string"}}
+          "text": { "type": "string" },
+          "detectedSource": { "type": "string" },
+          "targetLang": { "type": "string" },
+          "provider": { "type": "string" },
+          "engine": { "type": "string" },
+          "latencyMs": { "type": "integer" },
+          "requestId": { "type": "string" },
+          "chars": { "type": "integer" },
+          "warnings": { "type": "array", "items": { "type": "string" } }
         },
-        "required": ["text", "detected_source", "target_lang", "provider", "engine", "latency_ms", "request_id", "target_lang", "warnings"]
+        "required": ["text", "detectedSource", "targetLang", "provider", "engine", "latencyMs", "requestId"]
       }
     },
     "providers": {
-      "description": "List all providers with capabilities and credential status",
-      "input": {"type": "object", "properties": {}},
+      "description": "List registered providers with capabilities and credential state",
+      "command": "translatex providers --format json",
+      "input": { "type": "object", "properties": {}, "additionalProperties": false },
       "output": {
         "type": "object",
         "properties": {
@@ -51,15 +54,16 @@
             "items": {
               "type": "object",
               "properties": {
-                "name": {"type": "string"},
-                "display_name": {"type": "string"},
-                "kind": {"type": "string", "enum": ["free", "keyed", "llm"]},
-                "needs_key": {"type": "boolean"},
-                "max_chars": {"type": "integer"},
-                "auto_detect": {"type": "boolean"},
-                "languages": {"type": "array", "items": {"type": "string"}},
-                "free_tier": {"type": "string"},
-                "configured": {"type": "boolean"}
+                "name": { "type": "string" },
+                "displayName": { "type": "string" },
+                "kind": { "type": "string", "enum": ["web", "official", "llm"] },
+                "priority": { "type": "integer", "description": "Lower runs earlier: 1-12 web, 20-27 official, 40+ LLM" },
+                "needsKey": { "type": "boolean" },
+                "maxChars": { "type": "integer" },
+                "autoDetect": { "type": "boolean" },
+                "languages": { "type": "array", "items": { "type": "string" } },
+                "freeTier": { "type": "string" },
+                "configured": { "type": "boolean" }
               }
             }
           }
@@ -67,38 +71,41 @@
       }
     },
     "languages": {
-      "description": "List supported language codes",
+      "description": "List language codes, optionally restricted to one provider",
+      "command": "translatex languages --provider {provider} --format json",
       "input": {
         "type": "object",
         "properties": {
-          "provider": {"type": "string", "description": "Provider name or 'all'"}
-        }
+          "provider": { "type": "string", "default": "all", "description": "Provider name or 'all'" }
+        },
+        "additionalProperties": false
       },
       "output": {
         "type": "object",
         "properties": {
-          "provider": {"type": "string"},
-          "languages": {"type": "array", "items": {"type": "string"}}
+          "provider": { "type": "string" },
+          "languages": { "type": "array", "items": { "type": "string" } }
         }
       }
     },
     "health": {
-      "description": "Probe all configured providers",
-      "input": {"type": "object", "properties": {}},
+      "description": "Probe every registered provider",
+      "command": "translatex health --format json",
+      "input": { "type": "object", "properties": {}, "additionalProperties": false },
       "output": {
         "type": "object",
         "properties": {
-          "healthy": {"type": "boolean"},
+          "healthy": { "type": "boolean" },
           "providers": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "provider": {"type": "string"},
-                "configured": {"type": "boolean"},
-                "healthy": {"type": "boolean"},
-                "latency_ms": {"type": "integer"},
-                "error": {"type": "string"}
+                "provider": { "type": "string" },
+                "configured": { "type": "boolean" },
+                "healthy": { "type": "boolean" },
+                "latencyMs": { "type": "integer" },
+                "error": { "type": "string" }
               }
             }
           }
@@ -106,8 +113,24 @@
       }
     }
   },
+  "errorContract": {
+    "fields": ["code", "message", "retryable", "retryAfterSecs", "suggestedAction"],
+    "retryableCodes": ["RATE_LIMITED", "QUOTA_EXHAUSTED", "NETWORK_ERROR"],
+    "nonRetryableCodes": [
+      "AUTH_FAILED",
+      "AUTO_DETECT_UNSUPPORTED",
+      "LANGUAGE_PAIR_NOT_SUPPORTED",
+      "PROVIDER_NOT_CONFIGURED",
+      "PROVIDER_NOT_FOUND",
+      "INVALID_INPUT",
+      "CHAIN_EXHAUSTED",
+      "CONFIG_ERROR",
+      "TIMEOUT"
+    ]
+  },
   "mcp": {
     "transport": "stdio",
+    "command": ["translatex", "mcp"],
     "tools": ["translate", "providers", "languages", "health"]
   }
 }

@@ -1,186 +1,280 @@
 # translatex
 
-**Agent-first translation CLI & MCP server.** Single binary, zero config, structured JSON/NDJSON output, official APIs only.
+**Web-first translation for agents.** One static binary that scrapes free translation endpoints first, falls back to official APIs when you have keys, and answers every request with structured JSON.
+
+[English](./README.md) · [简体中文](./README.zh-cn.md) · [Русский](./README.ru.md) · [Docs](./docs/README.md)
+
+---
+
+## Why web-first
+
+A keyed translation API costs money, needs signup, and fails closed when the invoice is late. The public web endpoints behind Google Translate, Bing, iFlytek, Papago, Reverso and friends already answer the same questions for free, at the same quality, without a quota sheet. `translatex` treats those endpoints as the primary path and keeps the paid APIs as the fallback for the cases where they matter: guaranteed uptime, SLA-backed latency, and languages the free endpoints refuse.
+
+```
+request ─▶ priority 1-12  free web endpoints        (no keys, no signup)
+        ─▶ priority 20-27 official APIs             (only if credentials exist)
+        ─▶ priority 40-42 LLM providers             (last resort, opt-in)
+```
+
+Lower priority number means tried earlier. Every hop is recorded, so a failure tells you exactly which engines were consulted and why each one declined.
 
 ## Features
 
-- **Provider fallback chain** — walks DeepL → Azure → Google Cloud → Baidu → Tencent → Youdao → Caiyun → Niutrans → LibreTranslate → LLM until one succeeds
-- **Key rotation** — multiple API keys per provider, automatic cooldown on quota/auth/rate-limit errors, shared across processes via cache dir
-- **Structured output** — JSON, NDJSON streaming, or bare text; every error carries `code`, `retryable`, `retry_after_secs`, `suggested_action`
-- **Preserve patterns** — regex spans (code blocks, variables, etc.) are masked before translation and restored afterwards; corruption is detected and triggers fallback
-- **Agent-native** — CLI emits machine-readable output; MCP server exposes `translate`, `providers`, `languages`, `health` tools
-- **Zero-config defaults** — works out of the box with free endpoints; keyed providers auto-detected from `~/.config/translatex/credentials.toml`, environment variables, or OS keyring
+| Capability | What you get |
+| --- | --- |
+| **26 providers** | 14 free web endpoints, 9 official APIs, 3 LLM providers. LibreTranslate is opt-in via `base_url`. |
+| **Fallback chain** | Ordered by priority; explicit `--fallback` order is preserved, and a pinned provider still degrades to its fallback list. |
+| **Key rotation** | Several credentials per provider, round-robin, with cooldowns shared across processes through `~/.config/translatex/cache/`. |
+| **Structured output** | JSON or NDJSON on stdout, logs on stderr, exit codes an agent can branch on. |
+| **Preserve patterns** | Regex spans (code, variables, URLs) are masked before translation and restored after; a corrupted restore triggers fallback. |
+| **MCP server** | `translatex mcp` speaks MCP over stdio with `translate`, `providers`, `languages`, `health`. |
+| **Timeouts that hold** | `timeoutMs` from the request (or `timeout_ms` in config) caps the whole provider call, not just the socket read. |
+| **Honest errors** | `code`, `retryable`, `retryAfterSecs`, `suggestedAction` on every failure. |
 
-## Quick Start
+## Install
 
 ```bash
-# Install (Linux/macOS/Windows via cargo)
-cargo install translatex
-
-# Or download a prebuilt binary from GitHub Releases
+cargo install translatex                 # any platform with Rust 1.80+
+# or grab a prebuilt binary
+# https://github.com/w21180239/translatex/releases/latest
 ```
 
+Verify:
+
 ```bash
-# Translate once (JSON output)
+translatex --version
+translatex providers --format text
+```
+
+## Quick start
+
+```bash
+# Web endpoints only, no configuration at all
 translatex translate "Hello world" -t zh
 
-# NDJSON streaming for batch
-translatex batch --file jobs.ndjson --parallel 4
+# Pin a provider and keep a fallback list
+translatex translate "Deploy failed" -t ja --provider deepl --fallback google,edge
 
-# Explicit provider with fallback chain
-translatex translate "..." -t ja --provider deepl --fallback openai,google
+# Read stdin
+echo "Good morning" | translatex translate -t fr
 
-# Preserve code blocks, variables, etc.
-translatex translate "Run `make test` first." -t zh --preserve '`[^`]*`'
+# Force detection off; pass the source
+translatex translate "Guten Tag" -s de -t en
 
-# MCP server (stdio transport)
-translatex mcp
+# NDJSON batch, four at a time
+translatex batch --file examples/batch.ndjson --parallel 4
+
+# Keep code spans intact
+translatex translate 'Run `make test` before pushing.' -t zh --preserve '`[^`]*`'
 ```
+
+Successful response:
+
+```json
+{
+  "text": "你好，世界",
+  "detectedSource": "en",
+  "targetLang": "zh",
+  "provider": "google",
+  "engine": "google",
+  "latencyMs": 412,
+  "requestId": "c506d3bb-8eb2-451a-9e84-f2be63833f79",
+  "chars": 11
+}
+```
+
+Failures carry a machine-readable reason:
+
+```json
+{
+  "error": {
+    "code": "PROVIDER_NOT_CONFIGURED",
+    "message": "provider deepl is implemented but not configured; add credentials or a base_url",
+    "retryable": false,
+    "suggestedAction": "configure_a_provider"
+  },
+  "requestId": ""
+}
+```
+
+## MCP server
+
+```json
+{
+  "mcpServers": {
+    "translatex": {
+      "command": "translatex",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+The server loads the same `config.toml` and `credentials.toml` as the CLI, so keys configured for the CLI are immediately available to your agent. `tools/call` returns spec-compliant `content` blocks plus `structuredContent`; `isError` is set on failure instead of a broken tool result.
+
+| Tool | Input | Returns |
+| --- | --- | --- |
+| `translate` | `TranslateRequest` | `TranslateResponse` |
+| `providers` | `{}` | `{providers: ProviderInfo[]}` |
+| `languages` | `{provider?: string}` | `{provider, languages: string[]}` |
+| `health` | `{}` | `{healthy, providers: HealthRecord[]}` |
+
+## Provider matrix
+
+Priorities are the numbers the chain sorts by. `chars` is the request limit the adapter enforces before splitting.
+
+### Free web endpoints — primary path
+
+| # | Provider | ID | Auto-detect | Max chars | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Google Translate (web) | `google` | yes | 5 000 | `translate.googleapis.com/translate_a/single`, best effort |
+| 2 | Microsoft Edge Translator | `edge` | yes | 50 000 | `edge.microsoft.com/translate`, no key |
+| 3 | Iciba | `iciba` | yes | 3 000 | AES-ECB signed payload |
+| 4 | iFlytek iFlyrec | `iflyrec` | yes | 2 000 | zh-anchored pairs only |
+| 4 | ModernMT | `modernmt` | yes | 5 000 | md5 verify + timestamp |
+| 5 | Volcengine | `volcengine` | yes | 5 000 | `crx/translate/v1/` |
+| 5 | Lara Translate | `lara` | yes | 500 | daily per-IP credit |
+| 6 | Lingvanex | `lingvanex` | no | 1 000 | `API_BEARER_TOKEN` |
+| 7 | Mirai Translate | `mirai` | yes | 500 | Japanese-anchored pairs only, trial key scraped per call |
+| 8 | Papago (Naver) | `papago` | yes | 1 000 | cookie-primed detect + form POST |
+| 9 | Reverso Context | `reverso` | no | 2 000 | three-letter codes; see status table |
+| 10 | Sogou | `sogou` | yes | 5 000 | md5 sign; per-IP throttle returns `RATE_LIMITED` |
+| 11 | MyMemory | `mymemory` | no | 5 000 | RFC 3066 codes, daily cap |
+| 12 | SysTran | `systran` | no | 5 000 | OAuth client credentials scraped from the bundle |
+| — | LibreTranslate | `libretranslate` | yes | 5 000 | self-hosted only: set `[provider.libretranslate] base_url` |
+
+### Official APIs — fallback when credentials exist
+
+| # | Provider | ID | Credentials |
+| --- | --- | --- | --- |
+| 20 | DeepL | `deepl` | `api_key` |
+| 20 | Baidu | `baidu` | `appid`, `secret_key` |
+| 21 | Google Cloud Translation | `googlecloud` | `api_key` |
+| 22 | Azure Translator | `azure` | `api_key`, `region` |
+| 23 | Alibaba Cloud | `aliyun` | `access_key_id`, `access_key_secret` |
+| 24 | Caiyun | `caiyun` | `token` |
+| 25 | Niutrans | `niutrans` | `apikey` |
+| 26 | Tencent | `tencent` | `secret_id`, `secret_key` |
+| 27 | Youdao | `youdao` | `app_key`, `app_secret` |
+
+### LLM — last resort
+
+| # | Provider | ID | Credentials |
+| --- | --- | --- | --- |
+| 40 | OpenAI | `openai` | `api_key`, optional `base_url`, `model` |
+| 41 | Anthropic | `anthropic` | `api_key`, optional `model` |
+| 42 | DeepSeek | `deepseek` | `api_key`, optional `model` |
+
+## Live channel status
+
+Endpoints drift. This is what a full sweep against the free web endpoints returned on 2026-11-03:
+
+| Status | Providers |
+| --- | --- |
+| Verified end-to-end | `google`, `edge`, `iciba`, `modernmt`, `lara`, `volcengine`, `lingvanex`, `papago`, `sogou`, `mymemory`, `systran` |
+| Restricted pairs | `iflyrec` (zh ↔ any), `mirai` (ja-anchored) |
+| Throttles under load | `sogou` — per-IP limit surfaces as `RATE_LIMITED` with `retryAfterSecs`, never a fake translation |
+| Blocked by fingerprinting | `reverso` — Cloudflare rejects the rustls JA3; works from browsers and Python clients |
+| Opt-in only | `libretranslate` — no public instance is alive; self-host and set `base_url` |
+| Retired upstream | `iflytek` — aliased to `iflyrec` so old configs keep working |
+
+Run `translatex health --format json` on your own network before trusting this table.
 
 ## Configuration
 
-### Credentials (`~/.config/translatex/credentials.toml`)
+`~/.config/translatex/config.toml` (or `--config`, or `TRANSLATEX_CONFIG`):
 
 ```toml
-# DeepL (api_key is required; `:fx` suffix uses free endpoint)
-[deepl]
-api_key = "@keyring"   # reads from OS keyring (macOS Keychain, Windows Credential Manager, libsecret)
-
-# Azure AI Translator (region is optional)
-[azure]
-api_key = "@keyring"
-region = "eastus"
-
-# Google Cloud Translation
-[googlecloud]
-api_key = "@keyring"
-
-# Baidu Fanyi
-[baidu]
-appid = "@keyring"
-secret_key = "@keyring"
-
-# Tencent Cloud MT
-[tencent]
-secret_id = "@keyring"
-secret_key = "@keyring"
-
-# Youdao
-[youdao]
-app_key = "@keyring"
-app_secret = "@keyring"
-
-# Caiyun
-[caiyun]
-token = "@keyring"
-
-# Niutrans
-[niutrans]
-api_key = "@keyring"
-
-# OpenAI-compatible LLM (DeepSeek, Moonshot, SiliconFlow, etc.)
-[openai]
-api_key = "@keyring"
-base_url = "https://api.openai.com/v1"
-model = "gpt-4o-mini"
-```
-
-### Environment variables (override file)
-
-All fields can also be set via `TRANSLATEX_<PROVIDER>_<FIELD>`, e.g.:
-
-```bash
-export TRANSLATEX_DEEPL_API_KEY="your-key:fx"
-export TRANSLATEX_OPENAI_BASE_URL="https://api.deepseek.com/v1"
-```
-
-### Settings (`~/.config/translatex/config.toml`)
-
-```toml
-# Override the default auto chain
-chain = ["deepl", "azure", "googlecloud", "baidu", "libretranslate", "openai"]
+# Replaces the built-in auto chain. Keyed providers are still appended
+# afterwards if credentials exist.
+chain = ["edge", "google", "iciba", "deepl", "openai"]
 
 default_target = "zh"
 timeout_ms = 20000
-retries = 2
+retries = 1
+log = "warn"
+
+[provider.libretranslate]
+base_url = "http://localhost:5000"
 
 [provider.openai]
 base_url = "https://api.openai.com/v1"
 model = "gpt-4o-mini"
 ```
 
-## CLI Reference
+`~/.config/translatex/credentials.toml`:
 
-```
-translatex <COMMAND>
+```toml
+[deepl.default]
+api_key = "..."
 
-COMMANDS:
-    translate       Translate a single text (reads stdin if no argument)
-    batch           Translate many requests from NDJSON file/stdin
-    providers       List providers with capabilities and credential status
-    languages       List supported language codes (optionally per provider)
-    keys            Show key rotation state (cooldowns, failure counts)
-    health          Probe all configured providers
-    schema          Print JSON Schema for request/response types
-    manifest        Print MCP tool manifest
-    mcp             Run as MCP server over stdio
-    init            Print or write default config template
-    completions     Generate shell completions
+[azure.default]
+api_key = "..."
+region = "eastasia"
 
-GLOBAL FLAGS:
-    --format json|text   Output format (default: json)
-    --quiet              Compact single-line JSON
-    --verbose            Include attempt trail in response
-    --config <path>      Override config file
-    --credentials <path> Override credentials file
-    --log <level>        error|warn|info|debug (default: warn)
+# A second key takes over when the first is cooling.
+[deepl.backup]
+api_key = "..."
 ```
 
-## Error Codes
+Resolution order: environment (`TRANSLATEX_<PROVIDER>_<FIELD>`) → credentials file → OS keyring (`@keyring` placeholder) → free endpoints.
 
-| Code | Retryable | Retry After | Suggested Action |
-|------|-----------|-------------|------------------|
-| `QUOTA_EXHAUSTED` | Yes | `retry_after_secs` | `switch_provider_or_upgrade_plan` |
-| `RATE_LIMITED` | Yes | `retry_after_secs` | `backoff_and_retry` |
-| `AUTH_FAILED` | No | - | `refresh_credentials` |
-| `LANGUAGE_PAIR_NOT_SUPPORTED` | No | - | `change_provider_or_language` |
-| `NETWORK_ERROR` | Yes | - | `retry_with_backoff` |
-| `TIMEOUT` | Yes | - | `increase_timeout_and_retry` |
-| `UPSTREAM_ERROR` (5xx) | Yes | - | `retry_later` |
-| `UPSTREAM_ERROR` (4xx) | No | - | `fix_request` |
-| `CHAIN_EXHAUSTED` | No | - | `check_credentials_or_network` |
+## CLI reference
 
-## MCP Integration
+| Command | Purpose |
+| --- | --- |
+| `translate [TEXT]` | One request; reads stdin when text is omitted |
+| `batch` | NDJSON in, NDJSON out, order preserved |
+| `providers` | Capability and configuration state per provider |
+| `languages` | Canonical codes, or one provider's advertised set |
+| `keys [PROVIDER]` | Cooldown and failure state; `--reset` clears it |
+| `health` | Probe every configured provider |
+| `schema` | JSON Schema (draft 2020-12) for all wire types |
+| `manifest` | MCP tool manifest for agent discovery |
+| `mcp` | MCP server over stdio |
+| `init` | Write a config template |
+| `completions SHELL` | Bash/zsh/fish/PowerShell completion |
+
+Global flags: `--format json|text`, `--quiet`, `--verbose`, `--config`, `--credentials`, `--log`.
+
+Exit codes: `0` success, `1` request error, `2` config error, `3` chain exhausted, `4` network error.
+
+## Error contract
+
+| `code` | Retryable | Agent action |
+| --- | --- | --- |
+| `RATE_LIMITED` | yes | Wait `retryAfterSecs`, then retry |
+| `QUOTA_EXHAUSTED` | yes | Rotate key or wait |
+| `NETWORK_ERROR` | yes | Exponential backoff |
+| `UPSTREAM_ERROR` | 5xx only | Retry on 5xx, fix input on 4xx |
+| `TIMEOUT` | yes | Raise `timeoutMs` and retry, or switch provider |
+| `AUTH_FAILED` | no | Refresh credentials |
+| `PROVIDER_NOT_CONFIGURED` | no | Add credentials |
+| `PROVIDER_NOT_FOUND` | no | Fix the provider name |
+| `AUTO_DETECT_UNSUPPORTED` | no | Pass an explicit `sourceLang` |
+| `LANGUAGE_PAIR_NOT_SUPPORTED` | no | Change provider or target |
+| `INVALID_INPUT` | no | Fix the request |
+| `CHAIN_EXHAUSTED` | no | Inspect `--verbose` attempts |
+
+Full reference: [docs/en/api/OVERVIEW.md](./docs/en/api/OVERVIEW.md).
+
+## Documentation
+
+| Language | Entry point |
+| --- | --- |
+| English | [docs/en/OVERVIEW.md](./docs/en/OVERVIEW.md) |
+| 简体中文 | [docs/zh-cn/OVERVIEW.md](./docs/zh-cn/OVERVIEW.md) |
+| Agent integration | [AGENTS.md](./AGENTS.md) |
+
+## Development
 
 ```bash
-# Install as MCP server (once)
-translatex mcp
-# or
-mcp install translatex
+cargo test --lib          # 216 tests
+cargo build --release     # ~5 min with LTO
+cargo clippy --all-targets
 ```
 
-Available tools:
-- `translate` — single translation with full fallback chain
-- `providers` — list providers and their capabilities
-- `languages` — supported language codes
-- `health` — provider health check with latency
-
-## Provider Matrix (2026)
-
-| Provider | Free Tier | Quality | Latency | Streaming | Regions |
-|----------|-----------|---------|---------|-----------|---------|
-| DeepL | 1M chars total (dev) / 500k/mo (free) | ★★★★★ | ~300ms | No | Global |
-| Azure | 2M chars/mo (F0) | ★★★★☆ | ~350ms | No | Global |
-| Google Cloud | 500k chars/mo | ★★★★☆ | ~400ms | No | Global |
-| Baidu | 50k chars/mo | ★★★☆☆ | ~300ms | No | China |
-| Tencent | Varies | ★★★☆☆ | ~300ms | No | China |
-| Youdao | Trial quota | ★★★☆☆ | ~300ms | No | China |
-| Caiyun | 1M chars one-time | ★★★★☆ | ~400ms | No | China |
-| Niutrans | 500k on signup | ★★★☆☆ | ~300ms | No | China |
-| LibreTranslate | Unlimited (self-host) | ★★★☆☆ | ~800ms | No | Self-host |
-| OpenAI-compatible LLM | Pay-as-you-go | ★★★★☆ | ~500ms | Yes | Global |
-
-**Default auto chain:** `deepl > azure > googlecloud > baidu > tencent > youdao > caiyun > niutrans > libretranslate > openai`
+Adding a provider: implement `Provider` in `src/providers/<name>.rs`, set `priority` in the 1-12 range for web endpoints or 20-27 for APIs, register it in `src/cli.rs::build_registry`, and add the name to `KNOWN_PROVIDERS`.
 
 ## License
 

@@ -1,153 +1,162 @@
 # translatex skill
 
-An OpenCode skill for the `translatex` translation CLI and MCP server.
+An agent skill for the `translatex` CLI and MCP server: web-first translation with provider fallback, key rotation, and structured JSON output.
 
-## Installation
+## Install
 
 ```bash
-# Install the CLI
 cargo install translatex
+# or: https://github.com/w21180239/translatex/releases/latest
 
-# Or download from GitHub Releases
-# https://github.com/w21180239/translatex/releases
-
-# Install this skill
+# Link this skill into your agent's skills directory
 mkdir -p ~/.config/opencode/skills
 ln -s /path/to/translatex-skill ~/.config/opencode/skills/translatex
 ```
 
-## Usage
-
-After installation, agents can use `translatex` via the CLI or MCP server.
-
-### CLI Commands
+Verify the binary before relying on it:
 
 ```bash
-# Translate text
+translatex --version
+translatex providers --format text
+```
+
+## CLI
+
+```bash
 translatex translate "Hello world" -t zh --format json
-
-# Batch translation
+translatex translate "Deploy failed" -t ja --provider deepl --fallback google,edge
+translatex translate 'Run `make test` first.' -t zh --preserve '`[^`]*`'
 translatex batch --file jobs.ndjson --parallel 4
-
-# List providers
 translatex providers --format json
-
-# Health check
 translatex health --format json
-
-# MCP server
-translatex mcp
 ```
 
-### MCP Integration
+All wire fields are camelCase. Unknown request fields are rejected, so a typo fails immediately instead of silently using a default.
+
+## MCP
 
 ```bash
-# Run as MCP server (stdio transport)
 translatex mcp
-
-# Or install via mcp CLI
-mcp install translatex
 ```
 
-## Skill Commands
+Client configuration:
 
-This skill provides the following commands to agents:
+```json
+{
+  "mcpServers": {
+    "translatex": {
+      "command": "translatex",
+      "args": ["mcp"]
+    }
+  }
+}
+```
 
-### `translatex:translate`
-Translate text with automatic provider fallback and key rotation.
+The server loads the same `config.toml` and `credentials.toml` as the CLI and builds its engine once at startup. Restart it after adding a key.
 
-**Input:**
+Tools: `translate`, `providers`, `languages`, `health`. Results carry `content` (one text block) and `structuredContent` (the same JSON); failures set `isError: true`.
+
+## Tool schemas
+
+### `translate`
+
+Input:
+
 ```json
 {
   "text": "string",
-  "target_lang": "string (ISO 639-1)",
-  "source_lang": "string (default: auto)",
-  "provider": "string (default: auto)",
-  "fallback_chain": ["string"],
-  "preserve": ["regex patterns"],
-  "timeout_ms": "number",
-  "idempotency_key": "string"
+  "targetLang": "string (ISO 639-1)",
+  "sourceLang": "string (default: auto)",
+  "provider": "string (omit to walk the chain)",
+  "fallbackChain": ["string"],
+  "preserve": ["regex"],
+  "timeoutMs": 20000,
+  "idempotencyKey": "string"
 }
 ```
 
-**Output:**
+Output:
+
 ```json
 {
   "text": "translated text",
-  "detected_source": "language code",
-  "target_lang": "language code",
-  "provider": "provider name",
-  "engine": "engine name",
-  "latency_ms": "number",
-  "request_id": "uuid",
-  "chars": "number",
-  "warnings": ["string"]
+  "detectedSource": "en",
+  "targetLang": "zh",
+  "provider": "google",
+  "engine": "google",
+  "latencyMs": 412,
+  "requestId": "uuid",
+  "chars": 33
 }
 ```
 
-### `translatex:providers`
-List all available providers with their capabilities and configuration status.
+### `providers`
 
-### `translatex:languages`
-List supported language codes, optionally filtered by provider.
+Returns the registered set with `name`, `displayName`, `kind` (`web` | `official` | `llm`), `priority`, `needsKey`, `maxChars`, `autoDetect`, `languages`, `freeTier`, `configured`.
 
-### `translatex:health`
-Check health of all configured providers.
+### `languages`
+
+`{provider?}` → `{provider, languages[]}`. A provider that advertises `*` expands to the canonical list. Unknown ids return `PROVIDER_NOT_FOUND`; unconfigured ones return `PROVIDER_NOT_CONFIGURED`.
+
+### `health`
+
+`{}` → `{healthy, providers[]}` with per-provider `configured`, `healthy`, `latencyMs`, `error`.
 
 ## Configuration
 
-The CLI reads configuration from:
-1. Environment variables `TRANSLATEX_<PROVIDER>_<FIELD>`
-2. `~/.config/translatex/credentials.toml`
-3. OS keyring (`@keyring` placeholder in TOML)
+Resolution order, later wins:
 
-Example `credentials.toml`:
+1. Built-in free endpoints.
+2. `~/.config/translatex/credentials.toml`.
+3. `TRANSLATEX_<PROVIDER>_<FIELD>` environment variables.
+4. OS keyring when a field is `@keyring`.
+
+`credentials.toml` uses `[provider.label]` sections:
+
 ```toml
-[deepl]
+[deepl.default]
 api_key = "@keyring"
 
-[azure]
+[azure.default]
 api_key = "@keyring"
-region = "eastus"
+region = "eastasia"
 
-[googlecloud]
-api_key = "@keyring"
-
-[openai]
+[openai.default]
 api_key = "@keyring"
 base_url = "https://api.openai.com/v1"
 model = "gpt-4o-mini"
 ```
 
-## Error Handling
+The label is the rotation slot: `[deepl.backup]` is used when `default` is cooling.
 
-All errors follow a consistent schema:
+## Errors
 
 ```json
 {
   "code": "RATE_LIMITED",
-  "message": "rate limited by deepl",
+  "message": "rate limited by sogou",
   "retryable": true,
-  "retry_after_secs": 60,
-  "suggested_action": "backoff_and_retry"
+  "retryAfterSecs": 300,
+  "suggestedAction": "backoff_and_retry"
 }
 ```
 
-Agents should use `suggested_action` to decide how to handle errors.
+Act on `suggestedAction`:
 
-## MCP Server
+| Action | Do |
+| --- | --- |
+| `backoff_and_retry` | Sleep `retryAfterSecs`, retry |
+| `retry_with_backoff` | Exponential backoff, retry |
+| `switch_key_or_upgrade_plan` | Rotate credential or wait |
+| `refresh_credentials` | Re-read credentials, retry once |
+| `pass_an_explicit_source` | Set `sourceLang` |
+| `change_provider_or_language` | Change `provider` or `targetLang` |
+| `configure_a_provider` | Add credentials |
+| `fix_input` / `fix_config_file` | Fix and resubmit; do not retry |
 
-The CLI can run as an MCP server over stdio:
+## Provider order
 
-```bash
-translatex mcp
-```
-
-Exposes tools:
-- `translate` - Single translation with full fallback
-- `providers` - List providers and capabilities
-- `languages` - Supported language codes
-- `health` - Provider health check
+Free web endpoints (priorities 1-12) are always available; official APIs (20-27) only when credentials exist; LLM (40-42) last. Inspect the live set with `translatex providers --format json`.
 
 ## License
 

@@ -1,61 +1,57 @@
 # AGENTS.md
 
-This file documents how `translatex` is intended to be used by agents (LLM-powered tools, AI assistants, autonomous scripts).
+How `translatex` is meant to be used by an agent: every interface is machine-readable, every failure is actionable, and every behaviour is deterministic.
 
-## Design Goal
+## Design goal
 
-`translatex` is **agent-first**: every interface is machine-readable, every failure is actionable, every behavior is deterministic. Agents should not need to parse human-oriented output or guess retry strategies.
+An agent should never parse human-oriented output or guess a retry strategy. Read the exit code, then `error.code`, then act.
 
-## Programmatic Interfaces
+## Interfaces
 
-### 1. CLI (stdin/stdout)
+### 1. CLI
 
 ```bash
-# Single request
 translatex translate "Hello world" -t zh --format json
-
-# Batch from NDJSON file
 translatex batch --file jobs.ndjson --parallel 4
-
-# Health check
-translatex health --format json
-
-# List providers
 translatex providers --format json
+translatex languages --provider google --format json
+translatex health --format json
+translatex schema --format json
 ```
 
-**Input (single request):**
+**Request**
 
 ```json
 {
   "text": "Hello world",
-  "source_lang": "auto",
-  "target_lang": "zh",
+  "sourceLang": "auto",
+  "targetLang": "zh",
   "provider": "auto",
-  "fallback_chain": ["deepl", "openai"],
+  "fallbackChain": ["edge", "iciba"],
   "preserve": ["`[^`]*`"],
-  "timeout_ms": 20000,
-  "idempotency_key": "optional-correlation-id"
+  "timeoutMs": 20000,
+  "idempotencyKey": "optional-correlation-id"
 }
 ```
 
-**Output (success):**
+All field names are camelCase. Unknown fields are rejected with `INVALID_INPUT`, so a typo fails loudly.
+
+**Success**
 
 ```json
 {
   "text": "你好世界",
-  "detected_source": "en",
-  "target_lang": "zh",
-  "provider": "deepl",
-  "engine": "deepl",
-  "latency_ms": 245,
-  "request_id": "uuid",
-  "chars": 11,
-  "warnings": []
+  "detectedSource": "en",
+  "targetLang": "zh",
+  "provider": "google",
+  "engine": "google",
+  "latencyMs": 245,
+  "requestId": "uuid",
+  "chars": 11
 }
 ```
 
-**Output (error):**
+**Failure**
 
 ```json
 {
@@ -63,34 +59,36 @@ translatex providers --format json
     "code": "QUOTA_EXHAUSTED",
     "message": "quota exhausted for deepl",
     "retryable": true,
-    "retry_after_secs": 3600,
-    "suggested_action": "switch_provider_or_upgrade_plan"
+    "retryAfterSecs": 3600,
+    "suggestedAction": "switch_key_or_upgrade_plan"
   },
-  "attempts": [
-    {"provider":"deepl","key_label":"default","ok":false,"latency_ms":120,"error_code":"QUOTA_EXHAUSTED"}
-  ],
-  "request_id": "uuid"
+  "requestId": "uuid"
 }
 ```
 
-**Batch NDJSON:** one request per line, same shape. Output is one JSON object per line (same order as input).
+**Batch NDJSON** — one request per line, one result per line, input order preserved:
 
-### 2. MCP Server (stdio transport)
+```json
+{"index":0,"ok":true,"result":{…}}
+{"index":1,"ok":false,"error":{…}}
+```
+
+### 2. MCP server
 
 ```bash
 translatex mcp
 ```
 
-**Tools exposed:**
+| Tool | Input | Output |
+| --- | --- | --- |
+| `translate` | `TranslateRequest` | `TranslateResponse` |
+| `providers` | `{}` | `{providers: ProviderInfo[]}` |
+| `languages` | `{provider?: string}` | `{provider, languages: string[]}` |
+| `health` | `{}` | `{healthy, providers: HealthRecord[]}` |
 
-| Tool | Description | Input Schema | Output Schema |
-|------|-------------|--------------|---------------|
-| `translate` | Single translation with full fallback | `TranslateRequest` | `TranslateResponse` |
-| `providers` | List providers + capabilities | `{}` | `{"providers": ProviderInfo[]}` |
-| `languages` | Supported codes (optional `provider` filter) | `{provider?: string}` | `{provider: string, languages: string[]}` |
-| `health` | Probe configured providers | `{}` | `{healthy: bool, providers: HealthRecord[]}` |
+Results follow the MCP contract: `content` with one text block, plus `structuredContent` carrying the same JSON. Failures set `isError: true` and put the typed error in `structuredContent`. The server reads the same config and credentials as the CLI and builds its engine once at startup — restart it after adding a key.
 
-The MCP manifest is available via `translatex manifest --format json`.
+The manifest is available from `translatex manifest --format json`.
 
 ### 3. JSON Schema
 
@@ -98,110 +96,91 @@ The MCP manifest is available via `translatex manifest --format json`.
 translatex schema --format json
 ```
 
-Generates a complete draft-2020-12 schema with definitions for:
-- `TranslateRequest`
-- `TranslateResponse`
-- `ErrorResponse`
-- `ProviderInfo`
-- `HealthRecord`
-- `AttemptRecord`
+Draft 2020-12 definitions for `TranslateRequest`, `TranslateResponse`, `ErrorResponse`, `ProviderInfo`, `HealthRecord`, `AttemptRecord`.
 
-Use this for agent tool generation, validation, or documentation.
+## Error handling
 
-## Error Handling Contract
+| `code` | Retryable | Agent action |
+| --- | --- | --- |
+| `RATE_LIMITED` | yes | Wait `retryAfterSecs`, retry |
+| `QUOTA_EXHAUSTED` | yes | Rotate credential or wait |
+| `NETWORK_ERROR` | yes | Exponential backoff |
+| `UPSTREAM_ERROR` | 5xx only | Retry on 5xx, fix input on 4xx |
+| `TIMEOUT` | yes | Raise `timeoutMs` and retry, or switch provider |
+| `AUTH_FAILED` | no | Refresh credentials |
+| `AUTO_DETECT_UNSUPPORTED` | no | Pass an explicit `sourceLang` |
+| `LANGUAGE_PAIR_NOT_SUPPORTED` | no | Change provider or target |
+| `PROVIDER_NOT_CONFIGURED` | no | Add credentials |
+| `PROVIDER_NOT_FOUND` | no | Fix the provider name |
+| `INVALID_INPUT` | no | Fix the request |
+| `CHAIN_EXHAUSTED` | no | Read `attempts` from `--verbose` |
+| `CONFIG_ERROR` | no | Fix the TOML file |
 
-Every error response includes:
+Exit codes: `0` success, `1` request error, `2` config error, `3` chain exhausted, `4` network error.
 
-```json
-{
-  "code": "RATE_LIMITED",
-  "message": "rate limited by deepl",
-  "retryable": true,
-  "retry_after_secs": 60,
-  "suggested_action": "backoff_and_retry"
-}
+## Provider order
+
+Free web endpoints occupy priorities 1-12 and are always available. Official APIs occupy 20-27 and are registered only when credentials exist. LLM providers occupy 40-42. Lower is tried first.
+
+Inspect the live set rather than assuming:
+
+```bash
+translatex providers --format json
+translatex health --format json
 ```
 
-**Agent decision rules:**
+## Credential resolution
 
-| `retryable` | `suggested_action` | Agent should |
-|-------------|-------------------|---------------|
-| true | `backoff_and_retry` | Wait `retry_after_secs` (or exponential backoff), retry same request |
-| true | `retry_with_backoff` | Exponential backoff (300ms → 600ms → 1.2s...), retry |
-| true | `retry_later` | Wait at least 60s, retry |
-| false | `switch_provider_or_upgrade_plan` | Try a different provider, or alert billing |
-| false | `refresh_credentials` | Re-read credentials from keyring/env/config |
-| false | `change_provider_or_language` | Change `--provider` or `--to` argument |
-| false | `fix_request` | Fix input (bad language code, empty text, etc.) |
-| false | `check_credentials_or_network` | All providers failed; check network or all credentials |
+Later wins:
 
-## Credential Resolution (agent-transparent)
+1. Built-in free endpoints.
+2. `~/.config/translatex/credentials.toml` (or `--credentials`, `TRANSLATEX_CREDENTIALS`).
+3. `TRANSLATEX_<PROVIDER>_<FIELD>` environment variables.
+4. OS keyring when a field is set to `@keyring`.
 
-Priority (later wins):
+Cooldown state lives in `~/.config/translatex/cache/keys-<provider>.json` and is shared across processes. `translatex keys --reset` clears it.
 
-1. `TRANSLATEX_<PROVIDER>_<FIELD>` environment variables
-2. `~/.config/translatex/credentials.toml` (or `TRANSLATEX_CONFIG`)
-3. OS keyring (`@keyring` placeholder in TOML)
-4. Built-in free endpoints (LibreTranslate, Volcengine web, Google web)
+Credentials never appear in output. Do not pass secrets as command-line flags; use the credentials file, environment variables, or the OS keyring.
 
-**Key rotation:** Multiple credentials per provider are rotated on auth/quota/rate-limit errors. Cooldown state is shared across processes via a cache file (`~/.cache/translatex/keys-<provider>.json`).
+## Language codes
 
-## Language Codes
-
-Canonical ISO 639-1 codes. Aliases accepted:
+Canonical ISO 639-1 with a few extensions. Aliases accepted:
 
 | Input | Canonical |
-|-------|-----------|
+| --- | --- |
 | `zh-CN`, `zh-Hans`, `chinese` | `zh` |
 | `zh-TW`, `zh-Hant`, `tw` | `zh-TW` |
 | `jp`, `japanese` | `ja` |
 | `kr`, `korean` | `ko` |
 | `iw` | `he` |
-| `auto`, `detect`, `auto-detect` | `auto` |
+| `auto`, `detect` | `auto` |
 
-Full list: `translatex languages --format json`
+Full list: `translatex languages --format json`.
 
-## Provider Capabilities
+## Preserve patterns
 
-Query at runtime:
+`preserve` takes Rust `regex` patterns. Matched spans are masked before translation and restored afterwards. A provider that drops or duplicates a token fails the attempt and the chain moves on — that is deliberate, so corrupted output never reaches the caller.
+
+## Installation
 
 ```bash
-translatex providers --format json
-translatex languages --provider deepl --format json
+cargo install translatex
+# or: https://github.com/w21180239/translatex/releases/latest
+```
+
+Single binary, no runtime dependencies.
+
+## Testing an integration
+
+```bash
+echo '{"text":"hi","targetLang":"zh"}' | translatex batch --format json
+translatex schema --format json | sha256sum    # schema stability
 translatex health --format json
 ```
-
-## Installation for Agents
-
-```bash
-# Linux/macOS (prebuilt)
-curl -fsSL https://github.com/w21180239/translatex/releases/latest/download/translatex-x86_64-unknown-linux-gnu.tar.gz | tar xz -C /usr/local/bin
-
-# Windows (Scoop)
-scoop install translatex
-
-# Cargo (any platform with Rust)
-cargo install translatex
-```
-
-The binary is a single statically-linked executable with no runtime dependencies.
 
 ## Versioning
 
-`translatex --version` returns semver. JSON schema version is embedded in the schema output. Breaking changes to output shapes will bump the major version.
-
-## Testing Agent Integration
-
-```bash
-# Smoke test
-echo '{"text":"hi","target_lang":"zh"}' | translatex batch --format json
-
-# Verify schema stability
-translatex schema | sha256sum
-
-# Health check (should return healthy=true for configured providers)
-translatex health --format json
-```
+`translatex --version` returns semver. Field names and error codes are the public contract; adding optional fields is not a breaking change, removing or renaming one is.
 
 ## License
 
