@@ -1,6 +1,6 @@
-﻿//! Structured error taxonomy. `code` and `retryable` drive fallback, retry and agent decisions.
+//! Structured error taxonomy. `code` and `retryable` drive fallback, retry and agent decisions.
 
-use serde::{{Deserialize, Serialize}};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -106,7 +106,9 @@ impl Error {
             Error::RateLimited { .. }
             | Error::Network(_)
             | Error::Timeout { .. }
-            | Error::Upstream { status: 500..=599, .. } => true,
+            | Error::Upstream {
+                status: 500..=599, ..
+            } => true,
             Error::Upstream { status, .. } => !matches!(status, 400..=499),
             _ => false,
         }
@@ -127,8 +129,12 @@ impl Error {
 
     pub fn retry_after_secs(&self) -> Option<u64> {
         match self {
-            Error::QuotaExhausted { retry_after_secs, .. }
-            | Error::RateLimited { retry_after_secs, .. } => *retry_after_secs,
+            Error::QuotaExhausted {
+                retry_after_secs, ..
+            }
+            | Error::RateLimited {
+                retry_after_secs, ..
+            } => *retry_after_secs,
             _ => None,
         }
     }
@@ -247,24 +253,48 @@ mod tests {
             map_status("p", 401, "bad key"),
             Error::AuthFailed { .. }
         ));
-        assert!(matches!(map_status("p", 429, ""), Error::RateLimited { .. }));
+        assert!(matches!(
+            map_status("p", 429, ""),
+            Error::RateLimited { .. }
+        ));
         assert!(matches!(map_status("p", 503, ""), Error::Upstream { .. }));
         assert!(matches!(map_status("p", 400, ""), Error::Upstream { .. }));
     }
 
     #[test]
     fn retryable_split() {
-        assert!(Error::RateLimited { provider: "p".into(), retry_after_secs: None }.retryable());
+        assert!(Error::RateLimited {
+            provider: "p".into(),
+            retry_after_secs: None
+        }
+        .retryable());
         assert!(Error::Network("x".into()).retryable());
-        assert!(Error::Upstream { provider: "p".into(), status: 500, body: String::new() }.retryable());
-        assert!(!Error::Upstream { provider: "p".into(), status: 400, body: String::new() }.retryable());
-        assert!(!Error::AuthFailed { provider: "p".into(), reason: String::new() }.retryable());
+        assert!(Error::Upstream {
+            provider: "p".into(),
+            status: 500,
+            body: String::new()
+        }
+        .retryable());
+        assert!(!Error::Upstream {
+            provider: "p".into(),
+            status: 400,
+            body: String::new()
+        }
+        .retryable());
+        assert!(!Error::AuthFailed {
+            provider: "p".into(),
+            reason: String::new()
+        }
+        .retryable());
         assert!(!Error::InvalidInput("x".into()).retryable());
     }
 
     #[test]
     fn key_cooling_and_skip_rules() {
-        let auth = Error::AuthFailed { provider: "p".into(), reason: String::new() };
+        let auth = Error::AuthFailed {
+            provider: "p".into(),
+            reason: String::new(),
+        };
         assert!(auth.cools_key());
         assert!(!auth.retryable());
         assert!(auth.skip_to_next_provider());
@@ -273,7 +303,11 @@ mod tests {
 
     #[test]
     fn wire_shape_is_stable() {
-        let e = Error::RateLimited { provider: "deepl".into(), retry_after_secs: Some(7) }.wire();
+        let e = Error::RateLimited {
+            provider: "deepl".into(),
+            retry_after_secs: Some(7),
+        }
+        .wire();
         let json = serde_json::to_value(&e).unwrap();
         assert_eq!(json["code"], "RATE_LIMITED");
         assert_eq!(json["retryAfterSecs"], 7);

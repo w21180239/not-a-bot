@@ -212,11 +212,10 @@ impl SysTran {
         if status != 200 {
             return Err(map_status("systran", status, &body));
         }
-        let parsed: TokenResp =
-            serde_json::from_str(&body).map_err(|e| Error::BadResponse {
-                provider: "systran".into(),
-                reason: format!("{e}: {}", truncate(&body, 160)),
-            })?;
+        let parsed: TokenResp = serde_json::from_str(&body).map_err(|e| Error::BadResponse {
+            provider: "systran".into(),
+            reason: format!("{e}: {}", truncate(&body, 160)),
+        })?;
         let access = parsed.access_token.ok_or_else(|| Error::BadResponse {
             provider: "systran".into(),
             reason: "no access_token".into(),
@@ -303,18 +302,19 @@ impl Provider for SysTran {
             return Err(map_status("systran", status, &body));
         }
 
-        let parsed: Resp =
-            serde_json::from_str(&body).map_err(|e| Error::BadResponse {
-                provider: "systran".into(),
-                reason: format!("{e}: {}", truncate(&body, 160)),
-            })?;
-
-        let outputs = parsed.outputs.filter(|v| !v.is_empty()).ok_or_else(|| {
-            Error::BadResponse {
-                provider: "systran".into(),
-                reason: format!("missing outputs: {}", truncate(&body, 160)),
-            }
+        let parsed: Resp = serde_json::from_str(&body).map_err(|e| Error::BadResponse {
+            provider: "systran".into(),
+            reason: format!("{e}: {}", truncate(&body, 160)),
         })?;
+
+        let outputs =
+            parsed
+                .outputs
+                .filter(|v| !v.is_empty())
+                .ok_or_else(|| Error::BadResponse {
+                    provider: "systran".into(),
+                    reason: format!("missing outputs: {}", truncate(&body, 160)),
+                })?;
 
         let text = flatten(&outputs).ok_or_else(|| Error::BadResponse {
             provider: "systran".into(),
@@ -361,8 +361,7 @@ mod tests {
     #[test]
     fn missing_bundle_marker_is_none() {
         assert!(extract_client_data("no oidc here").is_none());
-        assert!(extract_client_data("\"https://translate.systran.net/oidc\",")
-            .is_none());
+        assert!(extract_client_data("\"https://translate.systran.net/oidc\",").is_none());
     }
 
     #[test]

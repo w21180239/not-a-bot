@@ -5,8 +5,8 @@ use crate::core::config::{Settings, CONFIG_TEMPLATE};
 use crate::core::creds::CredentialStore;
 use crate::core::engine::Engine;
 use crate::core::error::{Error, Result};
-use crate::providers::Registry;
 use crate::core::types::{AttemptRecord, ErrorResponse, HealthRecord, TranslateRequest};
+use crate::providers::Registry;
 use clap::{Parser, Subcommand};
 use std::io::Write;
 use std::sync::Arc;
@@ -239,7 +239,10 @@ struct Failure {
 
 impl From<Error> for Failure {
     fn from(error: Error) -> Self {
-        Self { error, attempts: Vec::new() }
+        Self {
+            error,
+            attempts: Vec::new(),
+        }
     }
 }
 
@@ -361,7 +364,9 @@ fn build_keyed(reg: &mut Registry, creds: &CredentialStore, settings: &Settings)
         reg.register(Arc::new(azure::Azure::new(&opts("azure"))));
     }
     if has("googlecloud") {
-        reg.register(Arc::new(googlecloud::GoogleCloud::new(&opts("googlecloud"))));
+        reg.register(Arc::new(googlecloud::GoogleCloud::new(&opts(
+            "googlecloud",
+        ))));
     }
     if has("baidu") {
         reg.register(Arc::new(baidu::Baidu::new()));
@@ -398,9 +403,7 @@ impl Ctx {
         if let Some(width) = cli.race {
             settings.race_width = Some(width);
         }
-        let creds = CredentialStore::load(
-            cli.credentials.as_ref().map(std::path::PathBuf::from),
-        )?;
+        let creds = CredentialStore::load(cli.credentials.as_ref().map(std::path::PathBuf::from))?;
         if let Some(w) = creds.warning() {
             tracing::warn!("{w}");
         }
@@ -423,7 +426,9 @@ fn read_stdin_text() -> Result<String> {
         .map_err(|e| Error::InvalidInput(format!("read stdin: {e}")))?;
     let text = buf.trim_end_matches(['\r', '\n']).to_string();
     if text.is_empty() {
-        return Err(Error::InvalidInput("no text: pass an argument or pipe stdin".into()));
+        return Err(Error::InvalidInput(
+            "no text: pass an argument or pipe stdin".into(),
+        ));
     }
     Ok(text)
 }
@@ -445,12 +450,13 @@ async fn cmd_translate(cli: &Cli, ctx: &Ctx) -> std::result::Result<(), Failure>
     };
 
     let req: TranslateRequest = match json {
-        Some(raw) => serde_json::from_str(raw)
-            .map_err(|e| Error::InvalidInput(format!("--json: {e}")))?,
+        Some(raw) => {
+            serde_json::from_str(raw).map_err(|e| Error::InvalidInput(format!("--json: {e}")))?
+        }
         None => {
-            let target = to.clone().ok_or_else(|| {
-                Error::InvalidInput("missing --to <language>".into())
-            })?;
+            let target = to
+                .clone()
+                .ok_or_else(|| Error::InvalidInput("missing --to <language>".into()))?;
             TranslateRequest {
                 text: text.clone().map(Ok).unwrap_or_else(read_stdin_text)?,
                 source_lang: from.clone(),
@@ -475,7 +481,10 @@ async fn cmd_translate(cli: &Cli, ctx: &Ctx) -> std::result::Result<(), Failure>
                 emit_json(cli, &render_success(cli, &out)).map_err(Failure::from)
             }
         }
-        Err(err) => Err(Failure { error: err, attempts }),
+        Err(err) => Err(Failure {
+            error: err,
+            attempts,
+        }),
     }
 }
 
@@ -505,8 +514,9 @@ async fn cmd_roundtrip(cli: &Cli, ctx: &Ctx) -> Result<()> {
     };
 
     let req: RoundtripRequest = match json {
-        Some(raw) => serde_json::from_str(raw)
-            .map_err(|e| Error::InvalidInput(format!("--json: {e}")))?,
+        Some(raw) => {
+            serde_json::from_str(raw).map_err(|e| Error::InvalidInput(format!("--json: {e}")))?
+        }
         None => RoundtripRequest {
             text: text.clone().map(Ok).unwrap_or_else(read_stdin_text)?,
             source_lang: from.clone(),
@@ -551,7 +561,9 @@ fn render_success(cli: &Cli, out: &crate::core::engine::Outcome) -> serde_json::
 }
 
 async fn cmd_batch(cli: &Cli, ctx: &Ctx) -> Result<()> {
-    let Command::Batch { file, parallel } = &cli.command else { unreachable!() };
+    let Command::Batch { file, parallel } = &cli.command else {
+        unreachable!()
+    };
     let raw = match file {
         Some(path) => std::fs::read_to_string(path)
             .map_err(|e| Error::InvalidInput(format!("{path}: {e}")))?,
@@ -608,8 +620,7 @@ async fn cmd_batch(cli: &Cli, ctx: &Ctx) -> Result<()> {
     let mut results = results;
     results.sort_by_key(|v| v.get("index").and_then(|i| i.as_u64()).unwrap_or(0));
     for body in results {
-        writeln!(out, "{body}")
-            .map_err(|e| Error::Internal(format!("write: {e}")))?;
+        writeln!(out, "{body}").map_err(|e| Error::Internal(format!("write: {e}")))?;
     }
     Ok(())
 }
@@ -619,8 +630,14 @@ fn cmd_providers(cli: &Cli, ctx: &Ctx) -> Result<()> {
     if cli.format == Format::Text {
         for row in &rows {
             let name = row.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            let needs = row.get("needsKey").and_then(|v| v.as_bool()).unwrap_or(false);
-            let configured = row.get("configured").and_then(|v| v.as_bool()).unwrap_or(false);
+            let needs = row
+                .get("needsKey")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let configured = row
+                .get("configured")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             let status = if !needs {
                 "free"
             } else if configured {
@@ -649,9 +666,13 @@ fn cmd_languages(cli: &Cli, ctx: &Ctx, provider: &str) -> Result<()> {
             .get(provider)
             .ok_or_else(|| {
                 if crate::providers::is_known_provider(provider) {
-                    Error::ProviderNotConfigured { name: provider.into() }
+                    Error::ProviderNotConfigured {
+                        name: provider.into(),
+                    }
                 } else {
-                    Error::ProviderNotFound { name: provider.into() }
+                    Error::ProviderNotFound {
+                        name: provider.into(),
+                    }
                 }
             })?
             .info();
@@ -681,10 +702,9 @@ fn cmd_keys(cli: &Cli, ctx: &Ctx, provider: Option<&str>, reset: bool) -> Result
     };
     if reset {
         for name in &names {
-            if let Some(path) = crate::core::keys::state_path(
-                crate::core::config::cache_dir().as_deref(),
-                name,
-            ) {
+            if let Some(path) =
+                crate::core::keys::state_path(crate::core::config::cache_dir().as_deref(), name)
+            {
                 let _ = std::fs::remove_file(path);
             }
         }
@@ -700,10 +720,8 @@ fn cmd_keys(cli: &Cli, ctx: &Ctx, provider: Option<&str>, reset: bool) -> Result
             .get(&name)
             .map(|p| p.credential_labels())
             .unwrap_or_default();
-        let path = crate::core::keys::state_path(
-            crate::core::config::cache_dir().as_deref(),
-            &name,
-        );
+        let path =
+            crate::core::keys::state_path(crate::core::config::cache_dir().as_deref(), &name);
         let ring = crate::core::keys::KeyRing::new(labels, path);
         out.insert(
             name,
@@ -755,7 +773,10 @@ async fn cmd_health(cli: &Cli, ctx: &Ctx) -> Result<()> {
         }
     }
     let all_healthy = records.iter().all(|r| !r.configured || r.healthy);
-    emit_json(cli, &serde_json::json!({ "healthy": all_healthy, "providers": records }))?;
+    emit_json(
+        cli,
+        &serde_json::json!({ "healthy": all_healthy, "providers": records }),
+    )?;
     if all_healthy {
         Ok(())
     } else {
@@ -870,10 +891,9 @@ fn schema_types() -> &'static [&'static str] {
 pub fn manifest_document() -> Result<serde_json::Value> {
     let translate_schema = serde_json::to_value(schemars::schema_for!(TranslateRequest))
         .map_err(|e| Error::Internal(e.to_string()))?;
-    let roundtrip_schema = serde_json::to_value(schemars::schema_for!(
-        crate::core::types::RoundtripRequest
-    ))
-    .map_err(|e| Error::Internal(e.to_string()))?;
+    let roundtrip_schema =
+        serde_json::to_value(schemars::schema_for!(crate::core::types::RoundtripRequest))
+            .map_err(|e| Error::Internal(e.to_string()))?;
     Ok(serde_json::json!({
         "name": "translatex",
         "version": crate::core::types::VERSION,
@@ -917,7 +937,6 @@ pub fn manifest_document() -> Result<serde_json::Value> {
     }))
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -930,7 +949,13 @@ mod tests {
 
     #[test]
     fn exit_codes_are_distinct() {
-        let codes = [exit::OK, exit::REQUEST, exit::CONFIG, exit::CHAIN, exit::NETWORK];
+        let codes = [
+            exit::OK,
+            exit::REQUEST,
+            exit::CONFIG,
+            exit::CHAIN,
+            exit::NETWORK,
+        ];
         let unique: std::collections::HashSet<_> = codes.iter().collect();
         assert_eq!(unique.len(), codes.len());
     }
@@ -956,7 +981,10 @@ mod tests {
         let doc = schema_document().unwrap();
         let defs = doc["definitions"].as_object().expect("definitions");
         for ty in schema_types() {
-            assert!(defs.contains_key(&ty.to_string()), "missing schema for {ty}");
+            assert!(
+                defs.contains_key(&ty.to_string()),
+                "missing schema for {ty}"
+            );
         }
         assert!(doc.get("version").is_some());
         assert!(doc.get("$schema").is_some());

@@ -99,7 +99,8 @@ impl Provider for Edge {
         let to = to_ms_code(&lang::normalize(&req.target_lang));
         let from = to_ms_code(&lang::normalize(&req.source_lang));
 
-        let mut query: Vec<(&str, String)> = vec![("to", to.clone()), ("isEnterpriseClient", "false".into())];
+        let mut query: Vec<(&str, String)> =
+            vec![("to", to.clone()), ("isEnterpriseClient", "false".into())];
         // `from=auto-detect` is rejected with 400; omitting it auto-detects.
         if from != "auto" {
             query.push(("from", from.clone()));
@@ -187,7 +188,10 @@ mod tests {
     fn parses_success_shape() {
         let body = r#"[{"detectedLanguage":{"language":"en","score":1.0},"translations":[{"text":"你好，世界","to":"zh-Hans"}]}]"#;
         let parsed: Vec<Item> = serde_json::from_str(body).unwrap();
-        assert_eq!(parsed[0].translations.as_ref().unwrap()[0].text, "你好，世界");
+        assert_eq!(
+            parsed[0].translations.as_ref().unwrap()[0].text,
+            "你好，世界"
+        );
         assert_eq!(parsed[0].detected_language.as_ref().unwrap().language, "en");
     }
 

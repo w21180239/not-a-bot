@@ -110,6 +110,11 @@ impl Provider for ModernMt {
         } else {
             to_modernmt_code(&from_raw)
         };
+        let source_hint = if source.is_empty() {
+            None
+        } else {
+            Some(source.clone())
+        };
 
         let ts = now_millis();
         let payload = Payload {
@@ -143,11 +148,10 @@ impl Provider for ModernMt {
             return Err(map_status("modernmt", status, &body));
         }
 
-        let parsed: Resp =
-            serde_json::from_str(&body).map_err(|e| Error::BadResponse {
-                provider: "modernmt".into(),
-                reason: format!("{e}: {}", truncate(&body, 160)),
-            })?;
+        let parsed: Resp = serde_json::from_str(&body).map_err(|e| Error::BadResponse {
+            provider: "modernmt".into(),
+            reason: format!("{e}: {}", truncate(&body, 160)),
+        })?;
 
         let data = parsed.data.ok_or_else(|| Error::BadResponse {
             provider: "modernmt".into(),
@@ -164,7 +168,7 @@ impl Provider for ModernMt {
 
         let detected = data
             .detected_language
-            .or_else(|| if source.is_empty() { None } else { Some(source) })
+            .or(source_hint)
             .unwrap_or_else(|| from_raw.clone());
 
         Ok(TranslateResponse {

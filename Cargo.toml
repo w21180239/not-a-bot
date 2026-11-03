@@ -1,8 +1,8 @@
 [package]
 name = "translatex"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.89"
 description = "Free translation CLI for AI agents: no API key, no signup, no config. 26 providers raced in parallel, structured JSON, key rotation, de-AI rewriting."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/w21180239/translatex"
@@ -11,6 +11,7 @@ documentation = "https://github.com/w21180239/translatex#readme"
 keywords = ["translation", "cli", "agent", "i18n", "free"]
 categories = ["command-line-utilities", "web-programming", "text-processing"]
 readme = "README.md"
+exclude = ["npm", "repo-assets", ".github", ".claude-plugin"]
 
 [lib]
 name = "translatex"

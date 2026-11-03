@@ -104,12 +104,9 @@ impl Settings {
     }
 
     pub fn chain(&self) -> Vec<String> {
-        self.chain.clone().unwrap_or_else(|| {
-            DEFAULT_AUTO_CHAIN
-                .iter()
-                .map(|s| s.to_string())
-                .collect()
-        })
+        self.chain
+            .clone()
+            .unwrap_or_else(|| DEFAULT_AUTO_CHAIN.iter().map(|s| s.to_string()).collect())
     }
 
     pub fn timeout(&self) -> std::time::Duration {

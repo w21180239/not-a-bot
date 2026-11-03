@@ -59,7 +59,8 @@ pub fn mirai_pair_ok(source: &str, target: &str) -> bool {
         return target == "ja";
     }
     is_mirai_language(source) && (source == "ja" || target == "ja")
-}#[derive(Debug, Serialize)]
+}
+#[derive(Debug, Serialize)]
 struct Payload<'a> {
     input: &'a str,
     source: &'a str,
@@ -265,11 +266,10 @@ impl Provider for Mirai {
             return Err(map_status("mirai", status, &body));
         }
 
-        let parsed: Resp =
-            serde_json::from_str(&body).map_err(|e| Error::BadResponse {
-                provider: "mirai".into(),
-                reason: format!("{e}: {}", truncate(&body, 160)),
-            })?;
+        let parsed: Resp = serde_json::from_str(&body).map_err(|e| Error::BadResponse {
+            provider: "mirai".into(),
+            reason: format!("{e}: {}", truncate(&body, 160)),
+        })?;
 
         if parsed.status.as_deref() != Some("success") {
             return Err(Error::Upstream {
@@ -283,12 +283,14 @@ impl Provider for Mirai {
             });
         }
 
-        let outputs = parsed.outputs.filter(|v| !v.is_empty()).ok_or_else(|| {
-            Error::BadResponse {
-                provider: "mirai".into(),
-                reason: format!("missing outputs: {}", truncate(&body, 160)),
-            }
-        })?;
+        let outputs =
+            parsed
+                .outputs
+                .filter(|v| !v.is_empty())
+                .ok_or_else(|| Error::BadResponse {
+                    provider: "mirai".into(),
+                    reason: format!("missing outputs: {}", truncate(&body, 160)),
+                })?;
 
         let text = flatten(&outputs).ok_or_else(|| Error::BadResponse {
             provider: "mirai".into(),
@@ -385,7 +387,8 @@ mod tests {
     #[test]
     fn empty_outputs_flatten_to_none() {
         assert!(flatten(&Vec::new()).is_none());
-        let p: Resp = serde_json::from_str(r#"{"status":"success","outputs":[{"output":[]}]}"#).unwrap();
+        let p: Resp =
+            serde_json::from_str(r#"{"status":"success","outputs":[{"output":[]}]}"#).unwrap();
         assert!(flatten(&p.outputs.unwrap()).is_none());
     }
 

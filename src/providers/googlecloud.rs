@@ -100,7 +100,11 @@ impl Provider for GoogleCloud {
             form.insert("source".into(), from.clone());
         }
 
-        let url = format!("{}?key={}", self.endpoint, crate::core::http::percent_encode(key));
+        let url = format!(
+            "{}?key={}",
+            self.endpoint,
+            crate::core::http::percent_encode(key)
+        );
         let started = Instant::now();
         let resp = self
             .client

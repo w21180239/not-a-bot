@@ -1,6 +1,6 @@
 {
   "name": "translatex",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Free translation CLI for AI agents: no API key, no signup, no config. 26 providers, JSON output, one 6 MB binary.",
   "license": "MIT OR Apache-2.0",
   "author": "w21180239",
@@ -32,14 +32,17 @@
   "bin": {
     "translatex": "bin/translatex.js"
   },
-  "scripts": {
-    "postinstall": "node scripts/install.js"
-  },
   "files": [
     "bin/translatex.js",
-    "scripts/install.js",
     "README.md"
   ],
+  "optionalDependencies": {
+    "translatex-darwin-arm64": "0.1.1",
+    "translatex-darwin-x64": "0.1.1",
+    "translatex-linux-arm64": "0.1.1",
+    "translatex-linux-x64": "0.1.1",
+    "translatex-win32-x64": "0.1.1"
+  },
   "engines": {
     "node": ">=18"
   },

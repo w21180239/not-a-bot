@@ -136,11 +136,10 @@ impl Provider for Lara {
             return Err(map_status("lara", status, &body));
         }
 
-        let parsed: Resp =
-            serde_json::from_str(&body).map_err(|e| Error::BadResponse {
-                provider: "lara".into(),
-                reason: format!("{e}: {}", truncate(&body, 160)),
-            })?;
+        let parsed: Resp = serde_json::from_str(&body).map_err(|e| Error::BadResponse {
+            provider: "lara".into(),
+            reason: format!("{e}: {}", truncate(&body, 160)),
+        })?;
 
         let content = parsed.content.ok_or_else(|| Error::BadResponse {
             provider: "lara".into(),
@@ -207,10 +206,7 @@ mod tests {
         let p: Resp = serde_json::from_str(body).unwrap();
         let c = p.content.unwrap();
         assert_eq!(
-            c.translations.unwrap()[0]
-                .translation
-                .as_deref()
-                .unwrap(),
+            c.translations.unwrap()[0].translation.as_deref().unwrap(),
             "大家好，这是一条测试消息。"
         );
         assert_eq!(c.source_language.as_deref(), Some("en"));
@@ -219,7 +215,8 @@ mod tests {
 
     #[test]
     fn overquota_flag_is_detectable() {
-        let body = r#"{"content":{"translations":[{"translation":"x"}],"limit":{"overquota":true}}}"#;
+        let body =
+            r#"{"content":{"translations":[{"translation":"x"}],"limit":{"overquota":true}}}"#;
         let p: Resp = serde_json::from_str(body).unwrap();
         assert_eq!(p.content.unwrap().limit.unwrap().overquota, Some(true));
     }

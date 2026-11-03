@@ -181,9 +181,7 @@ mod tests {
         let cred = Credential {
             provider: "niutrans".into(),
             label: "default".into(),
-            fields: [("api_key".to_string(), "k".into())]
-                .into_iter()
-                .collect(),
+            fields: [("api_key".to_string(), "k".into())].into_iter().collect(),
         };
         let req = TranslateRequest {
             text: "hi".into(),

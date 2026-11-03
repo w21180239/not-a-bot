@@ -28,7 +28,15 @@ fn input_snippet(text: &str) -> String {
 /// SHA-256 hex of appKey + input + salt + curtime + appSecret (v3 scheme).
 pub fn sign(app_key: &str, text: &str, salt: &str, curtime: &str, secret: &str) -> String {
     http::sha256_hex(
-        format!("{}{}{}{}{}", app_key, input_snippet(text), salt, curtime, secret).as_bytes(),
+        format!(
+            "{}{}{}{}{}",
+            app_key,
+            input_snippet(text),
+            salt,
+            curtime,
+            secret
+        )
+        .as_bytes(),
     )
 }
 

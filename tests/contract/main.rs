@@ -29,7 +29,10 @@ fn default_registry() -> Registry {
 #[test]
 fn schema_publishes_every_wire_type() {
     let doc = schema_document().expect("schema document");
-    assert_eq!(doc["$schema"], "https://json-schema.org/draft/2020-12/schema");
+    assert_eq!(
+        doc["$schema"],
+        "https://json-schema.org/draft/2020-12/schema"
+    );
     assert_eq!(doc["version"], translatex::core::types::VERSION);
     assert_eq!(doc["title"], "translatex");
 
@@ -50,7 +53,10 @@ fn translate_schema_requires_text_and_target() {
         .filter_map(|v| v.as_str())
         .collect();
     assert!(required.contains(&"text"), "text must be required");
-    assert!(required.contains(&"targetLang"), "targetLang must be required");
+    assert!(
+        required.contains(&"targetLang"),
+        "targetLang must be required"
+    );
     // The wire contract is camelCase; a snake_case property would break clients.
     let props = req["properties"].as_object().expect("properties");
     assert!(props.contains_key("targetLang"));
@@ -67,9 +73,8 @@ fn request_accepts_only_the_camel_case_contract() {
     let snake = serde_json::from_str::<TranslateRequest>(r#"{"text":"hi","target_lang":"zh"}"#);
     assert!(snake.is_err(), "snake_case must not be accepted");
 
-    let unknown = serde_json::from_str::<TranslateRequest>(
-        r#"{"text":"hi","targetLang":"zh","bogus":1}"#,
-    );
+    let unknown =
+        serde_json::from_str::<TranslateRequest>(r#"{"text":"hi","targetLang":"zh","bogus":1}"#);
     assert!(unknown.is_err(), "unknown fields must be rejected");
 }
 
@@ -127,7 +132,11 @@ fn provider_catalogue_honours_kind_and_priority_bands() {
             info.kind
         );
 
-        assert!(!info.languages.is_empty(), "{} advertises no languages", info.name);
+        assert!(
+            !info.languages.is_empty(),
+            "{} advertises no languages",
+            info.name
+        );
         assert!(info.max_chars > 0, "{} advertises no size limit", info.name);
         for code in &info.languages {
             assert!(
@@ -213,11 +222,17 @@ fn retry_policy_matches_the_documented_table() {
     assert!(!Error::Timeout { timeout_ms: 1 }.cools_key());
 
     assert_eq!(
-        Error::ProviderNotConfigured { name: "deepl".into() }.code(),
+        Error::ProviderNotConfigured {
+            name: "deepl".into()
+        }
+        .code(),
         "PROVIDER_NOT_CONFIGURED"
     );
     assert_eq!(
-        Error::AutoDetectUnsupported { provider: "reverso".into() }.code(),
+        Error::AutoDetectUnsupported {
+            provider: "reverso".into()
+        }
+        .code(),
         "AUTO_DETECT_UNSUPPORTED"
     );
 }

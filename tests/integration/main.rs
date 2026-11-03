@@ -73,7 +73,11 @@ async fn libretranslate_round_trip() {
     assert_eq!(out.response.provider, "libretranslate");
     assert_eq!(out.response.target_lang, "zh");
     assert_eq!(out.response.detected_source, "en");
-    assert_eq!(out.response.chars, Some(11), "source characters are counted");
+    assert_eq!(
+        out.response.chars,
+        Some(11),
+        "source characters are counted"
+    );
     assert_eq!(out.attempts.len(), 1);
     assert!(out.attempts[0].ok);
     assert_eq!(mock.hits(), 1);
@@ -230,7 +234,10 @@ async fn chain_moves_on_after_an_upstream_error() {
     assert_eq!(out.response.provider, "deepseek");
     assert_eq!(out.attempts.len(), 2, "one failed hop, one success");
     assert!(!out.attempts[0].ok);
-    assert_eq!(out.attempts[0].error_code.as_deref(), Some("UPSTREAM_ERROR"));
+    assert_eq!(
+        out.attempts[0].error_code.as_deref(),
+        Some("UPSTREAM_ERROR")
+    );
     assert!(out.attempts[1].ok);
     assert_eq!(first.hits(), 1);
     assert_eq!(second.hits(), 1);

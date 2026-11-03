@@ -6,9 +6,7 @@ pub mod providers;
 pub mod cli;
 pub mod retry;
 
-pub use core::{
-    config, creds, engine, error, http, keys, lang, preserve, types,
-};
+pub use core::{config, creds, engine, error, http, keys, lang, preserve, types};
 pub use error::{Error, Result};
 pub use providers::{Provider, Registry};
 pub use types::{

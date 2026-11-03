@@ -1,0 +1,20 @@
+{
+  "name": "translatex-linux-arm64",
+  "version": "0.1.1",
+  "description": "The translatex binary for Linux arm64 (glibc). Installed automatically by translatex.",
+  "license": "MIT OR Apache-2.0",
+  "homepage": "https://github.com/w21180239/translatex",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/w21180239/translatex.git"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "translatex"
+  ]
+}

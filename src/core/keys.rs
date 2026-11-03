@@ -1,4 +1,4 @@
-﻿//! Key rotation with cross-process cooldown state.
+//! Key rotation with cross-process cooldown state.
 //!
 //! Each provider may hold several credential sets. A credential that returns
 //! auth/quota/rate-limit errors is put on cooldown so the next attempt uses a
@@ -46,8 +46,12 @@ pub fn cooldown_for(err: &Error) -> Option<u64> {
         return None;
     }
     Some(match err {
-        Error::QuotaExhausted { retry_after_secs, .. } => retry_after_secs.unwrap_or(QUOTA_SECS),
-        Error::RateLimited { retry_after_secs, .. } => retry_after_secs.unwrap_or(RATE_SECS),
+        Error::QuotaExhausted {
+            retry_after_secs, ..
+        } => retry_after_secs.unwrap_or(QUOTA_SECS),
+        Error::RateLimited {
+            retry_after_secs, ..
+        } => retry_after_secs.unwrap_or(RATE_SECS),
         Error::AuthFailed { .. } => AUTH_SECS,
         _ => return None,
     })
@@ -62,10 +66,7 @@ pub struct KeyRing {
 
 impl KeyRing {
     pub fn new(labels: Vec<String>, path: Option<PathBuf>) -> Self {
-        let state = path
-            .as_deref()
-            .and_then(load_state)
-            .unwrap_or_default();
+        let state = path.as_deref().and_then(load_state).unwrap_or_default();
         Self {
             labels,
             state: Mutex::new(state),
@@ -196,15 +197,24 @@ mod tests {
     #[test]
     fn cooldown_duration_per_class() {
         assert_eq!(
-            cooldown_for(&Error::QuotaExhausted { provider: "p".into(), retry_after_secs: None }),
+            cooldown_for(&Error::QuotaExhausted {
+                provider: "p".into(),
+                retry_after_secs: None
+            }),
             Some(QUOTA_SECS)
         );
         assert_eq!(
-            cooldown_for(&Error::RateLimited { provider: "p".into(), retry_after_secs: Some(5) }),
+            cooldown_for(&Error::RateLimited {
+                provider: "p".into(),
+                retry_after_secs: Some(5)
+            }),
             Some(5)
         );
         assert_eq!(
-            cooldown_for(&Error::AuthFailed { provider: "p".into(), reason: String::new() }),
+            cooldown_for(&Error::AuthFailed {
+                provider: "p".into(),
+                reason: String::new()
+            }),
             Some(AUTH_SECS)
         );
         assert_eq!(cooldown_for(&Error::Network("x".into())), None);
@@ -214,7 +224,14 @@ mod tests {
     fn failure_cools_label_and_success_clears_it() {
         let ring = KeyRing::new(vec!["a".into()], None);
         let t = now();
-        ring.record_failure("a", &Error::RateLimited { provider: "p".into(), retry_after_secs: Some(60) }, t);
+        ring.record_failure(
+            "a",
+            &Error::RateLimited {
+                provider: "p".into(),
+                retry_after_secs: Some(60),
+            },
+            t,
+        );
         assert_eq!(ring.pick(t), None, "only key is cooling");
         assert_eq!(ring.next_available(t), Some(60));
         assert_eq!(ring.pick(t + Cd::seconds(61)), Some(0));
@@ -230,7 +247,14 @@ mod tests {
         let labels: Vec<String> = vec!["k1".into(), "k2".into(), "k3".into()];
         let ring = KeyRing::new(labels, None);
         let t = now();
-        ring.record_failure("k1", &Error::AuthFailed { provider: "p".into(), reason: String::new() }, t);
+        ring.record_failure(
+            "k1",
+            &Error::AuthFailed {
+                provider: "p".into(),
+                reason: String::new(),
+            },
+            t,
+        );
         let picked = ring.pick(t).expect("a key is free");
         assert_ne!(picked, 0, "cooling key must not be picked");
         let snap = ring.snapshot(t);
@@ -245,7 +269,14 @@ mod tests {
         let t = now();
         {
             let ring = KeyRing::new(vec!["a".into(), "b".into()], Some(path.clone()));
-            ring.record_failure("a", &Error::QuotaExhausted { provider: "p".into(), retry_after_secs: Some(3600) }, t);
+            ring.record_failure(
+                "a",
+                &Error::QuotaExhausted {
+                    provider: "p".into(),
+                    retry_after_secs: Some(3600),
+                },
+                t,
+            );
         }
         let reloaded = KeyRing::new(vec!["a".into(), "b".into()], Some(path));
         let snap = reloaded.snapshot(t);

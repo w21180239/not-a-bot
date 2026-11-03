@@ -1,7 +1,7 @@
 //! Iciba free web endpoint: AES-ECB signed request, AES-ECB encrypted reply.
 
-use crate::core::crypto::{aes_ecb_decrypt_pkcs7, aes_ecb_encrypt_pkcs7};
 use crate::core::creds::Credential;
+use crate::core::crypto::{aes_ecb_decrypt_pkcs7, aes_ecb_encrypt_pkcs7};
 use crate::core::error::{Error, Result};
 use crate::core::http::{body_text, map_status, md5_hex, truncate};
 use crate::core::lang;
@@ -111,7 +111,8 @@ impl Provider for Iciba {
     ) -> Result<TranslateResponse> {
         let to = lang::normalize(&req.target_lang);
         let from = lang::normalize(&req.source_lang);
-        let sign = iciba_sign(&req.text).map_err(|e| Error::Internal(format!("iciba sign: {e}")))?;
+        let sign =
+            iciba_sign(&req.text).map_err(|e| Error::Internal(format!("iciba sign: {e}")))?;
 
         let query: [(&str, String); 5] = [
             ("c", "trans".into()),
@@ -146,11 +147,10 @@ impl Provider for Iciba {
             return Err(map_status("iciba", status, &body));
         }
 
-        let envelope: Envelope =
-            serde_json::from_str(&body).map_err(|e| Error::BadResponse {
-                provider: "iciba".into(),
-                reason: format!("{e}: {}", truncate(&body, 160)),
-            })?;
+        let envelope: Envelope = serde_json::from_str(&body).map_err(|e| Error::BadResponse {
+            provider: "iciba".into(),
+            reason: format!("{e}: {}", truncate(&body, 160)),
+        })?;
 
         let content = envelope.content.ok_or_else(|| Error::BadResponse {
             provider: "iciba".into(),
@@ -170,17 +170,22 @@ impl Provider for Iciba {
             });
         }
 
-        let text = payload.out.filter(|s| !s.trim().is_empty()).ok_or_else(|| {
-            Error::BadResponse {
+        let text = payload
+            .out
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| Error::BadResponse {
                 provider: "iciba".into(),
                 reason: "empty out field".into(),
-            }
-        })?;
+            })?;
 
         let detected = payload
             .from_lang
             .filter(|s| s != "auto")
-            .or(if from == "auto" { None } else { Some(from.clone()) })
+            .or(if from == "auto" {
+                None
+            } else {
+                Some(from.clone())
+            })
             .unwrap_or_else(|| from.clone());
 
         Ok(TranslateResponse {

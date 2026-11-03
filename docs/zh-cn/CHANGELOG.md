@@ -2,6 +2,19 @@
 
 文档修订历史。1.0 之前，应用变更也记录在此。
 
+## 0.1.1 — 2026-11-04
+
+### 调整
+
+- npm 分发改为按平台的二进制包（`translatex-win32-x64`、`translatex-linux-arm64` 等）作为 optional 依赖，安装期不再执行任何脚本 —— npm 12 默认禁止依赖执行安装脚本，原来的 `postinstall` 下载方式会装出空壳。
+- 声明的最低 Rust 版本改为 1.89（依赖图里最高的 `rust-version`），原来的 1.80 实际从未编译通过。
+- CI 覆盖 `cargo fmt --check`、`clippy -D warnings`、三大平台测试、MSRV 构建与 npm 打包检查；Dependabot 跟踪 actions、Cargo 与 npm 清单。
+
+### 修复
+
+- `cargo clippy --all-targets -- -D warnings` 已清零，此前 `preserve`、`google`、`modernmt`、`volcengine`、`providers` 与引擎测试中共有 7 条告警。
+- 仓库声明 `MIT OR Apache-2.0` 却没有许可证正文，现补上 `LICENSE-MIT` 与 `LICENSE-APACHE`。
+
 ## 0.1.0 — 2026-11-04
 
 ### 新增

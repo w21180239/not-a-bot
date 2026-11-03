@@ -1,8 +1,8 @@
 //! Sogou free web endpoint: md5-signed form POST, no key required.
 
 use crate::core::creds::Credential;
-use crate::core::http::md5_hex;
 use crate::core::error::{Error, Result};
+use crate::core::http::md5_hex;
 use crate::core::http::{body_text, map_status, truncate};
 use crate::core::lang;
 use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
@@ -150,11 +150,10 @@ impl Provider for Sogou {
             return Err(map_status("sogou", status, &body));
         }
 
-        let parsed: Resp =
-            serde_json::from_str(&body).map_err(|e| Error::BadResponse {
-                provider: "sogou".into(),
-                reason: format!("{e}: {}", truncate(&body, 160)),
-            })?;
+        let parsed: Resp = serde_json::from_str(&body).map_err(|e| Error::BadResponse {
+            provider: "sogou".into(),
+            reason: format!("{e}: {}", truncate(&body, 160)),
+        })?;
 
         let data = parsed.data.ok_or_else(|| Error::BadResponse {
             provider: "sogou".into(),
@@ -184,12 +183,13 @@ impl Provider for Sogou {
             }
         }
 
-        let text = item.dit.filter(|s| !s.trim().is_empty()).ok_or_else(|| {
-            Error::BadResponse {
+        let text = item
+            .dit
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| Error::BadResponse {
                 provider: "sogou".into(),
                 reason: "empty dit".into(),
-            }
-        })?;
+            })?;
 
         let detected = item
             .from_lang
@@ -246,13 +246,19 @@ mod tests {
     fn parses_success_shape() {
         let body = r#"{"status":0,"data":{"translate":{"errorCode":"0","dit":"你好，世界","from":"en","to":"zh-CHS"}}}"#;
         let r: Resp = serde_json::from_str(body).unwrap();
-        assert_eq!(r.data.unwrap().translate.unwrap().dit.as_deref(), Some("你好，世界"));
+        assert_eq!(
+            r.data.unwrap().translate.unwrap().dit.as_deref(),
+            Some("你好，世界")
+        );
     }
 
     #[test]
     fn detects_shape() {
         let body = r#"{"status":0,"data":{"detect":{"detect":"en","errorCode":"0"}}}"#;
         let r: Resp = serde_json::from_str(body).unwrap();
-        assert_eq!(r.data.unwrap().detect.unwrap().detect.as_deref(), Some("en"));
+        assert_eq!(
+            r.data.unwrap().detect.unwrap().detect.as_deref(),
+            Some("en")
+        );
     }
 }

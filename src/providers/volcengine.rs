@@ -120,11 +120,7 @@ impl Provider for Volcengine {
         })?;
         // The endpoint accepts `auto` directly.
         let from_raw = lang::normalize(&req.source_lang);
-        let source = match to_volc_code(&from_raw) {
-            Some(c) => c,
-            None => "auto",
-        };
-
+        let source = to_volc_code(&from_raw).unwrap_or("auto");
         let body = serde_json::json!({
             "text": req.text,
             "source_language": source,
@@ -148,11 +144,10 @@ impl Provider for Volcengine {
             return Err(map_status("volcengine", status, &text_body));
         }
 
-        let parsed: Resp =
-            serde_json::from_str(&text_body).map_err(|e| Error::BadResponse {
-                provider: "volcengine".into(),
-                reason: format!("{e}: {}", truncate(&text_body, 160)),
-            })?;
+        let parsed: Resp = serde_json::from_str(&text_body).map_err(|e| Error::BadResponse {
+            provider: "volcengine".into(),
+            reason: format!("{e}: {}", truncate(&text_body, 160)),
+        })?;
 
         if let Some(br) = &parsed.base_resp {
             if br.status_code.unwrap_or(0) != 0 {
@@ -226,10 +221,7 @@ mod tests {
         // Captured live from translate.volcengine.com/crx/translate/v1/.
         let body = r#"{"translation":"你好，世界，这是一个测试。","detected_language":"en","probability":1,"base_resp":{"status_code":0,"status_message":""}}"#;
         let p: Resp = serde_json::from_str(body).unwrap();
-        assert_eq!(
-            p.translation.as_deref(),
-            Some("你好，世界，这是一个测试。")
-        );
+        assert_eq!(p.translation.as_deref(), Some("你好，世界，这是一个测试。"));
         assert_eq!(p.detected_language.as_deref(), Some("en"));
         assert_eq!(p.base_resp.unwrap().status_code, Some(0));
     }
@@ -243,7 +235,8 @@ mod tests {
 
     #[test]
     fn nonzero_base_resp_is_detectable() {
-        let body = r#"{"translation":"","base_resp":{"status_code":500,"status_message":"internal"}}"#;
+        let body =
+            r#"{"translation":"","base_resp":{"status_code":500,"status_message":"internal"}}"#;
         let p: Resp = serde_json::from_str(body).unwrap();
         assert_ne!(p.base_resp.unwrap().status_code.unwrap_or(0), 0);
     }

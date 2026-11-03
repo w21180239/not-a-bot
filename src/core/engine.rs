@@ -5,9 +5,7 @@ use crate::core::creds::CredentialStore;
 use crate::core::error::{Error, Result};
 use crate::core::keys::KeyRing;
 use crate::core::preserve::Preserver;
-use crate::core::types::{
-    AttemptRecord, RoundtripRequest, TranslateRequest, TranslateResponse,
-};
+use crate::core::types::{AttemptRecord, RoundtripRequest, TranslateRequest, TranslateResponse};
 use crate::providers::{Provider, Registry};
 use crate::retry::backoff;
 use futures::StreamExt;
@@ -39,7 +37,10 @@ pub struct ChainFailure {
 
 impl ChainFailure {
     fn new(error: Error) -> Self {
-        Self { error, attempts: Vec::new() }
+        Self {
+            error,
+            attempts: Vec::new(),
+        }
     }
 }
 
@@ -69,7 +70,13 @@ impl Engine {
         settings: Settings,
     ) -> Self {
         let chain = settings.chain();
-        Self { registry, creds, cache_dir, settings, chain }
+        Self {
+            registry,
+            creds,
+            cache_dir,
+            settings,
+            chain,
+        }
     }
 
     pub fn registry(&self) -> &Registry {
@@ -85,7 +92,9 @@ impl Engine {
     }
 
     pub async fn translate(&self, req: &TranslateRequest) -> Result<Outcome> {
-        self.translate_inner(req).await.map_err(|failure| failure.error)
+        self.translate_inner(req)
+            .await
+            .map_err(|failure| failure.error)
     }
 
     /// Translate and keep the hop records when the chain fails, so a caller can
@@ -100,14 +109,19 @@ impl Engine {
         }
     }
 
-    async fn translate_inner(&self, req: &TranslateRequest) -> std::result::Result<Outcome, ChainFailure> {
+    async fn translate_inner(
+        &self,
+        req: &TranslateRequest,
+    ) -> std::result::Result<Outcome, ChainFailure> {
         let request_id = req
             .idempotency_key
             .clone()
             .unwrap_or_else(|| Uuid::new_v4().to_string());
 
         if req.text.trim().is_empty() {
-            return Err(ChainFailure::new(Error::InvalidInput("text is empty".into())));
+            return Err(ChainFailure::new(Error::InvalidInput(
+                "text is empty".into(),
+            )));
         }
         let target = crate::core::lang::normalize(&req.target_lang);
         let source = crate::core::lang::normalize(&req.source_lang);
@@ -145,11 +159,18 @@ impl Engine {
             .map_err(ChainFailure::new)?;
         let pinned = req.provider.is_some();
         // Per-request timeout wins over the configured default.
-        let budget_ms = req.timeout_ms.or(self.settings.timeout_ms).unwrap_or(20_000);
+        let budget_ms = req
+            .timeout_ms
+            .or(self.settings.timeout_ms)
+            .unwrap_or(20_000);
         let budget = Duration::from_millis(budget_ms);
         // Pinning means "this one first": racing its fallback against it could
         // return the fallback while the pinned provider was about to answer.
-        let width = if pinned { 1 } else { self.settings.race_width() };
+        let width = if pinned {
+            1
+        } else {
+            self.settings.race_width()
+        };
 
         let mut attempts = Vec::new();
         let mut failures: Vec<String> = Vec::new();
@@ -193,13 +214,19 @@ impl Engine {
                     if resp.chars.is_none() {
                         resp.chars = Some(req.text.chars().count());
                     }
-                    return Ok(Outcome { response: resp, attempts });
+                    return Ok(Outcome {
+                        response: resp,
+                        attempts,
+                    });
                 }
                 Some(Err(err)) => {
                     // Invalid input or a bad pattern: another provider cannot
                     // help, so stop the window instead of burning more calls.
                     if !err.skip_to_next_provider() {
-                        return Err(ChainFailure { error: err, attempts });
+                        return Err(ChainFailure {
+                            error: err,
+                            attempts,
+                        });
                     }
                     last = Some(err);
                 }
@@ -407,15 +434,13 @@ impl Engine {
             let mut attempt = 0u32;
             loop {
                 let started = Instant::now();
-                let result = match tokio::time::timeout(
-                    budget,
-                    provider.translate_once(req, &cred),
-                )
-                .await
-                {
-                    Ok(r) => r,
-                    Err(_) => Err(Error::Timeout { timeout_ms: budget_ms }),
-                };
+                let result =
+                    match tokio::time::timeout(budget, provider.translate_once(req, &cred)).await {
+                        Ok(r) => r,
+                        Err(_) => Err(Error::Timeout {
+                            timeout_ms: budget_ms,
+                        }),
+                    };
                 let latency_ms = started.elapsed().as_millis() as u64;
 
                 match result {
@@ -491,8 +516,8 @@ mod tests {
     use crate::core::creds::Credential;
     use crate::core::error::Result as R;
     use crate::core::types::{ProviderInfo, ProviderKind};
-    use crate::providers::Provider;
     use crate::core::TranslateRequest as TR;
+    use crate::providers::Provider;
     use async_trait::async_trait;
     use std::collections::BTreeMap;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -510,7 +535,11 @@ mod tests {
             ProviderInfo {
                 name: self.name.into(),
                 display_name: self.name.into(),
-                kind: if self.name == "free" { ProviderKind::Web } else { ProviderKind::Official },
+                kind: if self.name == "free" {
+                    ProviderKind::Web
+                } else {
+                    ProviderKind::Official
+                },
                 priority: if self.name == "free" { 30 } else { 1 },
                 needs_key: self.name != "free",
                 max_chars: 5000,
@@ -530,8 +559,14 @@ mod tests {
         async fn translate_once(&self, req: &TR, _cred: &Credential) -> R<TranslateResponse> {
             let n = self.calls.fetch_add(1, Ordering::SeqCst);
             match self.script.get(n).copied().flatten() {
-                Some("auth") => Err(Error::AuthFailed { provider: self.name.into(), reason: "bad".into() }),
-                Some("rate") => Err(Error::RateLimited { provider: self.name.into(), retry_after_secs: Some(1) }),
+                Some("auth") => Err(Error::AuthFailed {
+                    provider: self.name.into(),
+                    reason: "bad".into(),
+                }),
+                Some("rate") => Err(Error::RateLimited {
+                    provider: self.name.into(),
+                    retry_after_secs: Some(1),
+                }),
                 Some(_) => Err(Error::Upstream {
                     provider: self.name.into(),
                     status: 500,
@@ -562,7 +597,11 @@ mod tests {
     ) -> (Arc<Stub>, Arc<AtomicUsize>) {
         let calls = Arc::new(AtomicUsize::new(0));
         (
-            Arc::new(Stub { name, calls: calls.clone(), script }),
+            Arc::new(Stub {
+                name,
+                calls: calls.clone(),
+                script,
+            }),
             calls,
         )
     }
@@ -738,7 +777,11 @@ mod tests {
         );
         let err = engine.translate(&request(None)).await.unwrap_err();
         assert_eq!(err.code(), "NO_PROVIDER");
-        assert_eq!(calls.load(Ordering::SeqCst), 0, "no request for missing keys");
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            0,
+            "no request for missing keys"
+        );
     }
 
     #[tokio::test]
@@ -928,7 +971,10 @@ mod tests {
     }
 
     fn raced(settings: Settings) -> Settings {
-        Settings { chain: Some(vec!["slow".into(), "fast".into()]), ..settings }
+        Settings {
+            chain: Some(vec!["slow".into(), "fast".into()]),
+            ..settings
+        }
     }
 
     #[tokio::test]
@@ -961,7 +1007,11 @@ mod tests {
             "racing must not wait for the slow provider, took {elapsed:?}"
         );
         assert_eq!(fast_calls.load(Ordering::SeqCst), 1);
-        assert_eq!(slow_calls.load(Ordering::SeqCst), 1, "the loser was started");
+        assert_eq!(
+            slow_calls.load(Ordering::SeqCst),
+            1,
+            "the loser was started"
+        );
     }
 
     #[tokio::test]
@@ -1121,9 +1171,9 @@ mod tests {
         }
     }
 
-    fn recorder(
-        detected: &'static str,
-    ) -> (Arc<Recorder>, Arc<std::sync::Mutex<Vec<(String, String, String)>>>) {
+    type RecordedCalls = Arc<std::sync::Mutex<Vec<(String, String, String)>>>;
+
+    fn recorder(detected: &'static str) -> (Arc<Recorder>, RecordedCalls) {
         let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
         (
             Arc::new(Recorder {

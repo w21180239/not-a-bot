@@ -2,10 +2,10 @@
 
 use crate::core::creds::Credential;
 use crate::core::error::{Error, Result};
-use crate::core::http::{client, body_text};
+use crate::core::http::{body_text, client};
 use crate::core::lang;
-use crate::providers::{Provider, ProviderKind};
 use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
+use crate::providers::{Provider, ProviderKind};
 use async_trait::async_trait;
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -93,7 +93,9 @@ impl Provider for LibreTranslate {
 
         Ok(TranslateResponse {
             text: parsed.translatedText,
-            detected_source: parsed.detected_source_language.unwrap_or_else(|| from.clone()),
+            detected_source: parsed
+                .detected_source_language
+                .unwrap_or_else(|| from.clone()),
             target_lang: to,
             provider: "libretranslate".into(),
             engine: "libretranslate".into(),

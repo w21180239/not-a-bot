@@ -114,8 +114,14 @@ impl Provider for Aliyun {
         params.insert("AccessKeyId".into(), id.to_string());
         params.insert("SignatureMethod".into(), "HMAC-SHA1".into());
         params.insert("SignatureVersion".into(), "1.0".into());
-        params.insert("SignatureNonce".into(), uuid::Uuid::new_v4().simple().to_string());
-        params.insert("Timestamp".into(), chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string());
+        params.insert(
+            "SignatureNonce".into(),
+            uuid::Uuid::new_v4().simple().to_string(),
+        );
+        params.insert(
+            "Timestamp".into(),
+            chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+        );
         params.insert("Signature".into(), sign_query(&params, secret));
 
         let started = Instant::now();
@@ -134,13 +140,14 @@ impl Provider for Aliyun {
             }
         }
 
-        let text = parsed
-            .data
-            .and_then(|d| d.translated_text)
-            .ok_or_else(|| Error::BadResponse {
-                provider: "aliyun".into(),
-                reason: "missing data.translatedText".into(),
-            })?;
+        let text =
+            parsed
+                .data
+                .and_then(|d| d.translated_text)
+                .ok_or_else(|| Error::BadResponse {
+                    provider: "aliyun".into(),
+                    reason: "missing data.translatedText".into(),
+                })?;
 
         Ok(TranslateResponse {
             text,
@@ -185,7 +192,10 @@ mod tests {
     fn parses_success_shape() {
         let body = r#"{"code":"200","data":{"translatedText":"你好"}}"#;
         let parsed: Resp = serde_json::from_str(body).unwrap();
-        assert_eq!(parsed.data.unwrap().translated_text.as_deref(), Some("你好"));
+        assert_eq!(
+            parsed.data.unwrap().translated_text.as_deref(),
+            Some("你好")
+        );
     }
 
     #[test]

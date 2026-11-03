@@ -104,7 +104,10 @@ impl Provider for Azure {
             .query(&query)
             .header("Ocp-Apim-Subscription-Key", key);
         // Global resources take no region header.
-        if let Some(region) = cred.get("region").filter(|r| !r.is_empty() && *r != "global") {
+        if let Some(region) = cred
+            .get("region")
+            .filter(|r| !r.is_empty() && *r != "global")
+        {
             call = call.header("Ocp-Apim-Subscription-Region", region);
         }
 

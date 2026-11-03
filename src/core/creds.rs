@@ -103,7 +103,11 @@ impl Credential {
     pub fn is_complete(&self, provider: &str) -> bool {
         KEY_TABLE
             .get(provider)
-            .map(|fields| fields.iter().all(|f| self.get(f).is_some_and(|v| !v.is_empty())))
+            .map(|fields| {
+                fields
+                    .iter()
+                    .all(|f| self.get(f).is_some_and(|v| !v.is_empty()))
+            })
             .unwrap_or(false)
     }
 }
@@ -138,12 +142,11 @@ impl CredentialStore {
                 file.display()
             ));
         }
-        let value: toml::Value = toml::from_str(&text).map_err(|e| {
-            Error::Config(format!("{}: {e}", file.display()))
-        })?;
-        let root = value.as_table().ok_or_else(|| {
-            Error::Config("credentials file must be a table of tables".into())
-        })?;
+        let value: toml::Value =
+            toml::from_str(&text).map_err(|e| Error::Config(format!("{}: {e}", file.display())))?;
+        let root = value
+            .as_table()
+            .ok_or_else(|| Error::Config("credentials file must be a table of tables".into()))?;
 
         for (section, table) in root {
             let Some(section_table) = table.as_table() else {
@@ -165,7 +168,9 @@ impl CredentialStore {
             }
             // Labelled form: [deeplApi.work] tables for extra keys.
             for (label, sub) in section_table {
-                let Some(sub_table) = sub.as_table() else { continue };
+                let Some(sub_table) = sub.as_table() else {
+                    continue;
+                };
                 let fields: BTreeMap<String, String> = sub_table
                     .iter()
                     .filter_map(|(k, v)| v.as_str().map(|s| (canonical_field(k), s.to_string())))
@@ -244,7 +249,10 @@ impl CredentialStore {
 
     /// Credential labels in rotation order. Empty when unconfigured.
     pub fn labels(&self, provider: &str) -> Vec<String> {
-        self.keys(provider).iter().map(|c| c.label.clone()).collect()
+        self.keys(provider)
+            .iter()
+            .map(|c| c.label.clone())
+            .collect()
     }
 
     pub fn is_configured(&self, provider: &str) -> bool {
@@ -260,12 +268,14 @@ impl CredentialStore {
     }
 }
 
-fn expand_keyring(_provider: &str, mut fields: BTreeMap<String, String>) -> Result<BTreeMap<String, String>> {
+fn expand_keyring(
+    _provider: &str,
+    mut fields: BTreeMap<String, String>,
+) -> Result<BTreeMap<String, String>> {
     for (k, v) in fields.iter_mut() {
         if v == "@keyring" {
-            let secret = read_keyring(k).ok_or_else(|| {
-                Error::Config(format!("no keyring entry for {k}"))
-            })?;
+            let secret = read_keyring(k)
+                .ok_or_else(|| Error::Config(format!("no keyring entry for {k}")))?;
             *v = secret;
         }
     }
@@ -292,7 +302,11 @@ pub fn default_path() -> Option<PathBuf> {
         return Some(PathBuf::from(p));
     }
     let home = dirs_home()?;
-    Some(home.join(".config").join("translatex").join("credentials.toml"))
+    Some(
+        home.join(".config")
+            .join("translatex")
+            .join("credentials.toml"),
+    )
 }
 
 fn dirs_home() -> Option<PathBuf> {
@@ -363,7 +377,10 @@ app_secret = "s"
 "#,
         );
         let store = CredentialStore::load(Some(path.clone())).unwrap();
-        assert!(!store.is_configured("baidu"), "partial credentials rejected");
+        assert!(
+            !store.is_configured("baidu"),
+            "partial credentials rejected"
+        );
         assert!(store.is_configured("youdao"));
     }
 

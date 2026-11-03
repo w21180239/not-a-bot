@@ -170,7 +170,8 @@ mod tests {
 
     #[test]
     fn error_status_is_mapped() {
-        let body = r#"{"responseData":null,"responseStatus":403,"responseDetails":"quota exceeded"}"#;
+        let body =
+            r#"{"responseData":null,"responseStatus":403,"responseDetails":"quota exceeded"}"#;
         let parsed: Resp = serde_json::from_str(body).unwrap();
         assert_eq!(parsed.response_status, 403);
     }

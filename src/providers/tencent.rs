@@ -42,7 +42,8 @@ struct ApiError {
 
 /// Derive the TC3 signing key for a date: HMAC chain secret -> date -> service.
 pub fn tc3_signing_key(secret_key: &str, date: &str) -> Vec<u8> {
-    let secret_date = http::hmac_sha256_bytes(format!("TC3{secret_key}").as_bytes(), date.as_bytes());
+    let secret_date =
+        http::hmac_sha256_bytes(format!("TC3{secret_key}").as_bytes(), date.as_bytes());
     let secret_service = http::hmac_sha256_bytes(&secret_date, SERVICE.as_bytes());
     http::hmac_sha256_bytes(&secret_service, b"tc3_request")
 }

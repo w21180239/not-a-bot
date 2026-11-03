@@ -80,7 +80,7 @@ Lower number means tried earlier. Every hop is recorded, so a failure names the 
 
 ```bash
 npm install -g translatex                 # prebuilt binary for this platform
-cargo install translatex                 # or build from source, Rust 1.80+
+cargo install translatex                 # or build from source, Rust 1.89+
 # or grab a prebuilt binary
 # https://github.com/w21180239/translatex/releases/latest
 ```
@@ -418,3 +418,5 @@ Adding a provider: implement `Provider` in `src/providers/<name>.rs`, set `prior
 ## License
 
 MIT OR Apache-2.0
+
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option.

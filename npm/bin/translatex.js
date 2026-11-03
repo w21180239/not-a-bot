@@ -1,40 +1,51 @@
 #!/usr/bin/env node
 'use strict';
 
-// Thin shim: the native binary is fetched by scripts/install.js at install
-// time, so this package stays platform-neutral and a few kilobytes.
+// The native binary ships in a per-platform package declared as an optional
+// dependency, so nothing runs at install time. That matters because npm 12
+// blocks dependency install scripts by default: a download-on-install shim
+// would silently install nothing.
 
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const exe = path.join(
-  __dirname,
-  process.platform === 'win32' ? 'translatex.exe' : 'translatex'
-);
+const exe = process.platform === 'win32' ? 'translatex.exe' : 'translatex';
+const platformPackage = `translatex-${process.platform}-${process.arch}`;
 
-if (!fs.existsSync(exe)) {
+function binaryFromPlatformPackage() {
+  let packageJson;
+  try {
+    packageJson = require.resolve(`${platformPackage}/package.json`);
+  } catch {
+    return null;
+  }
+  const candidate = path.join(path.dirname(packageJson), exe);
+  return fs.existsSync(candidate) ? candidate : null;
+}
+
+const binary = process.env.TRANSLATEX_BINARY_PATH || binaryFromPlatformPackage();
+
+if (!binary) {
   process.stderr.write(
     [
-      'translatex: the native binary is missing from this install.',
+      `translatex: no binary for ${process.platform}/${process.arch}.`,
       '',
-      'Reinstall it:',
+      `The package ${platformPackage} is missing. Reinstall, or install from source:`,
       '  npm install -g translatex --force',
-      '',
-      'Or build from source:',
       '  cargo install translatex --locked',
       '',
-      'If your platform has no prebuilt binary yet, use cargo.',
+      'If your platform has no prebuilt binary, cargo is the way.',
       '',
     ].join('\n')
   );
   process.exit(1);
 }
 
-const child = spawn(exe, process.argv.slice(2), { stdio: 'inherit' });
+const child = spawn(binary, process.argv.slice(2), { stdio: 'inherit' });
 
 child.on('error', (err) => {
-  process.stderr.write(`translatex: failed to start ${exe}: ${err.message}\n`);
+  process.stderr.write(`translatex: failed to start ${binary}: ${err.message}\n`);
   process.exit(1);
 });
 

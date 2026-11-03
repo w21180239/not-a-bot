@@ -80,7 +80,7 @@
 
 ```bash
 npm install -g translatex                 # 按平台下载预编译二进制
-cargo install translatex                 # 或源码构建，Rust 1.80+
+cargo install translatex                 # 或源码构建，Rust 1.89+
 # 或直接取预编译二进制
 # https://github.com/w21180239/translatex/releases/latest
 ```
@@ -407,3 +407,5 @@ cargo clippy --all-targets
 ## 许可
 
 MIT OR Apache-2.0
+
+任选 [Apache License 2.0](LICENSE-APACHE) 或 [MIT 许可](LICENSE-MIT) 其一使用。

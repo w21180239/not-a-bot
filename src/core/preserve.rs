@@ -1,12 +1,11 @@
-﻿//! Preserve spans: replace matched regions with tokens, translate, restore, verify.
+//! Preserve spans: replace matched regions with tokens, translate, restore, verify.
 
 use crate::core::error::{Error, Result};
 use regex::Regex;
 
 /// Marker alphabet avoids sequences that translators commonly emit.
 const ALPHABET: &[&str] = &[
-    "AQ", "ZQ", "QX", "XQ", "VQ", "QV", "WQ", "QW", "JQ", "QJ", "KQ", "QK", "ZV", "VZ", "KW",
-    "WK",
+    "AQ", "ZQ", "QX", "XQ", "VQ", "QV", "WQ", "QW", "JQ", "QJ", "KQ", "QK", "ZV", "VZ", "KW", "WK",
 ];
 
 #[derive(Debug)]
@@ -22,9 +21,7 @@ impl Preserver {
         }
         let mut compiled = Vec::with_capacity(patterns.len());
         for p in patterns {
-            compiled.push(Regex::new(p).map_err(|e| {
-                Error::BadPattern(format!("{p}: {e}"))
-            })?);
+            compiled.push(Regex::new(p).map_err(|e| Error::BadPattern(format!("{p}: {e}")))?);
         }
         Ok(Some(Self {
             patterns: compiled,
@@ -48,20 +45,14 @@ impl Preserver {
                 let proposed_idx = idx_map.len();
                 idx_map.push(None);
                 // Check if this match contributes any new characters.
-                let mut contributes = false;
-                for i in m.start()..m.end() {
-                    if matches[i].is_none() {
-                        contributes = true;
-                        break;
-                    }
-                }
+                let contributes = matches[m.start()..m.end()].iter().any(|slot| slot.is_none());
                 if contributes {
                     let actual_idx = self.tokens.len();
                     idx_map[proposed_idx] = Some(actual_idx);
                     self.tokens.push(text[m.start()..m.end()].to_string());
-                    for i in m.start()..m.end() {
-                        if matches[i].is_none() {
-                            matches[i] = Some(actual_idx);
+                    for slot in &mut matches[m.start()..m.end()] {
+                        if slot.is_none() {
+                            *slot = Some(actual_idx);
                         }
                     }
                 }
@@ -82,7 +73,10 @@ impl Preserver {
             } else {
                 // `i` is a byte offset; advance by one whole UTF-8 character or
                 // multi-byte input gets indexed as if it were ASCII.
-                let ch = text[i..].chars().next().expect("byte offset on a char boundary");
+                let ch = text[i..]
+                    .chars()
+                    .next()
+                    .expect("byte offset on a char boundary");
                 out.push(ch);
                 i += ch.len_utf8();
             }
@@ -156,7 +150,10 @@ mod tests {
         let masked = p.mask("Run `make test` before you push.");
         assert!(!masked.contains("make test"));
         assert!(find_stray_token(&masked).is_some());
-        assert_eq!(p.restore(&masked).unwrap(), "Run `make test` before you push.");
+        assert_eq!(
+            p.restore(&masked).unwrap(),
+            "Run `make test` before you push."
+        );
     }
 
     #[test]
@@ -174,7 +171,9 @@ mod tests {
 
     #[test]
     fn restores_multiple_distinct_tokens() {
-        let mut p = Preserver::new(&[r"\{\{\s*\w+\s*\}\}".to_string()]).unwrap().unwrap();
+        let mut p = Preserver::new(&[r"\{\{\s*\w+\s*\}\}".to_string()])
+            .unwrap()
+            .unwrap();
         let src = "Hi {{ first }} {{ last }}, ok {{ last2 }}";
         let masked = p.mask(src);
         assert_eq!(p.tokens.len(), 3);
@@ -183,7 +182,9 @@ mod tests {
 
     #[test]
     fn adjacent_tokens_survive_restore() {
-        let mut p = Preserver::new(&[r"\{\{\s*\w+\s*\}\}".to_string()]).unwrap().unwrap();
+        let mut p = Preserver::new(&[r"\{\{\s*\w+\s*\}\}".to_string()])
+            .unwrap()
+            .unwrap();
         let src = "{{a}}{{b}}{{c}}";
         let masked = p.mask(src);
         assert_eq!(p.restore(&masked).unwrap(), src);
@@ -222,12 +223,9 @@ mod tests {
 
     #[test]
     fn later_pattern_skips_masked_text() {
-        let mut p = Preserver::new(&[
-            r"`[^`]*`".to_string(),
-            r"\S+".to_string(),
-        ])
-        .unwrap()
-        .unwrap();
+        let mut p = Preserver::new(&[r"`[^`]*`".to_string(), r"\S+".to_string()])
+            .unwrap()
+            .unwrap();
         let masked = p.mask("keep `a b` word");
         assert_eq!(p.restore(&masked).unwrap(), "keep `a b` word");
     }

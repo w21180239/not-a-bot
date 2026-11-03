@@ -113,7 +113,7 @@ pub struct ProviderInfo {
     pub name: String,
     pub display_name: String,
     pub kind: ProviderKind,
-    pub priority: u8,  // Lower = higher priority (web scraping first)
+    pub priority: u8, // Lower = higher priority (web scraping first)
     pub needs_key: bool,
     pub max_chars: usize,
     pub auto_detect: bool,

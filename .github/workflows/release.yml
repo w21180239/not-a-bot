@@ -4,14 +4,24 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   build:
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -28,11 +38,15 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
 
       - name: Install the aarch64 linker
         if: matrix.cross
@@ -58,7 +72,7 @@ jobs:
           fi
           tar -czf "${name}.tar.gz" -C dist .
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: translatex-${{ matrix.target }}
           path: translatex-${{ matrix.target }}.tar.gz
@@ -67,44 +81,88 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      # Sigstore provenance for the npm tarballs.
+      id-token: write
     env:
       # Step-level `if` cannot read `secrets`, so hoist it to job env and test that.
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
 
       - name: Create the GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: artifacts/*.tar.gz
           generate_release_notes: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Sync the npm version with the tag
-        working-directory: npm
+      - name: Configure npm auth
+        if: env.NPM_TOKEN != ''
+        run: npm config set "//registry.npmjs.org/:_authToken" "${NPM_TOKEN}" --location=user
+
+      - name: Sync every package version with the tag
+        shell: bash
         run: |
+          set -euo pipefail
           node -e '
-            const fs = require("fs");
-            const pkg = require("./package.json");
-            pkg.version = process.env.REF_NAME.replace(/^v/, "");
-            fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+            const fs = require("node:fs");
+            const version = process.env.REF_NAME.replace(/^v/, "");
+            const files = [
+              "npm/package.json",
+              ...fs.readdirSync("npm/platforms").map((d) => `npm/platforms/${d}/package.json`),
+            ];
+            for (const file of files) {
+              const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+              pkg.version = version;
+              for (const dep of Object.keys(pkg.optionalDependencies ?? {})) {
+                pkg.optionalDependencies[dep] = version;
+              }
+              fs.writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`);
+            }
           '
         env:
           REF_NAME: ${{ github.ref_name }}
 
-      - name: Publish to npm
-        # Skipped until the repository has an NPM_TOKEN secret.
+      - name: Stage the binaries into the platform packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          declare -A targets=(
+            [win32-x64]=x86_64-pc-windows-msvc
+            [linux-x64]=x86_64-unknown-linux-gnu
+            [linux-arm64]=aarch64-unknown-linux-gnu
+            [darwin-x64]=x86_64-apple-darwin
+            [darwin-arm64]=aarch64-apple-darwin
+          )
+          for key in "${!targets[@]}"; do
+            tar -xzf "artifacts/translatex-${targets[$key]}.tar.gz" -C "npm/platforms/${key}"
+          done
+          ls -l npm/platforms/*/translatex*
+
+      # Platform packages first: the main package pins their exact version, so a
+      # half-finished release would leave `npm install -g translatex` broken.
+      - name: Publish the platform packages
+        if: env.NPM_TOKEN != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          for dir in npm/platforms/*/; do
+            echo "publishing ${dir}"
+            (cd "$dir" && npm publish --access public --provenance)
+          done
+
+      - name: Publish the main package
         if: env.NPM_TOKEN != ''
         working-directory: npm
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
+        run: npm publish --access public --provenance

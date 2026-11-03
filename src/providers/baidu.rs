@@ -6,8 +6,8 @@ use crate::core::creds::Credential;
 use crate::core::error::{Error, Result};
 use crate::core::http::{client, json, now_secs};
 use crate::core::lang;
-use crate::providers::{Provider, ProviderKind};
 use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
+use crate::providers::{Provider, ProviderKind};
 use async_trait::async_trait;
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -147,7 +147,12 @@ impl Provider for Baidu {
 
         if let Some(code) = parsed.error_code.as_deref() {
             let mut err = map_baidu_error(code, parsed.error_msg.as_deref().unwrap_or(""));
-            if let Error::LanguagePairNotSupported { from_lang: source, target, .. } = &mut err {
+            if let Error::LanguagePairNotSupported {
+                from_lang: source,
+                target,
+                ..
+            } = &mut err
+            {
                 *source = from.clone();
                 *target = to.clone();
             }
@@ -230,8 +235,14 @@ mod tests {
 
     #[test]
     fn error_codes_map_to_right_variants() {
-        assert!(matches!(map_baidu_error("54003", "sign error"), Error::AuthFailed { .. }));
-        assert!(matches!(map_baidu_error("54005", "qps"), Error::RateLimited { .. }));
+        assert!(matches!(
+            map_baidu_error("54003", "sign error"),
+            Error::AuthFailed { .. }
+        ));
+        assert!(matches!(
+            map_baidu_error("54005", "qps"),
+            Error::RateLimited { .. }
+        ));
         assert_eq!(
             map_baidu_error("54008", "daily quota").code(),
             "QUOTA_EXHAUSTED"
@@ -250,7 +261,11 @@ mod tests {
         let parsed: Resp = serde_json::from_str(body).unwrap();
         let items = parsed.trans_result.unwrap();
         assert_eq!(
-            items.iter().map(|i| i.dst.as_str()).collect::<Vec<_>>().join("\n"),
+            items
+                .iter()
+                .map(|i| i.dst.as_str())
+                .collect::<Vec<_>>()
+                .join("\n"),
             "甲\n乙"
         );
     }

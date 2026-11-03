@@ -47,7 +47,10 @@ pub trait Provider: Send + Sync {
 
     /// Whether this provider can serve a canonical target language.
     fn supports(&self, target: &str) -> bool {
-        self.info().languages.iter().any(|l| l == target || l == "*")
+        self.info()
+            .languages
+            .iter()
+            .any(|l| l == target || l == "*")
     }
 
     /// Whether this provider can serve a language pair. `source` is `auto`
@@ -64,16 +67,37 @@ pub trait Provider: Send + Sync {
 /// that simply has no credentials yet.
 pub const KNOWN_PROVIDERS: &[&str] = &[
     // Free web endpoints
-    "google", "edge", "iciba", "iflyrec", "modernmt", "volcengine", "lara",
-    "lingvanex", "mirai", "papago", "reverso", "sogou", "mymemory", "systran",
+    "google",
+    "edge",
+    "iciba",
+    "iflyrec",
+    "modernmt",
+    "volcengine",
+    "lara",
+    "lingvanex",
+    "mirai",
+    "papago",
+    "reverso",
+    "sogou",
+    "mymemory",
+    "systran",
     "libretranslate",
     // Retired upstream, aliased to `iflyrec`
     "iflytek",
     // Official APIs
-    "deepl", "azure", "googlecloud", "baidu", "aliyun", "tencent", "youdao",
-    "caiyun", "niutrans",
+    "deepl",
+    "azure",
+    "googlecloud",
+    "baidu",
+    "aliyun",
+    "tencent",
+    "youdao",
+    "caiyun",
+    "niutrans",
     // LLM
-    "openai", "anthropic", "deepseek",
+    "openai",
+    "anthropic",
+    "deepseek",
 ];
 
 pub fn is_known_provider(name: &str) -> bool {
@@ -163,8 +187,7 @@ impl Registry {
         let detects = source == "auto";
         let accepts = |p: &Arc<dyn Provider>| {
             let info = p.info();
-            (target == "auto" || p.supports_pair(&source, target))
-                && (!detects || info.auto_detect)
+            (target == "auto" || p.supports_pair(&source, target)) && (!detects || info.auto_detect)
         };
 
         let mut seen: Vec<String> = Vec::new();
@@ -190,9 +213,13 @@ impl Registry {
         if let Some(name) = requested {
             let Some(provider) = self.get(name) else {
                 return Err(if is_known_provider(name) {
-                    Error::ProviderNotConfigured { name: name.to_string() }
+                    Error::ProviderNotConfigured {
+                        name: name.to_string(),
+                    }
                 } else {
-                    Error::ProviderNotFound { name: name.to_string() }
+                    Error::ProviderNotFound {
+                        name: name.to_string(),
+                    }
                 });
             };
 
@@ -209,7 +236,9 @@ impl Registry {
             if fallback.is_empty() {
                 let info = provider.info();
                 return Err(if detects && !info.auto_detect {
-                    Error::AutoDetectUnsupported { provider: info.name }
+                    Error::AutoDetectUnsupported {
+                        provider: info.name,
+                    }
                 } else {
                     Error::LanguagePairNotSupported {
                         from_lang: source.clone(),
@@ -259,7 +288,7 @@ impl Registry {
         self.iter()
             .map(|p| {
                 let info = p.info();
-                serde_json::to_value(&info).unwrap_or_else(|_| serde_json::Value::Null)
+                serde_json::to_value(&info).unwrap_or(serde_json::Value::Null)
             })
             .collect()
     }
@@ -367,9 +396,7 @@ mod tests {
         let mut reg = Registry::new();
         reg.register(stub("api", 20, &["*"]));
         reg.register(stub("web", 1, &["*"]));
-        let chain = reg
-            .chain(None, &[], &[], "en", "zh")
-            .expect("chain");
+        let chain = reg.chain(None, &[], &[], "en", "zh").expect("chain");
         assert_eq!(names(&chain), vec!["web", "api"]);
     }
 
@@ -379,7 +406,13 @@ mod tests {
         reg.register(stub("api", 1, &["*"]));
         reg.register(stub("web", 20, &["*"]));
         let chain = reg
-            .chain(None, &[], &["api".to_string(), "web".to_string()], "en", "zh")
+            .chain(
+                None,
+                &[],
+                &["api".to_string(), "web".to_string()],
+                "en",
+                "zh",
+            )
             .expect("chain");
         assert_eq!(names(&chain), vec!["api", "web"]);
     }
@@ -415,7 +448,13 @@ mod tests {
         reg.alias("retired", "live");
         assert!(reg.get("retired").is_some());
         let chain = reg
-            .chain(None, &["retired".to_string(), "live".to_string()], &[], "en", "zh")
+            .chain(
+                None,
+                &["retired".to_string(), "live".to_string()],
+                &[],
+                "en",
+                "zh",
+            )
             .expect("chain");
         assert_eq!(names(&chain), vec!["live"]);
     }
@@ -456,7 +495,13 @@ mod tests {
         reg.register(stub_no_detect("no-detect", 1));
         reg.register(stub("fallback", 5, &["*"]));
         let chain = reg
-            .chain(Some("no-detect"), &["fallback".to_string()], &[], "auto", "zh")
+            .chain(
+                Some("no-detect"),
+                &["fallback".to_string()],
+                &[],
+                "auto",
+                "zh",
+            )
             .expect("chain");
         assert_eq!(names(&chain), vec!["fallback"]);
     }

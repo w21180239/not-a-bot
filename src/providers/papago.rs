@@ -76,10 +76,7 @@ impl Papago {
 
     async fn detect(&self, text: &str) -> Option<String> {
         let _ = self.client.get(HOST).send().await.ok();
-        let mut req = self
-            .client
-            .post(DETECT)
-            .form(&[("query", text)]);
+        let mut req = self.client.post(DETECT).form(&[("query", text)]);
         for (k, v) in Self::api_headers() {
             req = req.header(k, v);
         }

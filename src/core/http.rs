@@ -24,7 +24,11 @@ pub async fn body_text(provider: &str, resp: Response) -> Result<String> {
         .await
         .map_err(|e| Error::Network(format!("read body: {e}")))?;
     if status != StatusCode::OK {
-        return Err(crate::core::error::map_status(provider, status.as_u16(), &text));
+        return Err(crate::core::error::map_status(
+            provider,
+            status.as_u16(),
+            &text,
+        ));
     }
     Ok(text)
 }

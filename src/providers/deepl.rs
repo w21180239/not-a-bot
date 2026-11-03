@@ -7,8 +7,8 @@ use crate::core::creds::Credential;
 use crate::core::error::{Error, Result};
 use crate::core::http::{client, json};
 use crate::core::lang;
-use crate::providers::{Provider, ProviderKind};
 use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
+use crate::providers::{Provider, ProviderKind};
 use async_trait::async_trait;
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -176,14 +176,13 @@ impl Provider for DeepL {
             .map_err(|e| Error::Network(format!("deepl: {e}")))?;
 
         let parsed: Resp = json("deepl", resp).await?;
-        let first =
-            parsed
-                .translations
-                .first()
-                .ok_or_else(|| Error::BadResponse {
-                    provider: "deepl".into(),
-                    reason: "empty translations array".into(),
-                })?;
+        let first = parsed
+            .translations
+            .first()
+            .ok_or_else(|| Error::BadResponse {
+                provider: "deepl".into(),
+                reason: "empty translations array".into(),
+            })?;
 
         Ok(TranslateResponse {
             text: first.text.clone(),

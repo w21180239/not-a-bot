@@ -6,7 +6,10 @@ Thumbs.db
 .vscode/
 node_modules/
 
-# npm package: the downloaded binary and packed tarballs are build artifacts
+# npm package: binaries staged for the platform packages are build artifacts
 npm/bin/translatex
 npm/bin/translatex.exe
+npm/platforms/*/translatex
+npm/platforms/*/translatex.exe
 npm/*.tgz
+npm/platforms/*/*.tgz

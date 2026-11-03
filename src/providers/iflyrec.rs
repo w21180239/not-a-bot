@@ -177,7 +177,9 @@ impl Provider for Iflyrec {
 
     /// The endpoint only serves zh-anchored pairs: either side must be zh.
     fn supports_pair(&self, source: &str, target: &str) -> bool {
-        supports(source) && supports(target) && (source == "zh" || source == "auto" || target == "zh")
+        supports(source)
+            && supports(target)
+            && (source == "zh" || source == "auto" || target == "zh")
     }
 
     async fn translate_once(

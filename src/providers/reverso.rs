@@ -17,12 +17,40 @@ const UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
 
 /// Canonical code <-> Reverso's three-letter code, from the site's own map.
 const CODES: &[(&str, &str)] = &[
-    ("ar", "ara"), ("bg", "bul"), ("cs", "cze"), ("da", "dan"), ("de", "ger"), ("el", "gre"),
-    ("en", "eng"), ("es", "spa"), ("fa", "per"), ("fi", "fin"), ("fr", "fra"), ("he", "heb"),
-    ("hi", "hin"), ("hu", "hun"), ("id", "ind"), ("it", "ita"), ("ja", "jpn"), ("ko", "kor"),
-    ("nl", "dut"), ("no", "nor"), ("pl", "pol"), ("pt", "por"), ("ro", "rum"), ("ru", "rus"),
-    ("sk", "slo"), ("sr", "srp"), ("sv", "swe"), ("th", "tha"), ("tr", "tur"), ("uk", "ukr"),
-    ("ur", "urd"), ("vi", "vie"), ("zh", "chi"), ("zh-TW", "chi"),
+    ("ar", "ara"),
+    ("bg", "bul"),
+    ("cs", "cze"),
+    ("da", "dan"),
+    ("de", "ger"),
+    ("el", "gre"),
+    ("en", "eng"),
+    ("es", "spa"),
+    ("fa", "per"),
+    ("fi", "fin"),
+    ("fr", "fra"),
+    ("he", "heb"),
+    ("hi", "hin"),
+    ("hu", "hun"),
+    ("id", "ind"),
+    ("it", "ita"),
+    ("ja", "jpn"),
+    ("ko", "kor"),
+    ("nl", "dut"),
+    ("no", "nor"),
+    ("pl", "pol"),
+    ("pt", "por"),
+    ("ro", "rum"),
+    ("ru", "rus"),
+    ("sk", "slo"),
+    ("sr", "srp"),
+    ("sv", "swe"),
+    ("th", "tha"),
+    ("tr", "tur"),
+    ("uk", "ukr"),
+    ("ur", "urd"),
+    ("vi", "vie"),
+    ("zh", "chi"),
+    ("zh-TW", "chi"),
 ];
 
 /// Canonical -> Reverso code; `None` means the engine has no such language.
@@ -51,7 +79,10 @@ struct Resp {
 fn detected(resp: &Resp) -> Option<String> {
     resp.language_detection
         .as_ref()
-        .and_then(|v| v.get("from").or_else(|| v.get("input").and_then(|i| i.get("from"))))
+        .and_then(|v| {
+            v.get("from")
+                .or_else(|| v.get("input").and_then(|i| i.get("from")))
+        })
         .and_then(|v| v.as_str())
         .and_then(from_reverso_code)
         .map(String::from)
@@ -113,7 +144,11 @@ impl Provider for Reverso {
         let to = lang::normalize(&req.target_lang);
         let from_raw = lang::normalize(&req.source_lang);
         // The endpoint has no detection: fall back to Chinese, as the reference does.
-        let from_raw = if from_raw == "auto" { "zh".to_string() } else { from_raw };
+        let from_raw = if from_raw == "auto" {
+            "zh".to_string()
+        } else {
+            from_raw
+        };
 
         let from = to_reverso_code(&from_raw).ok_or_else(|| Error::LanguagePairNotSupported {
             from_lang: from_raw.clone(),
@@ -160,11 +195,10 @@ impl Provider for Reverso {
             return Err(map_status("reverso", status, &body));
         }
 
-        let parsed: Resp =
-            serde_json::from_str(&body).map_err(|e| Error::BadResponse {
-                provider: "reverso".into(),
-                reason: format!("{e}: {}", truncate(&body, 160)),
-            })?;
+        let parsed: Resp = serde_json::from_str(&body).map_err(|e| Error::BadResponse {
+            provider: "reverso".into(),
+            reason: format!("{e}: {}", truncate(&body, 160)),
+        })?;
 
         // Read detection before moving `translation` out of the response.
         let source = detected(&parsed);
@@ -241,9 +275,11 @@ mod tests {
 
     #[test]
     fn multi_segment_translation_joins() {
-        let p: Resp =
-            serde_json::from_str(r#"{"translation":["你好","世界"]}"#).unwrap();
-        assert_eq!(p.translation.map(|v| v.concat()).as_deref(), Some("你好世界"));
+        let p: Resp = serde_json::from_str(r#"{"translation":["你好","世界"]}"#).unwrap();
+        assert_eq!(
+            p.translation.map(|v| v.concat()).as_deref(),
+            Some("你好世界")
+        );
     }
 
     #[test]
@@ -255,10 +291,9 @@ mod tests {
 
     #[test]
     fn detection_maps_back_to_canonical() {
-        let p: Resp = serde_json::from_str(
-            r#"{"translation":["x"],"languageDetection":{"from":"fra"}}"#,
-        )
-        .unwrap();
+        let p: Resp =
+            serde_json::from_str(r#"{"translation":["x"],"languageDetection":{"from":"fra"}}"#)
+                .unwrap();
         assert_eq!(detected(&p).as_deref(), Some("fr"));
     }
 }

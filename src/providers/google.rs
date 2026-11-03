@@ -4,8 +4,8 @@ use crate::core::creds::Credential;
 use crate::core::error::{Error, Result};
 use crate::core::http::{client, map_status};
 use crate::core::lang;
-use crate::providers::{Provider, ProviderKind};
 use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
+use crate::providers::{Provider, ProviderKind};
 use async_trait::async_trait;
 use serde::Deserialize;
 use std::time::Duration;
@@ -27,6 +27,12 @@ impl GoogleFree {
     }
 }
 
+impl Default for GoogleFree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Extract translated text and detected language from the nested Google response array.
 fn parse_google_web(body: &str) -> Result<(String, String)> {
     let parsed: WebResp = serde_json::from_str(body).map_err(|e| Error::BadResponse {
@@ -35,18 +41,23 @@ fn parse_google_web(body: &str) -> Result<(String, String)> {
     })?;
 
     // First element: array of [translated, original, ...] segments
-    let segments = parsed
-        .0
-        .first()
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| Error::BadResponse {
-            provider: "google".into(),
-            reason: "no segments".into(),
-        })?;
+    let segments =
+        parsed
+            .0
+            .first()
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| Error::BadResponse {
+                provider: "google".into(),
+                reason: "no segments".into(),
+            })?;
 
     let text = segments
         .iter()
-        .filter_map(|seg| seg.as_array().and_then(|a| a.first()).and_then(|v| v.as_str()))
+        .filter_map(|seg| {
+            seg.as_array()
+                .and_then(|a| a.first())
+                .and_then(|v| v.as_str())
+        })
         .collect::<String>();
 
     if text.is_empty() {
@@ -96,7 +107,8 @@ impl Provider for GoogleFree {
         let to = lang::normalize(&req.target_lang);
         let from = lang::normalize(&req.source_lang);
 
-        let mut form: std::collections::BTreeMap<String, String> = std::collections::BTreeMap::new();
+        let mut form: std::collections::BTreeMap<String, String> =
+            std::collections::BTreeMap::new();
         form.insert("client".into(), "gtx".into());
         form.insert("sl".into(), from.clone());
         form.insert("tl".into(), to.clone());

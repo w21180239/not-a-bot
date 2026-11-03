@@ -1,11 +1,11 @@
-﻿//! LLM translation via OpenAI-compatible chat completions.
+//! LLM translation via OpenAI-compatible chat completions.
 //! One implementation covers OpenAI, DeepSeek, Moonshot, SiliconFlow, etc.
 
 use crate::core::creds::Credential;
 use crate::core::error::{Error, Result};
 use crate::core::http::{client, with_timeout};
-use crate::providers::{Provider, ProviderKind};
 use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
+use crate::providers::{Provider, ProviderKind};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -37,7 +37,11 @@ struct Choice {
 
 /// Build the translation prompt. Kept free so tests need no HTTP.
 fn build_prompt(source: &str, target: &str) -> String {
-    let src = if source == "auto" { "the detected source language" } else { source };
+    let src = if source == "auto" {
+        "the detected source language"
+    } else {
+        source
+    };
     format!(
         "Translate the user's text from {src} to {target}. Output ONLY the translated text. \
          No explanations, no notes. Preserve formatting, code blocks and placeholders exactly."
@@ -53,12 +57,7 @@ pub struct Llm {
 }
 
 impl Llm {
-    pub fn new(
-        name: &str,
-        display: &str,
-        base_url: Option<&str>,
-        model: Option<&str>,
-    ) -> Self {
+    pub fn new(name: &str, display: &str, base_url: Option<&str>, model: Option<&str>) -> Self {
         let base_url = base_url
             .unwrap_or("https://api.openai.com/v1")
             .trim_end_matches('/')
@@ -73,14 +72,21 @@ impl Llm {
     }
 
     pub fn openai(cfg: &crate::core::config::ProviderSettings) -> Self {
-        Self::new("openai", "OpenAI", cfg.base_url.as_deref(), cfg.model.as_deref())
+        Self::new(
+            "openai",
+            "OpenAI",
+            cfg.base_url.as_deref(),
+            cfg.model.as_deref(),
+        )
     }
 
     pub fn anthropic(cfg: &crate::core::config::ProviderSettings) -> Self {
         Self::new(
             "anthropic",
             "Anthropic Claude",
-            cfg.base_url.as_deref().or(Some("https://api.anthropic.com/v1")),
+            cfg.base_url
+                .as_deref()
+                .or(Some("https://api.anthropic.com/v1")),
             cfg.model.as_deref().or(Some("claude-sonnet-4-5")),
         )
     }
@@ -89,7 +95,9 @@ impl Llm {
         Self::new(
             "deepseek",
             "DeepSeek",
-            cfg.base_url.as_deref().or(Some("https://api.deepseek.com/v1")),
+            cfg.base_url
+                .as_deref()
+                .or(Some("https://api.deepseek.com/v1")),
             cfg.model.as_deref().or(Some("deepseek-chat")),
         )
     }
@@ -138,8 +146,14 @@ impl Provider for Llm {
         let body = ChatRequest {
             model: self.model.clone(),
             messages: vec![
-                Message { role: "system".into(), content: build_prompt(&req.source_lang, &req.target_lang) },
-                Message { role: "user".into(), content: req.text.clone() },
+                Message {
+                    role: "system".into(),
+                    content: build_prompt(&req.source_lang, &req.target_lang),
+                },
+                Message {
+                    role: "user".into(),
+                    content: req.text.clone(),
+                },
             ],
             temperature: 0.2,
             max_tokens: 4096,
@@ -153,8 +167,7 @@ impl Provider for Llm {
             .await
             .map_err(|e| Error::Network(format!("{}: {e}", self.name)))?;
 
-        let parsed: ChatResponse =
-            crate::core::http::json(&self.name, resp).await?;
+        let parsed: ChatResponse = crate::core::http::json(&self.name, resp).await?;
 
         let text = parsed
             .choices

@@ -29,8 +29,8 @@ pub fn aes_ecb_decrypt_pkcs7(data: &[u8], key: &str) -> Result<String, String> {
 
 /// AES-CBC encrypt with PKCS7 padding and an explicit ASCII IV.
 pub fn aes_cbc_encrypt_pkcs7(data: &str, key: &str, iv: &str) -> Result<Vec<u8>, String> {
-    let cipher = Aes128Enc::new_from_slices(key.as_bytes(), iv.as_bytes())
-        .map_err(|e| e.to_string())?;
+    let cipher =
+        Aes128Enc::new_from_slices(key.as_bytes(), iv.as_bytes()).map_err(|e| e.to_string())?;
     Ok(cipher.encrypt_padded_vec_mut::<Pkcs7>(data.as_bytes()))
 }
 
@@ -118,7 +118,8 @@ mod tests {
     fn iv_prefixed_round_trip() {
         let key = b"0123456789abcdef";
         let iv = b"fedcba9876543210";
-        let mut body = aes_cbc_encrypt_pkcs7("payload", "0123456789abcdef", "fedcba9876543210").unwrap();
+        let mut body =
+            aes_cbc_encrypt_pkcs7("payload", "0123456789abcdef", "fedcba9876543210").unwrap();
         let mut all = iv.to_vec();
         all.append(&mut body);
         assert_eq!(aes_cbc_decrypt_iv_prefixed(&all, key).unwrap(), "payload");

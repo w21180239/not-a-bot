@@ -2,6 +2,19 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.1.1 — 2026-11-04
+
+### Changed
+
+- npm distribution ships the binary in per-platform packages (`translatex-win32-x64`, `translatex-linux-arm64`, …) pulled in as optional dependencies. Installing runs no lifecycle script, which npm 12 blocks by default, so `npm install -g translatex` no longer depends on `postinstall` being allowed.
+- Declared MSRV is 1.89, the highest `rust-version` in the dependency graph; the previous 1.80 claim never compiled.
+- CI covers `cargo fmt --check`, `clippy -D warnings`, tests on Linux/macOS/Windows, an MSRV build, and an npm packaging check. Dependabot tracks the actions, Cargo and npm manifests.
+
+### Fixed
+
+- `cargo clippy --all-targets -- -D warnings` is clean; seven warnings were outstanding in `preserve`, `google`, `modernmt`, `volcengine`, `providers` and the engine tests.
+- The repository declared `MIT OR Apache-2.0` but shipped no license text; `LICENSE-MIT` and `LICENSE-APACHE` are now in the tree.
+
 ## 0.1.0 — 2026-11-04
 
 ### Added

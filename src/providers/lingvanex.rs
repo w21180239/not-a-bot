@@ -153,11 +153,10 @@ impl Provider for Lingvanex {
             return Err(map_status("lingvanex", status, &body));
         }
 
-        let parsed: Resp =
-            serde_json::from_str(&body).map_err(|e| Error::BadResponse {
-                provider: "lingvanex".into(),
-                reason: format!("{e}: {}", truncate(&body, 160)),
-            })?;
+        let parsed: Resp = serde_json::from_str(&body).map_err(|e| Error::BadResponse {
+            provider: "lingvanex".into(),
+            reason: format!("{e}: {}", truncate(&body, 160)),
+        })?;
 
         if matches!(&parsed.err, Some(v) if !v.is_null()) {
             return Err(Error::Upstream {

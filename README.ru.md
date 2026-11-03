@@ -79,7 +79,7 @@
 
 ```bash
 npm install -g translatex                 # готовый бинарник для платформы
-cargo install translatex                 # или сборка из исходников, Rust 1.80+
+cargo install translatex                 # или сборка из исходников, Rust 1.89+
 # или готовый бинарник:
 # https://github.com/w21180239/translatex/releases/latest
 ```
@@ -356,3 +356,5 @@ api_key = "..."
 - [AGENTS.md](./AGENTS.md) — интеграция с агентами
 
 MIT OR Apache-2.0
+
+Используйте на выбор [Apache License 2.0](LICENSE-APACHE) или [MIT](LICENSE-MIT).
