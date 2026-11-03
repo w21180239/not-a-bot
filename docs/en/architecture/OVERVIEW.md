@@ -11,6 +11,7 @@ src/
 ├── core/
 │   ├── config.rs        Settings, default chain, paths
 │   ├── creds.rs         credential loading, keyring expansion, env overlay
+│   ├── crypto.rs        AES-ECB/CBC helpers used by the Iciba adapter
 │   ├── engine.rs        fallback loop, key selection, preserve, timeout
 │   ├── http.rs          shared clients, signing helpers, body handling
 │   ├── keys.rs          per-credential cooldown state, cross-process

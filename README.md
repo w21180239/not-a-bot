@@ -137,7 +137,7 @@ Priorities are the numbers the chain sorts by. `chars` is the request limit the 
 | 6 | Lingvanex | `lingvanex` | no | 1 000 | `API_BEARER_TOKEN` |
 | 7 | Mirai Translate | `mirai` | yes | 500 | Japanese-anchored pairs only, trial key scraped per call |
 | 8 | Papago (Naver) | `papago` | yes | 1 000 | cookie-primed detect + form POST |
-| 9 | Reverso Context | `reverso` | no | 2 000 | three-letter codes; see status table |
+| 9 | Reverso Context | `reverso` | no | 2 000 | three-letter codes; excluded from the auto chain, see status |
 | 10 | Sogou | `sogou` | yes | 5 000 | md5 sign; per-IP throttle returns `RATE_LIMITED` |
 | 11 | MyMemory | `mymemory` | no | 5 000 | RFC 3066 codes, daily cap |
 | 12 | SysTran | `systran` | no | 5 000 | OAuth client credentials scraped from the bundle |
@@ -174,7 +174,7 @@ Endpoints drift. This is what a full sweep against the free web endpoints return
 | Verified end-to-end | `google`, `edge`, `iciba`, `modernmt`, `lara`, `volcengine`, `lingvanex`, `papago`, `sogou`, `mymemory`, `systran` |
 | Restricted pairs | `iflyrec` (zh ↔ any), `mirai` (ja-anchored) |
 | Throttles under load | `sogou` — per-IP limit surfaces as `RATE_LIMITED` with `retryAfterSecs`, never a fake translation |
-| Blocked by fingerprinting | `reverso` — Cloudflare rejects the rustls JA3; works from browsers and Python clients |
+| Blocked by fingerprinting | `reverso` — Cloudflare rejects the rustls JA3; it stays registered for explicit use but is skipped by the auto chain, so an automatic request never spends a round trip on it |
 | Opt-in only | `libretranslate` — no public instance is alive; self-host and set `base_url` |
 | Retired upstream | `iflytek` — aliased to `iflyrec` so old configs keep working |
 
@@ -269,7 +269,7 @@ Full reference: [docs/en/api/OVERVIEW.md](./docs/en/api/OVERVIEW.md).
 ## Development
 
 ```bash
-cargo test --lib          # 216 tests
+cargo test                # 243: 217 unit, 11 contract, 8 integration, 7 MCP
 cargo build --release     # ~5 min with LTO
 cargo clippy --all-targets
 ```

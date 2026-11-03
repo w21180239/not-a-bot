@@ -18,7 +18,7 @@
 | 6 | Lingvanex | `lingvanex` | no | 1 000 | `lingvanex.com/translation/api`, `API_BEARER_TOKEN` from the page | verified |
 | 7 | Mirai Translate | `mirai` | yes | 500 | `trial.miraitranslate.com`, `var tran` key scraped per call + trace ping | verified, Japanese-anchored pairs only |
 | 8 | Papago | `papago` | yes | 1 000 | `papago.naver.com`, cookie-primed detect then form POST | verified |
-| 9 | Reverso Context | `reverso` | no | 2 000 | `api.reverso.net/translate/v1/translation`, three-letter codes | Cloudflare blocks rustls JA3 |
+| 9 | Reverso Context | `reverso` | no | 2 000 | `api.reverso.net/translate/v1/translation`, three-letter codes | Cloudflare blocks rustls JA3; excluded from the auto chain |
 | 10 | Sogou | `sogou` | yes | 5 000 | `fanyi.sogou.com/api/transpc/text/result`, md5 sign | per-IP throttle → `RATE_LIMITED` |
 | 11 | MyMemory | `mymemory` | no | 5 000 | `api.mymemory.translated.net/get`, RFC 3066 codes | verified, daily cap |
 | 12 | SysTran | `systran` | no | 5 000 | `translate.systran.net`, OAuth client credentials from the bundle | verified |

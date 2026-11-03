@@ -59,13 +59,16 @@ pub trait Provider: Send + Sync {
     }
 }
 
-/// Every provider this binary implements, configured or not. Distinguishes an
-/// unknown name from one that simply has no credentials yet.
+/// Every provider name this binary can serve, configured or not, including
+/// retired names kept alive as aliases. Distinguishes an unknown name from one
+/// that simply has no credentials yet.
 pub const KNOWN_PROVIDERS: &[&str] = &[
     // Free web endpoints
     "google", "edge", "iciba", "iflyrec", "modernmt", "volcengine", "lara",
     "lingvanex", "mirai", "papago", "reverso", "sogou", "mymemory", "systran",
-    "libretranslate", "iflytek",
+    "libretranslate",
+    // Retired upstream, aliased to `iflyrec`
+    "iflytek",
     // Official APIs
     "deepl", "azure", "googlecloud", "baidu", "aliyun", "tencent", "youdao",
     "caiyun", "niutrans",
@@ -75,6 +78,19 @@ pub const KNOWN_PROVIDERS: &[&str] = &[
 
 pub fn is_known_provider(name: &str) -> bool {
     KNOWN_PROVIDERS.contains(&name)
+}
+
+/// Registered providers the registry never appends by priority.
+///
+/// `reverso` fails Cloudflare's TLS-fingerprint check: rustls is rejected while
+/// browsers and Python `requests` get through. Appending it to every automatic
+/// chain buys a failed round trip, so it only runs when the caller names it in
+/// `--provider`, `--fallback` or the configured `chain`. It stays visible in
+/// `translatex providers`.
+pub const DEFAULT_EXCLUDED: &[&str] = &["reverso"];
+
+pub fn is_default_excluded(name: &str) -> bool {
+    DEFAULT_EXCLUDED.contains(&name)
 }
 
 #[derive(Default)]
@@ -223,6 +239,9 @@ impl Registry {
         rest.sort_by_key(|p| p.info().priority);
         for provider in rest {
             let real = provider.info().name;
+            if is_default_excluded(&real) {
+                continue;
+            }
             if !seen.contains(&real) {
                 seen.push(real);
                 out.push(provider);
@@ -256,7 +275,6 @@ pub mod google;
 pub mod googlecloud;
 pub mod iciba;
 pub mod iflyrec;
-pub mod iflytek;
 pub mod lara;
 pub mod libretranslate;
 pub mod lingvanex;
@@ -452,5 +470,34 @@ mod tests {
             .err()
             .expect("unconfigured provider");
         assert_eq!(err.code(), "PROVIDER_NOT_CONFIGURED");
+    }
+
+    #[test]
+    fn default_excluded_providers_are_only_used_when_named() {
+        let mut reg = Registry::new();
+        reg.register(stub("reverso", 9, &["*"]));
+        reg.register(stub("google", 1, &["*"]));
+
+        // The priority append skips it even though it is registered.
+        let chain = reg.chain(None, &[], &[], "en", "zh").expect("chain");
+        assert_eq!(names(&chain), vec!["google"]);
+
+        // An explicit fallback list still includes it.
+        let chain = reg
+            .chain(None, &["reverso".to_string()], &[], "en", "zh")
+            .expect("chain");
+        assert!(names(&chain).contains(&"reverso".to_string()));
+
+        // So does an explicit `chain` in the config.
+        let chain = reg
+            .chain(None, &[], &["reverso".to_string()], "en", "zh")
+            .expect("chain");
+        assert_eq!(names(&chain), vec!["reverso", "google"]);
+
+        // Pinning it works too.
+        let chain = reg
+            .chain(Some("reverso"), &[], &[], "en", "zh")
+            .expect("chain");
+        assert_eq!(names(&chain), vec!["reverso"]);
     }
 }

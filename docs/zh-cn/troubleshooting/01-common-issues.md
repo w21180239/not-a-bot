@@ -42,7 +42,7 @@ chain = ["edge", "google", "iciba", "sogou"]
 
 ## `reverso` 总是失败且消息里是 HTML
 
-Cloudflare 拒绝 rustls 客户端的 TLS 指纹。接口本身是活的，浏览器可用。可以把它留在链里（代价是一次快速失败），或从 `chain` 中移除。没有靠请求头绕过的办法。
+Cloudflare 拒绝 rustls 客户端的 TLS 指纹。接口本身是活的，浏览器可用，所以这只在你显式要求 `reverso` 时发生 —— 它已被排除在自动链之外。没有靠请求头绕过的办法，换其它 Provider。
 
 ## 所有 Provider 都 `TIMEOUT`
 

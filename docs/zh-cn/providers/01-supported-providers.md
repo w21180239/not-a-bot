@@ -18,7 +18,7 @@
 | 6 | Lingvanex | `lingvanex` | 否 | 1 000 | `lingvanex.com/translation/api`，页面里的 `API_BEARER_TOKEN` | 实测可用 |
 | 7 | Mirai Translate | `mirai` | 是 | 500 | `trial.miraitranslate.com`，每次调用抓 `var tran` 并打 trace | 实测可用，仅日文相关语言对 |
 | 8 | Papago | `papago` | 是 | 1 000 | `papago.naver.com`，先取 Cookie 再表单 POST | 实测可用 |
-| 9 | Reverso Context | `reverso` | 否 | 2 000 | `api.reverso.net/translate/v1/translation`，三字母语言码 | Cloudflare 拦截 rustls JA3 |
+| 9 | Reverso Context | `reverso` | 否 | 2 000 | `api.reverso.net/translate/v1/translation`，三字母语言码 | Cloudflare 拦截 rustls JA3；不在自动链中 |
 | 10 | 搜狗翻译 | `sogou` | 是 | 5 000 | `fanyi.sogou.com/api/transpc/text/result`，md5 签名 | 按 IP 限流 → `RATE_LIMITED` |
 | 11 | MyMemory | `mymemory` | 否 | 5 000 | `api.mymemory.translated.net/get`，RFC 3066 语言码 | 实测可用，有每日上限 |
 | 12 | SysTran | `systran` | 否 | 5 000 | `translate.systran.net`，从 bundle 抓 OAuth client credentials | 实测可用 |

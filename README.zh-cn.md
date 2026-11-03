@@ -137,7 +137,7 @@ MCP 服务读取与 CLI 相同的 `config.toml` 和 `credentials.toml`，CLI 配
 | 6 | Lingvanex | `lingvanex` | 否 | 1 000 | `API_BEARER_TOKEN` |
 | 7 | Mirai Translate | `mirai` | 是 | 500 | 仅日文相关语言对，每次调用抓取 trial key |
 | 8 | Papago（Naver） | `papago` | 是 | 1 000 | 先取 Cookie 再表单 POST |
-| 9 | Reverso Context | `reverso` | 否 | 2 000 | 三字母语言码，见状态表 |
+| 9 | Reverso Context | `reverso` | 否 | 2 000 | 三字母语言码；不在自动链中，见状态表 |
 | 10 | 搜狗翻译 | `sogou` | 是 | 5 000 | md5 签名；按 IP 限流时返回 `RATE_LIMITED` |
 | 11 | MyMemory | `mymemory` | 否 | 5 000 | RFC 3066 语言码，有每日上限 |
 | 12 | SysTran | `systran` | 否 | 5 000 | 从前端 bundle 抓 OAuth client credentials |
@@ -174,7 +174,7 @@ MCP 服务读取与 CLI 相同的 `config.toml` 和 `credentials.toml`，CLI 配
 | 端到端可用 | `google`、`edge`、`iciba`、`modernmt`、`lara`、`volcengine`、`lingvanex`、`papago`、`sogou`、`mymemory`、`systran` |
 | 语言对受限 | `iflyrec`（中文 ↔ 其它）、`mirai`（仅日文相关） |
 | 高负载时限流 | `sogou` —— 按 IP 限流时报 `RATE_LIMITED` 并带 `retryAfterSecs`，绝不假装翻译成功 |
-| 被指纹拦截 | `reverso` —— Cloudflare 拒绝 rustls 的 JA3，浏览器与 Python 客户端可用 |
+| 被指纹拦截 | `reverso` —— Cloudflare 拒绝 rustls 的 JA3；仍保留注册以便显式调用，但自动链会跳过它，自动请求不再浪费一次往返 |
 | 仅自建 | `libretranslate` —— 已无可用公共实例，自建后配置 `base_url` |
 | 上游停用 | `iflytek` —— 已别名到 `iflyrec`，旧配置继续可用 |
 
@@ -268,7 +268,7 @@ api_key = "..."
 ## 开发
 
 ```bash
-cargo test --lib          # 216 个测试
+cargo test                # 243 个：217 单元、11 契约、8 集成、7 MCP
 cargo build --release     # 开 LTO 约 5 分钟
 cargo clippy --all-targets
 ```

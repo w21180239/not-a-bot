@@ -9,6 +9,11 @@ use std::path::PathBuf;
 /// are not listed; the registry appends whichever are configured, by ascending
 /// priority, after these. Keep this list and the provider `priority` fields in
 /// sync — web endpoints run before official APIs by design.
+///
+/// `reverso` is deliberately absent: its endpoint rejects this client's TLS
+/// fingerprint, so every automatic request would burn a round trip before
+/// falling through. It stays registered for explicit use; see
+/// [`crate::providers::DEFAULT_EXCLUDED`].
 pub const DEFAULT_AUTO_CHAIN: &[&str] = &[
     "google",
     "edge",
@@ -20,7 +25,6 @@ pub const DEFAULT_AUTO_CHAIN: &[&str] = &[
     "lingvanex",
     "mirai",
     "papago",
-    "reverso",
     "sogou",
     "mymemory",
     "systran",

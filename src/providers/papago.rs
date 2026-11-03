@@ -106,7 +106,10 @@ impl Provider for Papago {
             needs_key: false,
             max_chars: 1_000,
             auto_detect: true,
-            languages: LANGS.iter().map(|c| c.to_string()).collect(),
+            languages: LANGS
+                .iter()
+                .map(|c| crate::core::lang::normalize(c))
+                .collect(),
             free_tier: Some("unlimited (web endpoint)".into()),
             configured: true,
         }

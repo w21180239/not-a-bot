@@ -94,7 +94,10 @@ impl Provider for Volcengine {
             needs_key: false,
             max_chars: 5_000,
             auto_detect: true,
-            languages: CODES.iter().map(|c| c.to_string()).collect(),
+            languages: CODES
+                .iter()
+                .map(|c| crate::core::lang::normalize(c))
+                .collect(),
             free_tier: Some("public web endpoint, best effort".into()),
             configured: true,
         }

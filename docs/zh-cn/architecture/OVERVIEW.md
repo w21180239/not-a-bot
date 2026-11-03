@@ -11,6 +11,7 @@ src/
 ├── core/
 │   ├── config.rs        Settings、默认链、路径
 │   ├── creds.rs         凭据加载、钥匙串展开、环境变量覆盖
+│   ├── crypto.rs        Iciba 适配器使用的 AES-ECB/CBC 工具
 │   ├── engine.rs        回退循环、密钥选择、保护片段、超时
 │   ├── http.rs          共享客户端、签名工具、响应处理
 │   ├── keys.rs          单凭据冷却状态，跨进程

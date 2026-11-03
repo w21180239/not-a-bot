@@ -39,6 +39,16 @@ A provider is dropped from an unpinned chain when either check fails:
 
 Lower is earlier. The bands are a contract, not an accident: a web endpoint must never outrank an official API in the default chain unless it is genuinely more reliable for that language pair.
 
+## Default-chain exclusions
+
+One provider is registered but never selected automatically:
+
+| Provider | Why | How to use it |
+| --- | --- | --- |
+| `reverso` | Cloudflare rejects this client's TLS fingerprint, so the attempt fails at the handshake every time | `--provider reverso`, `--fallback reverso`, or listing it in `chain` |
+
+`DEFAULT_EXCLUDED` in `src/providers/mod.rs` is the skip list. The registry never appends those providers by priority; naming one anywhere — pinned, fallback or configured chain — still attempts it, and `translatex providers` still lists it.
+
 ## Attempt behaviour
 
 For each provider the engine can make up to `retries + 1` calls:

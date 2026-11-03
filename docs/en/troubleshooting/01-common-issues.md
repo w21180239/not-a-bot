@@ -42,7 +42,7 @@ chain = ["edge", "google", "iciba", "sogou"]
 
 ## `reverso` always fails with HTML in the message
 
-Cloudflare rejects the TLS fingerprint of a rustls client. The endpoint itself is alive and works from browsers. Leave `reverso` in the chain — it costs one fast failure — or remove it from `chain`. There is no header workaround.
+Cloudflare rejects the TLS fingerprint of a rustls client. The endpoint itself is alive and works from browsers, so this only happens when you ask for `reverso` explicitly — it is excluded from the automatic chain. There is no header workaround; use another provider.
 
 ## `TIMEOUT` for every provider
 

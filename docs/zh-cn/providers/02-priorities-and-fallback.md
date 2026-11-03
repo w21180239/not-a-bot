@@ -39,6 +39,16 @@
 
 数字越小越靠前。区间是约定而非巧合：默认链中网页接口不应排在官方 API 之后，除非它在特定语言对上确实更可靠。
 
+## 默认链排除项
+
+有一个 Provider 已注册，但永远不会被自动选中：
+
+| Provider | 原因 | 如何启用 |
+| --- | --- | --- |
+| `reverso` | Cloudflare 拒绝本客户端的 TLS 指纹，每次尝试都在握手阶段失败 | `--provider reverso`、`--fallback reverso`，或写进 `chain` |
+
+跳过列表是 `src/providers/mod.rs` 中的 `DEFAULT_EXCLUDED`。注册表不会按优先级把这类 Provider 追加进链；但只要显式点名（指定、fallback 或配置链），仍会尝试，`translatex providers` 也仍会列出它。
+
 ## 尝试行为
 
 每个 Provider 最多调用 `retries + 1` 次：

@@ -129,6 +129,8 @@ translatex providers --format json
 translatex health --format json
 ```
 
+`reverso` is registered but excluded from the automatic chain: its endpoint rejects this client's TLS fingerprint, so an automatic request would always pay for a failed attempt. Pin it with `--provider reverso`, list it in `--fallback`, or name it in `chain` to try it anyway.
+
 ## Credential resolution
 
 Later wins:

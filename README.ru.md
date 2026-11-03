@@ -132,7 +132,7 @@ translatex translate 'Run `make test` before pushing.' -t zh --preserve '`[^`]*`
 | 6 | Lingvanex | `lingvanex` | нет | 1 000 |
 | 7 | Mirai Translate | `mirai` | да | 500 | пары только с японским |
 | 8 | Papago (Naver) | `papago` | да | 1 000 |
-| 9 | Reverso Context | `reverso` | нет | 2 000 |
+| 9 | Reverso Context | `reverso` | нет | 2 000 | не входит в авто-цепочку |
 | 10 | Sogou | `sogou` | да | 5 000 |
 | 11 | MyMemory | `mymemory` | нет | 5 000 |
 | 12 | SysTran | `systran` | нет | 5 000 |
@@ -151,7 +151,7 @@ translatex translate 'Run `make test` before pushing.' -t zh --preserve '`[^`]*`
 | Работают полностью | `google`, `edge`, `iciba`, `modernmt`, `lara`, `volcengine`, `lingvanex`, `papago`, `sogou`, `mymemory`, `systran` |
 | Только часть пар | `iflyrec`, `mirai` |
 | Троттлинг под нагрузкой | `sogou` — `RATE_LIMITED` с `retryAfterSecs` |
-| Блокировка по отпечатку TLS | `reverso` — Cloudflare отклоняет rustls JA3 |
+| Блокировка по отпечатку TLS | `reverso` — Cloudflare отклоняет rustls JA3; остаётся доступным явно, но пропускается авто-цепочкой |
 | Только свой сервер | `libretranslate` |
 | Выведен вышестоящим | `iflytek` — псевдоним `iflyrec` |
 
