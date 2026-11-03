@@ -170,7 +170,13 @@ jobs:
         run: |
           set -euo pipefail
           for dir in npm/platforms/*/; do
-            echo "publishing ${dir}"
+            name=$(node -p "require('./${dir}/package.json').name")
+            version=$(node -p "require('./${dir}/package.json').version")
+            if npm view "${name}@${version}" version >/dev/null 2>&1; then
+              echo "skip ${name}@${version}: already on the registry"
+              continue
+            fi
+            echo "publishing ${name}@${version}"
             (cd "$dir" && npm publish --access public --provenance)
           done
 
@@ -179,4 +185,11 @@ jobs:
         working-directory: npm
         env:
           NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
-        run: npm publish --access public --provenance
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          if npm view "translatex@${version}" version >/dev/null 2>&1; then
+            echo "skip translatex@${version}: already on the registry"
+            exit 0
+          fi
+          npm publish --access public --provenance
