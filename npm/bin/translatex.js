@@ -11,7 +11,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const exe = process.platform === 'win32' ? 'translatex.exe' : 'translatex';
-const platformPackage = `translatex-${process.platform}-${process.arch}`;
+
+// npm blocks package names that look machine-generated, and "win32" trips its
+// spam filter, so the Windows package is published as translatex-windows-x64.
+const platformName = process.platform === 'win32' ? 'windows' : process.platform;
+const platformPackage = `translatex-${platformName}-${process.arch}`;
 
 function binaryFromPlatformPackage() {
   let packageJson;

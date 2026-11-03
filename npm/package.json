@@ -41,7 +41,7 @@
     "translatex-darwin-x64": "0.1.1",
     "translatex-linux-arm64": "0.1.1",
     "translatex-linux-x64": "0.1.1",
-    "translatex-win32-x64": "0.1.1"
+    "translatex-windows-x64": "0.1.1"
   },
   "engines": {
     "node": ">=18"
