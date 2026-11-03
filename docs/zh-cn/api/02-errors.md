@@ -67,8 +67,6 @@
 }
 ```
 
-MCP 工具调用把同样的载荷放进 `structuredContent`，并置 `isError: true`。
-
 ## 退出码
 
 | 错误类别 | 退出码 |

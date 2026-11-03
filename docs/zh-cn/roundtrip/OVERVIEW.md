@@ -17,6 +17,17 @@
 - 聊天回复、邮件、文档里一眼看出是生成的段落。
 - 用户说"AI 味太重""太端着""太顺了"的文本。
 
+它改写措辞，但保留句子。开头的"In today's fast-paced landscape"、模糊限定"it's important to note"、"not just X but Y" 这类句式属于内容：翻译成任何语言都会保留，往返自然也保留。删掉这些从句是编辑动作：在翻译之前删，并说明删了哪几句。
+
+## 与翻译的先后
+
+`roundtrip` 返回的是起始语言的文本，目标语言不同时要先翻译：
+
+```bash
+translatex translate "<text>" -t zh --format json          # 先译成中文
+translatex roundtrip "<中文文本>" --from zh --format json   # 再去中文的机器味
+```
+
 ## 不适合
 
 往返会改写，任何需要精确的地方都可能漂移：
@@ -61,7 +72,7 @@ translatex roundtrip draft.md --pivot ja          # 别名：translatex polish
 | `provider` | 完成最后一跳的 Provider |
 | `providers` | 逐跳的 Provider，按顺序 |
 
-MCP 中对应 `roundtrip` 工具。
+`translatex polish` 是 `roundtrip` 的别名。
 
 ## 中转语言怎么选
 

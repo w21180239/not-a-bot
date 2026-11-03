@@ -67,8 +67,6 @@ Every failure carries enough information for an agent to decide without guessing
 }
 ```
 
-MCP tool calls return the same payload inside `structuredContent` and set `isError: true`.
-
 ## Exit codes
 
 | Error classes | Exit |

@@ -28,7 +28,7 @@
 | **密钥轮换** | 单 Provider 多密钥轮询，冷却状态跨进程共享于 `~/.config/translatex/cache/`。 |
 | **结构化输出** | stdout 只输出 JSON / NDJSON，日志走 stderr，退出码可直接分支。 |
 | **保护片段** | 正则匹配的代码、变量、URL 在翻译前打码，翻译后还原；还原失败会触发回退。 |
-| **MCP 服务** | `translatex mcp` 通过 stdio 暴露 `translate`、`roundtrip`、`providers`、`languages`、`health`。 |
+| **面向 Agent 的 CLI** | 每条命令都在 stdout 输出 JSON、stderr 输出日志，退出码可直接分支。推荐的 harness 接入方式是 CLI + skill：[integrations/](./integrations/README.md)。 |
 | **真实超时** | 请求里的 `timeoutMs`（或配置里的 `timeout_ms`）限制整个 Provider 调用，不只是一次读。 |
 | **诚实的错误** | 每个失败都带 `code`、`retryable`、`retryAfterSecs`、`suggestedAction`。 |
 
@@ -102,30 +102,34 @@ translatex roundtrip "In today's fast-paced landscape, it's important to note th
 }
 ```
 
-## MCP 服务
+## Agent 接入：CLI + skill
 
-```json
-{
-  "mcpServers": {
-    "translatex": {
-      "command": "translatex",
-      "args": ["mcp"]
-    }
-  }
-}
+接入方式就是这条命令，外加一份告诉 Agent 何时调用的文档。没有服务要启动，也没有协议要协商。
+
+```bash
+# Claude Code
+mkdir -p .claude/skills/translatex && cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/
+
+# Codex / Gemini CLI（共享的跨运行时位置）
+mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/
+
+# OpenCode
+mkdir -p ~/.config/opencode/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/
+
+# 任何读取项目指令文件的 harness
+cat integrations/guidance/AGENTS.md >> AGENTS.md
 ```
 
-MCP 服务读取与 CLI 相同的 `config.toml` 和 `credentials.toml`，CLI 配好的 Key 对 Agent 立即可用。`tools/call` 返回符合规范的 `content` 块和 `structuredContent`；失败时置 `isError`，不再返回客户端无法解析的结果。
+同一份 skill 文本适用于所有 harness，只是存放位置不同。Claude Code、Codex、Gemini CLI、OpenCode、Cursor、Cline、Roo Code、Kilo Code、Continue、JetBrains AI、Zed、Aider、Qwen Code、Crush、Goose、DeepSeek Harness、MiMo Code、AtomCode、OpenClaw、Hermes Agent、Pi、Reasonix、ZCode、QwenPaw 以及其它 harness 的具体路径：[integrations/README.md](./integrations/README.md)。
 
-| 工具 | 入参 | 返回 |
-| --- | --- | --- |
-| `translate` | `TranslateRequest` | `TranslateResponse` |
-| `roundtrip` | `RoundtripRequest` | `RoundtripResponse` |
-| `providers` | `{}` | `{providers: ProviderInfo[]}` |
-| `languages` | `{provider?: string}` | `{provider, languages: string[]}` |
-| `health` | `{}` | `{healthy, providers: HealthRecord[]}` |
+偏好命令参考而非 skill 的 Agent，可以直接调用 CLI：
 
-各 harness 的接入（Claude Code 插件、OpenCode、Codex、Cursor、VS Code）：[integrations/](./integrations/README.md)。
+| 命令 | 用途 |
+| --- | --- |
+| `translatex translate "…" -t zh --format json` | 单条翻译 |
+| `translatex roundtrip "…" --from en --format json` | 经中转语言往返 |
+| `translatex providers --format json` | 本机能用哪些 Provider |
+| `translatex health --format json` | 探测所有已配置 Provider |
 
 ## 往返改写：去 AI 味
 
@@ -150,6 +154,8 @@ translatex roundtrip "Our comprehensive solution leverages cutting-edge technolo
 ```
 
 默认中转：非中文用中文，中文用英文。这个组合是实测出来的 —— 德语、法语、西班牙语往返后几乎原样返回；日文改写强度与中文相当；俄文改写最多但漂移也最大。技术类英文要保精确时用 `--pivot ja`；合同、API 文档、带数字且无法核对的内容不要用。方法与数据见 [docs/zh-cn/roundtrip/01-pivot-choice.md](./docs/zh-cn/roundtrip/01-pivot-choice.md)。
+
+它改写措辞但保留句子：AI 套话开头在任何语言里都会保留，所以要先把这些从句删掉再翻译，并告诉用户删了哪些。
 
 ## Provider 一览
 
@@ -263,8 +269,7 @@ api_key = "..."
 | `keys [PROVIDER]` | 冷却与失败状态；`--reset` 清空 |
 | `health` | 探测所有已配置 Provider |
 | `schema` | 全部线格式类型的 JSON Schema（draft 2020-12） |
-| `manifest` | 供 Agent 发现的 MCP 工具清单 |
-| `mcp` | stdio MCP 服务 |
+| `manifest` | 机器可读的 CLI 操作清单 |
 | `init` | 写出配置模板 |
 | `completions SHELL` | Bash/zsh/fish/PowerShell 补全 |
 
@@ -304,7 +309,7 @@ api_key = "..."
 ## 开发
 
 ```bash
-cargo test                # 253 个：226 单元、11 契约、8 集成、8 MCP
+cargo test                # 253 个测试
 cargo build --release     # 开 LTO 约 5 分钟
 cargo clippy --all-targets
 ```

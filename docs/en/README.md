@@ -2,7 +2,7 @@
 
 # translatex — Documentation
 
-`translatex` is an agent-first translation CLI and MCP server. It tries free web endpoints before official APIs, rotates credentials, and answers in structured JSON.
+`translatex` is an agent-first translation CLI. It tries free web endpoints before official APIs, rotates credentials, and answers in structured JSON.
 
 ## Start here
 
@@ -11,7 +11,7 @@
 | Install and translate something in one minute | [install/OVERVIEW.md](install/OVERVIEW.md) |
 | Learn every command and flag | [cli/OVERVIEW.md](cli/OVERVIEW.md) |
 | Know which providers exist and in what order | [providers/OVERVIEW.md](providers/OVERVIEW.md) |
-| Wire it into an MCP client | [mcp/OVERVIEW.md](mcp/OVERVIEW.md) |
+| Wire it into Claude Code, Codex, OpenCode or another agent | [integrations/OVERVIEW.md](integrations/OVERVIEW.md) |
 | Parse the output safely | [api/OVERVIEW.md](api/OVERVIEW.md) |
 | Fix a failing channel | [troubleshooting/OVERVIEW.md](troubleshooting/OVERVIEW.md) |
 
@@ -23,9 +23,8 @@
 | [cli/](cli/OVERVIEW.md) | Commands, flags, exit codes, config and credential files |
 | [providers/](providers/OVERVIEW.md) | Provider catalogue, priority scheme, fallback semantics, adding a provider |
 | [roundtrip/](roundtrip/OVERVIEW.md) | De-AI rewriting via a pivot language; measured pivot choice |
-| [integrations/](integrations/OVERVIEW.md) | npm, release archives, per-harness MCP and skill setup |
+| [integrations/](integrations/OVERVIEW.md) | npm, release archives, per-harness CLI and skill setup |
 | [api/](api/OVERVIEW.md) | JSON and NDJSON shapes, error taxonomy, agent decision rules |
-| [mcp/](mcp/OVERVIEW.md) | stdio transport, tool schemas, client configuration |
 | [env/](env/OVERVIEW.md) | Environment variables and their precedence |
 | [architecture/](architecture/OVERVIEW.md) | Request flow, key rotation, cooldown state, preserve engine |
 | [troubleshooting/](troubleshooting/OVERVIEW.md) | Symptom → cause → fix table for each failure class |

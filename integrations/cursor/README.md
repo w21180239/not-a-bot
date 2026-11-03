@@ -1,35 +1,31 @@
 # Cursor
 
-Cursor reads MCP servers from `.cursor/mcp.json` (project) or
-`~/.cursor/mcp.json` (global).
+Cursor reads project rules from `.cursor/rules/*.mdc` and, in recent versions,
+`AGENTS.md`.
 
-```json
-{
-  "mcpServers": {
-    "translatex": {
-      "command": "translatex",
-      "args": ["mcp"]
-    }
-  }
-}
+## Rule file
+
+```bash
+mkdir -p .cursor/rules
+cp integrations/cursor/translatex.mdc .cursor/rules/translatex.mdc
 ```
 
-Reload the window, then the tools are available in Agent mode as
-`translate`, `roundtrip`, `providers`, `languages` and `health`.
+[`translatex.mdc`](translatex.mdc) sets `alwaysApply: false`, so Cursor loads it
+when the request looks like a translation task instead of padding every prompt.
 
-Credentials resolve from `~/.config/translatex/credentials.toml` and
-`TRANSLATEX_*` variables in the environment Cursor inherits. On macOS a GUI
-launch does not read your shell profile, so either write the credentials file
-or add an `env` block:
+## AGENTS.md instead
 
-```json
-{
-  "mcpServers": {
-    "translatex": {
-      "command": "translatex",
-      "args": ["mcp"],
-      "env": { "TRANSLATEX_DEEPL_API_KEY": "…" }
-    }
-  }
-}
+```bash
+cat integrations/guidance/AGENTS.md >> AGENTS.md
 ```
+
+Use one or the other. Two copies drift.
+
+## Verify
+
+```bash
+translatex translate "Hello world" -t zh --format json
+```
+
+Then ask Cursor to translate a sentence. A correct run shows a terminal command
+and a `provider` name in the reply.

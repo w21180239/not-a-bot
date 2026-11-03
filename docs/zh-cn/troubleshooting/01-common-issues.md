@@ -74,11 +74,11 @@ ls ~/.config/translatex/cache/
 
 如果目录不可写，冷却只存在于该进程内存里，每次调用都是干净的。
 
-## MCP 客户端看不到工具
+## Agent 不调用 CLI，而是自己翻译
 
-1. `translatex mcp` 必须挂在 stdio 上，不要放到后台运行。
-2. 用 `translatex manifest --format json` 检查清单。
-3. 新增凭据后重启服务 —— 引擎在启动时只构建一次。
+1. 确认 skill 或指令文件放在该 harness 文档指定的路径。
+2. Agent 所在 shell 里 `translatex --version` 必须成功；从图形界面启动的 Agent 常常拿不到同样的 `PATH`。
+3. 让 Agent 翻译一句，回复里应出现 `provider`。没有就是根本没执行命令。
 
 ## 导航
 

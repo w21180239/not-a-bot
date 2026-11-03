@@ -1,83 +1,146 @@
 ---
 name: translatex
-description: Translate, localize, or rewrite text between languages with the translatex CLI or its MCP server. Use when the user asks for a translation, a localization pass, bulk translation of a file, or wants text to read less like machine output ("de-AI", "humanize", "make it sound natural") while keeping the same language.
+description: Use when the user asks to translate text, localize UI strings or documentation, batch-translate a file, or make prose read less like machine output ("de-AI", "humanize", "too polished", "sounds generated"), and when a translation must work without configuring an API key.
 ---
 
 # translatex
 
-Free web translation endpoints first, official APIs as fallback, structured JSON
-out. One binary, also available as an MCP server with the same tools and config.
+## Overview
 
-## Pick the operation
+One binary, no configuration needed for the free web endpoints. It rotates keys,
+races providers and falls back on its own, and every answer is JSON with a
+`text` field and a typed error.
 
-| The user wants | Do |
-| --- | --- |
-| Text in another language | `translate` |
-| The same text, same language, less machine-flavoured | `roundtrip` |
-| A file's worth of strings | `batch` (NDJSON) |
-| To know what is available | `providers`, `languages`, `health` |
+**Core principle:** the tool produces the translation; you decide what to
+delete. Typing the translation yourself loses provider fallback and the audit
+trail. Editing out filler the user asked you to remove is a different act, and
+it is allowed.
 
-## Prefer the MCP tools when they are available
-
-`translate` takes `{text, targetLang, sourceLang?, provider?, fallbackChain?, preserve?, timeoutMs?}`.
-`roundtrip` takes the same fields with `pivot` instead of `targetLang`.
-
-Both return camelCase JSON: `text`, `detectedSource`, `targetLang` (or
-`pivotLang`, `pivotText`), `provider`, `providers`, `latencyMs`, `requestId`,
-`chars`. Read `structuredContent` when the client provides it.
-
-## CLI equivalent
+## Confirm the binary once
 
 ```bash
-translatex translate "Hello world" -t zh --format json
-translatex roundtrip "In today's fast-paced landscape, ..." --from en --format json
-translatex translate "Run `make test` first." -t zh --preserve '`[^`]*`'
-echo '{"text":"hi","targetLang":"zh"}' | translatex batch --format json
+translatex --version        # missing? npm install -g translatex, or cargo install translatex
 ```
 
-## Rules that keep output correct
+## Operations
 
-- **Never translate code, identifiers, paths, or URLs.** Pass `preserve` with a
-  regex, for example `` `[^`]*` `` for backticks and `\b[A-Z][A-Z0-9_]{2,}\b` for
-  constants. The engine masks matches, translates the rest, and restores them.
-- **Do not hand-translate.** Call the tool; it rotates keys and falls back
-  across 15+ providers.
-- **Trust `detectedSource`** over your own guess for the reply.
-- **`roundtrip` is for prose, not facts.** It paraphrases: numbers, names and
-  precise technical wording can drift. Do not use it on contracts, legal text,
-  API descriptions, or anything the user will diff. Use it for marketing copy,
-  chat messages, docs prose, and anything the user calls "AI-sounding".
-- **Choose the pivot only when the default is wrong.** `pivot: "auto"` sends
-  English through Chinese and Chinese through English. Japanese (`ja`) rewrites
-  as strongly as Chinese and is a good second choice for technical English
-  where dropping articles costs meaning. German, French, Spanish and other
-  close languages round-trip almost verbatim, so they do not achieve the goal.
+| The user wants | Run |
+| --- | --- |
+| Text in another language | `translatex translate "<text>" -t <lang> --format json` |
+| The same language, less machine cadence | `translatex roundtrip "<text>" --from <lang> --format json` |
+| Many strings | `translatex batch --file jobs.ndjson --format json` |
+| To know what can serve a pair | `translatex providers --format json` |
+| To know whether anything is broken | `translatex health --format json` |
+
+Read `text` from the JSON. `provider` and `detectedSource` tell you what actually
+happened.
+
+## Choosing the order
+
+| Task | Do |
+| --- | --- |
+| Translate into language L | `translate -t L` |
+| De-AI text that is already in L | `roundtrip --from L` |
+| Translate into L **and** de-AI it | `translate -t L` first, then `roundtrip --from L` on the result |
+
+`roundtrip` returns text in the language it started from, so it can only de-AI
+the target language once the text is already in it.
+
+## The boundary: wording versus content
+
+`roundtrip` rewrites wording. It keeps the sentences. An opener like "In
+today's fast-paced digital landscape", a hedge like "it's important to note",
+and a scaffold like "not just X but Y" are content: they survive translation
+into every language, so a round trip preserves them.
+
+When the user asks for that filler to be gone:
+
+1. Delete those clauses yourself.
+2. Run the tool on what remains.
+3. Say which sentences you removed.
+
+Presenting an edited text as a straight translation hides a decision the user
+did not see.
+
+## Workflow
+
+1. **Identify the operation and the order** from the table above.
+2. **Protect what must not change.** Code, identifiers, paths, URLs and version
+   strings go through `--preserve`:
+
+   ```bash
+   translatex translate "Run \`make test\` before pushing to v2.4.0." -t zh \
+     --preserve '`[^`]*`' --preserve 'v[0-9]+\.[0-9]+\.[0-9]+' --format json
+   ```
+
+3. **Run it.** One command. Do not pre-split the text unless it exceeds the
+   provider limit shown by `providers`.
+4. **Report.** Give the final text, name the provider when it matters, and
+   disclose any sentences you removed. Add `--verbose` only when debugging a
+   failure.
+
+## Round trip options
+
+- Default pivot: Chinese for non-Chinese text, English for Chinese text.
+- `--pivot ja` rewrites as strongly and keeps more grammar; the better choice
+  for technical English that must stay precise.
+- **Never round-trip** legal text, contracts, API reference, configuration,
+  error messages, or numbers and names the user will check: the second hop
+  paraphrases by design.
 
 ## Errors
 
-Every failure carries `code`, `retryable`, `retryAfterSecs` and
-`suggestedAction`.
+Every failure carries `code`, `retryable`, `retryAfterSecs`, `suggestedAction`.
 
-| code | Action |
+| Code | Do |
 | --- | --- |
-| `RATE_LIMITED` | Wait `retryAfterSecs`, then retry |
-| `QUOTA_EXHAUSTED` | Rotate the key or wait |
-| `NETWORK_ERROR`, `TIMEOUT` | Retry with backoff, or raise `timeoutMs` |
-| `PROVIDER_NOT_CONFIGURED` | Tell the user which key to add; do not retry |
-| `LANGUAGE_PAIR_NOT_SUPPORTED` | Change provider or language; do not retry |
+| `RATE_LIMITED` | Wait `retryAfterSecs`, retry once |
+| `QUOTA_EXHAUSTED` | Switch key or wait; tell the user |
+| `NETWORK_ERROR`, `TIMEOUT` | Retry with backoff, or raise `--timeout-ms` |
+| `CHAIN_EXHAUSTED` | Run `translatex health --format json`, report which providers failed |
+| `PROVIDER_NOT_CONFIGURED` | Name the missing credential; do not retry |
+| `PROVIDER_NOT_FOUND` | Fix the provider name; check `translatex providers` |
+| `LANGUAGE_PAIR_NOT_SUPPORTED` | Change provider or target; do not retry |
+| `AUTO_DETECT_UNSUPPORTED` | Pass `--from <code>` |
 | `INVALID_INPUT` | Fix the request; do not retry |
-| `CHAIN_EXHAUSTED` | Run `translatex health --format json` and report |
 
-Never retry a `retryable: false` error unchanged.
+Retry only when `retryable` is `true`.
 
-## Discovering capability
+## Rationalizations to reject
+
+| Thought | Reality |
+| --- | --- |
+| "It's one short sentence, faster to translate myself" | The tool answers in ~300 ms and the user gets a provider they can audit. |
+| "I'll paraphrase to remove the AI tone" | Deleting filler *before* translating is editing; inventing the translation is not. Do the first, never the second. |
+| "Roundtrip will remove the AI opener" | It rewrites wording and keeps sentences. Delete the opener or report that it is still there. |
+| "The user didn't ask for a command" | They asked for a translation. The command is how this workspace produces one. |
+
+## Red flags
+
+- You are about to type the translated sentence yourself.
+- You are claiming `roundtrip` removed a sentence it cannot remove.
+- You are deleting clauses and presenting the result as a straight translation.
+- You are sending code, paths or identifiers without `--preserve`.
+- You are retrying an error whose `retryable` is `false`.
+
+## Example
 
 ```bash
-translatex providers --format json     # kind, priority, languages, configured
-translatex languages --provider edge --format json
-translatex health --format json
+$ translatex translate "Run \`make test\` before pushing." -t zh --preserve '`[^`]*`' --format json
+{
+  "text": "推送前先跑 `make test`。",
+  "detectedSource": "en",
+  "targetLang": "zh",
+  "provider": "google",
+  "engine": "google",
+  "latencyMs": 312,
+  "requestId": "…",
+  "chars": 34
+}
 ```
 
-Providers are attempted in priority order (free web endpoints 1-12, official
-APIs 20-27, LLMs 40-42), up to three at once by default, and the first success
-wins.
+The backtick span survived verbatim; provider and latency came from the tool.
+
+## Reference
+
+Full CLI, provider and error documentation: https://github.com/w21180239/translatex

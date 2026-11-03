@@ -21,6 +21,22 @@ wording. That is how machine cadence gets removed without asking a model to
 - Chat replies, emails and docs prose that sound generated.
 - Any text the user calls "AI-sounding", "stiff" or "too polished".
 
+It rewrites wording and keeps the sentences. An opener ("In today's fast-paced
+landscape"), a hedge ("it's important to note") or a scaffold ("not just X but
+Y") is content: it survives translation into every language, so a round trip
+preserves it. Deleting those clauses is an editorial step; do it before the
+translation, and say which sentences you removed.
+
+## Ordering with translation
+
+`roundtrip` returns text in the language it started from, so translate first when
+the target differs:
+
+```bash
+translatex translate "<text>" -t zh --format json          # into Chinese
+translatex roundtrip "<Chinese text>" --from zh --format json   # de-AI the Chinese
+```
+
 ## When it hurts
 
 The round trip paraphrases, so it can drift on anything precise:
@@ -67,7 +83,7 @@ translatex roundtrip draft.md --pivot ja          # alias: translatex polish
 | `provider` | Provider that served the final hop |
 | `providers` | One entry per hop, in order |
 
-MCP exposes the same operation as the `roundtrip` tool.
+`translatex polish` is an alias for `roundtrip`.
 
 ## Pivot selection
 

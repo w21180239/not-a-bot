@@ -114,7 +114,9 @@ translatex init --path ~/.config/translatex/config.toml
 translatex completions bash
 ```
 
-`schema` emits draft 2020-12 definitions for `TranslateRequest`, `TranslateResponse`, `ErrorResponse`, `ProviderInfo`, `HealthRecord`, `AttemptRecord`.
+`schema` emits draft 2020-12 definitions for `TranslateRequest`, `TranslateResponse`, `ErrorResponse`, `ProviderInfo`, `HealthRecord`, `AttemptRecord`, `RoundtripRequest` and `RoundtripResponse`.
+
+`manifest` emits `{interface: "cli", commands: [{name, command, description, inputSchema?}], skill, install}`, so an agent can discover the operations without parsing `--help`.
 
 ## Navigation
 

@@ -1,87 +1,56 @@
 # Claude Code
 
-Three ways in, from most to least integrated.
+The binary is the integration; a skill tells Claude when to run it.
 
-## 1. Plugin (MCP server + skill)
+## Skill (recommended)
 
-The plugin bundles the MCP server and a skill that tells Claude when to reach for
-it, so nothing has to be repeated in a prompt.
+Project scope:
 
 ```bash
-# Inside Claude Code
+mkdir -p .claude/skills/translatex
+cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/SKILL.md
+```
+
+Personal, every project:
+
+```bash
+mkdir -p ~/.claude/skills/translatex
+cp integrations/skill/translatex/SKILL.md ~/.claude/skills/translatex/SKILL.md
+```
+
+Claude Code discovers the skill from the frontmatter description and loads the
+body when a translation task appears. No config file, no restart.
+
+## Plugin
+
+The plugin bundles the same skill so a team can install it in one command:
+
+```bash
+# inside Claude Code
 /plugin marketplace add w21180239/translatex
 /plugin install translatex@translatex
 ```
 
-The marketplace entry is `.claude-plugin/marketplace.json`; the plugin itself
-lives in [`plugin/`](plugin/).
+The marketplace entry is [`.claude-plugin/marketplace.json`](../../.claude-plugin/marketplace.json);
+the plugin lives in [`plugin/`](plugin/) and contains only
+`skills/translatex/SKILL.md`.
 
-## 2. MCP server only
+## Project instructions instead of a skill
 
-Project scope, checked into the repo:
-
-```bash
-cp integrations/claude-code/.mcp.json .mcp.json
-```
-
-Or register it for every project:
+For a repository that prefers one shared instructions file, append the block:
 
 ```bash
-claude mcp add --scope user translatex -- translatex mcp
+cat integrations/guidance/AGENTS.md >> CLAUDE.md
 ```
 
-[`.mcp.json`](.mcp.json) contains:
-
-```json
-{
-  "mcpServers": {
-    "translatex": {
-      "command": "translatex",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-Tools: `translate`, `roundtrip`, `providers`, `languages`, `health`.
-
-## 3. Skill only
-
-For a session that should use the CLI directly:
-
-```bash
-mkdir -p .claude/skills/translatex
-cp integrations/skill/SKILL.md .claude/skills/translatex/SKILL.md
-```
-
-## Credentials
-
-The MCP server reads `~/.config/translatex/credentials.toml` and
-`TRANSLATEX_*` environment variables. To give the server a key without touching
-the host config, add an `env` block:
-
-```json
-{
-  "mcpServers": {
-    "translatex": {
-      "command": "translatex",
-      "args": ["mcp"],
-      "env": { "TRANSLATEX_DEEPL_API_KEY": "${DEEPL_API_KEY}" }
-    }
-  }
-}
-```
-
-Restart Claude Code after changing credentials; the server builds its provider
-registry once at startup.
+`CLAUDE.md` is always in context; the skill is loaded on demand and costs fewer
+tokens in sessions that never translate. Both work.
 
 ## Verify
 
 ```bash
-translatex mcp <<'EOF'
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}
-{"jsonrpc":"2.0","id":2,"method":"tools/list"}
-EOF
+claude plugin details translatex          # after the plugin install
+translatex translate "Hello world" -t zh --format json
 ```
 
-Two JSON responses, the second listing five tools.
+`plugin details` should report **Skills (1)**.

@@ -40,7 +40,7 @@ State is persisted per provider in `~/.config/translatex/cache/keys-<provider>.j
 }
 ```
 
-Every process reads and writes the same file, so a CLI call and an MCP server share one view. `translatex keys --reset` deletes the files.
+Every process reads and writes the same file, so two concurrent calls share one view. `translatex keys --reset` deletes the files.
 
 ## Keyless providers
 

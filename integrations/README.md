@@ -1,58 +1,100 @@
 # Agent integrations
 
-`translatex` is one binary with two faces: a CLI and an MCP server. Every
-harness below can use either, and most want both — the MCP server for the model,
-the CLI for scripts.
-
-| Harness | Recommended setup | Config file |
-| --- | --- | --- |
-| [Claude Code](claude-code/README.md) | Plugin (MCP + skill), or `claude mcp add` | `.mcp.json`, `.claude/skills/` |
-| [OpenCode](opencode/README.md) | MCP server, plus a skill for the CLI | `opencode.json`, `~/.config/opencode/skills/` |
-| [Codex](codex/README.md) | MCP server, plus an `AGENTS.md` note | `~/.codex/config.toml` |
-| [Cursor](cursor/README.md) | Project-level MCP server | `.cursor/mcp.json` |
-| [VS Code / Copilot](vscode/README.md) | Workspace MCP server | `.vscode/mcp.json` |
-| [Anything else](generic/README.md) | JSON-RPC over stdio | — |
-
-## Verified against
-
-Configs were checked with the real CLIs, not only parsed as JSON:
-
-| Harness | Version | Check | Result |
-| --- | --- | --- | --- |
-| Claude Code | 2.1.317 | `claude mcp add --scope user` then `claude mcp list` | `✔ Connected` |
-| Claude Code | 2.1.317 | `claude plugin marketplace add` + `claude plugin install translatex@translatex` | installed; 1 skill, 1 MCP server, ~84 always-on tokens |
-| Codex | 0.164.0 | `codex mcp add` / `list` / `get` | enabled, transport stdio, TOML shape as documented |
-| OpenCode | 2.2.5 | `opencode mcp add` then `opencode mcp list` | `✓ translatex connected`, 5 tools discovered |
-| Cursor, VS Code | — | not installed on this machine | JSON validated; config follows each client's published schema |
-
-The OpenCode entry in the schema is `mcp.servers.<name>`; the flat
-`mcp.<name>` form is still accepted for older configs.
-
-## Install the binary first
+`translatex` integrates as **a CLI plus a skill** — one binary the agent can run,
+one document telling it when and how. No MCP server, no protocol handshake: the
+agent calls the command and reads JSON.
 
 ```bash
-npm install -g translatex          # prebuilt binary for this platform
-# or
-cargo install translatex --locked
-```
-
-Then confirm it is on `PATH`:
-
-```bash
+npm install -g translatex     # or: cargo install translatex
 translatex --version
-translatex providers --format text
 ```
+
+The skill text is identical for every harness; only the place it goes differs.
+[`skill/translatex/SKILL.md`](skill/translatex/SKILL.md) is the canonical copy,
+and [`guidance/AGENTS.md`](guidance/AGENTS.md) is the short block for harnesses
+that take a project instructions file.
+
+## Harness matrix
+
+Every harness supported by FreeLLMAPI is listed. "Guidance" is how it learns the
+workflow; "Where" is the file to write.
+
+| Harness | Guidance | Where |
+| --- | --- | --- |
+| Claude Code | Skill | `.claude/skills/translatex/SKILL.md` (project) or `~/.claude/skills/translatex/SKILL.md` |
+| Claude Code | Plugin | `/plugin marketplace add w21180239/translatex` then `/plugin install translatex@translatex` |
+| Codex CLI | Skill | `~/.agents/skills/translatex/SKILL.md` |
+| Codex CLI | Instructions | `AGENTS.md` at the repo root, or `~/.codex/AGENTS.md` |
+| Gemini CLI | Skill | `~/.agents/skills/translatex/SKILL.md` |
+| Gemini CLI | Instructions | `GEMINI.md` |
+| OpenCode | Skill | `~/.config/opencode/skills/translatex/SKILL.md` |
+| OpenCode | Instructions | `AGENTS.md` |
+| Cursor | Rule | `.cursor/rules/translatex.mdc` |
+| Cline | Rule | `.clinerules/translatex.md` |
+| Roo Code | Rule | `.roo/rules/translatex.md` |
+| Kilo Code | Rule | `.kilocode/rules/translatex.md` |
+| Continue | Rule | `.continue/rules/translatex.md` |
+| JetBrains AI | Rule | `.aiassistant/rules/translatex.md` |
+| Zed | Rule | `.rules` |
+| Aider | Instructions | `CONVENTIONS.md`, read with `--read CONVENTIONS.md` |
+| Qwen Code | Instructions | `QWEN.md` |
+| Crush | Instructions | `CRUSH.md` |
+| Goose | Instructions | project instructions file |
+| DeepSeek Harness | Instructions | `AGENTS.md` |
+| MiMo Code | Instructions | `AGENTS.md` |
+| AtomCode | Instructions | `AGENTS.md` |
+| OpenClaw | Instructions | `AGENTS.md` |
+| Hermes Agent | Instructions | `AGENTS.md` |
+| Pi | Instructions | `AGENTS.md` |
+| Reasonix | Instructions | `AGENTS.md` |
+| ZCode | Instructions | `AGENTS.md` |
+| QwenPaw | Instructions | project instructions file |
+| Anything else | CLI | the agent runs `translatex … --format json` directly |
+
+`AGENTS.md` is the cross-vendor convention; a tool that documents a different
+instructions filename reads the same content under that name. Paths for Claude
+Code, Codex and OpenCode were verified against the installed CLIs; the rest are
+the vendor-documented locations for the same convention.
+
+## Install the skill once
+
+```bash
+# Claude Code
+mkdir -p .claude/skills/translatex && cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/
+
+# OpenCode
+mkdir -p ~/.config/opencode/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/
+
+# Codex and Gemini CLI (shared cross-runtime location)
+mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/
+
+# Anything with an instructions file
+cat integrations/guidance/AGENTS.md >> AGENTS.md
+```
+
+PowerShell, same operations: `New-Item -ItemType Directory -Force <dir>` then
+`Copy-Item <src> <dir>`.
 
 ## Which channel for which job
 
-| Need | Use |
+| Need | Command |
 | --- | --- |
-| The model should translate while answering | MCP tool `translate` |
-| Strip machine-flavoured phrasing before publishing | MCP tool `roundtrip`, or `translatex roundtrip` |
-| A script or CI job needs a translation | `translatex translate --format json` |
-| Bulk work from a file | `translatex batch` |
-| Health or capability discovery | `translatex providers`, `translatex health` |
+| The agent translates while answering | `translatex translate "…" -t <lang> --format json` |
+| Remove machine cadence from prose | `translatex roundtrip "…" --from <lang> --format json` |
+| A script or CI job needs a translation | same CLI, parse `text` |
+| Bulk work | `translatex batch --file jobs.ndjson` |
+| Capability discovery | `translatex providers`, `translatex languages`, `translatex health` |
 
-The MCP server and the CLI share one config, so a key added for one is visible
-to the other. Restart the MCP server after changing credentials: the engine is
-built once at startup.
+The CLI reads `~/.config/translatex/config.toml` and `credentials.toml`, or
+`TRANSLATEX_*` environment variables. Free web endpoints need neither, so the
+skill works on a fresh machine with only the binary installed.
+
+## Per-harness pages
+
+- [Claude Code](claude-code/README.md) — skill, plugin, project instructions
+- [Codex CLI](codex/README.md)
+- [OpenCode](opencode/README.md)
+- [Gemini CLI](gemini-cli/README.md)
+- [Cursor](cursor/README.md)
+- [Rules-file harnesses](harnesses/rules.md) — Cline, Roo, Kilo, Continue, JetBrains, Zed, Aider
+- [Instructions-file harnesses](harnesses/instructions.md) — Qwen Code, Crush, Goose and the AGENTS.md tools

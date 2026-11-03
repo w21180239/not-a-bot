@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "translatex": {
-      "command": "translatex",
-      "args": ["mcp"]
-    }
-  }
-}

@@ -110,7 +110,9 @@ translatex init --path ~/.config/translatex/config.toml
 translatex completions bash
 ```
 
-`schema` 输出 draft 2020-12 定义：`TranslateRequest`、`TranslateResponse`、`ErrorResponse`、`ProviderInfo`、`HealthRecord`、`AttemptRecord`。
+`schema` 输出 draft 2020-12 定义：`TranslateRequest`、`TranslateResponse`、`ErrorResponse`、`ProviderInfo`、`HealthRecord`、`AttemptRecord`、`RoundtripRequest`、`RoundtripResponse`。
+
+`manifest` 输出 `{interface: "cli", commands: [{name, command, description, inputSchema?}], skill, install}`，Agent 不必解析 `--help` 就能发现操作。
 
 ## 导航
 

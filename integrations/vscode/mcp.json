@@ -1,9 +1,0 @@
-{
-  "servers": {
-    "translatex": {
-      "type": "stdio",
-      "command": "translatex",
-      "args": ["mcp"]
-    }
-  }
-}

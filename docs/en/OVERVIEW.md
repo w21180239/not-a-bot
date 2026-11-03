@@ -12,12 +12,12 @@
 - Round-trips text through a pivot language to strip machine-flavoured phrasing.
 - Emits JSON, NDJSON, or bare text on stdout; diagnostics go to stderr.
 - Masks regex-defined spans before translation and restores them afterwards.
-- Serves the same engine over MCP stdio for agent clients.
+- Serves the same engine to agents as a CLI with structured output.
 
 ## Request flow
 
 ```
-agent ──▶ CLI or MCP
+agent ──▶ CLI
             │
             ├─ validate input, normalise language codes
             ├─ mask preserve patterns

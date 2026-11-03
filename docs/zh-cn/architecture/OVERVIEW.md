@@ -6,7 +6,6 @@
 src/
 ├── main.rs              入口，交给 cli::run
 ├── cli.rs               参数解析、分发、注册表构建
-├── mcp.rs               stdio MCP 服务
 ├── retry.rs             带抖动的指数退避
 ├── core/
 │   ├── config.rs        Settings、默认链、路径
@@ -17,7 +16,7 @@ src/
 │   ├── keys.rs          单凭据冷却状态，跨进程
 │   ├── lang.rs          规范语言码、别名、Provider 映射表
 │   ├── preserve.rs      正则打码与还原
-│   ├── types.rs         CLI、MCP、Provider 共用的线格式类型
+│   ├── types.rs         CLI 与 Provider 共用的线格式类型
 │   └── error.rs         错误分类、线格式映射、HTTP 状态映射
 └── providers/           每个后端一个模块，另有注册表与 trait
 ```

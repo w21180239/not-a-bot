@@ -6,12 +6,12 @@
 
 ### 新增
 
-- 中英文完整文档树：概览、安装、CLI、Provider、API、MCP、环境变量、架构、故障排查、往返翻译、集成。
+- 中英文完整文档树：概览、安装、CLI、Provider、API、环境变量、架构、故障排查、往返翻译、集成。
 - 根 README 按“网页优先”架构重写，覆盖中、英、俄三种语言。
-- 三套测试：`tests/contract`（线格式与 Provider 目录不变量）、`tests/integration`（对 mock 服务器的 Provider 往返）、`tests/mcp`（对真实二进制的 stdio JSON-RPC）。合计 253 个。
+- 三套测试：`tests/contract`（线格式与 Provider 目录不变量）、`tests/integration`（对 mock 服务器的 Provider 往返）、`tests/mcp`（对真实二进制的行分隔 JSON-RPC）。合计 253 个。
 - Provider 并发竞速：`race_width`（默认 3）让这么多次尝试同时在飞，第一个成功者胜出，失败的槽位从链里补人。`--race N` 与 `race_width = 1` 恢复严格串行。
-- `translatex roundtrip`（别名 `polish`）及对应的 MCP 工具：经中转语言翻出再翻回，去掉机器味。默认中转为非中文用中文、中文用英文，经实测选定；`roundtrip_pivot` 与 `--pivot` 可覆盖。
-- npm 包（`npm install -g translatex`）按平台下载预编译二进制、覆盖五个目标的 tag 发布流水线，以及 Claude Code（插件与 MCP）、OpenCode、Codex、Cursor、VS Code 和通用 MCP 客户端的接入文档。
+- `translatex roundtrip`（别名 `polish`）：经中转语言翻出再翻回，去掉机器味。默认中转为非中文用中文、中文用英文，经实测选定；`roundtrip_pivot` 与 `--pivot` 可覆盖。
+- npm 包（`npm install -g translatex`）按平台下载预编译二进制、覆盖五个目标的 tag 发布流水线，以及 Claude Code、Codex CLI、Gemini CLI、OpenCode、Cursor、Cline、Roo Code、Kilo Code、Continue、JetBrains AI、Zed、Aider、Qwen Code、Crush、Goose、DeepSeek Harness、MiMo Code、AtomCode、OpenClaw、Hermes Agent、Pi、Reasonix、ZCode、QwenPaw 的 CLI + skill 接入文档。
 
 ### 调整
 
@@ -20,13 +20,14 @@
 - 错误表补充 `PROVIDER_NOT_CONFIGURED` 与 `AUTO_DETECT_UNSUPPORTED`。
 - `volcengine` 与 `papago` 只对外声明规范语言码；接口方言（`zh-Hant`、`zh-CN`）留在适配器内部。
 - `reverso` 从自动链中排除：它在 TLS 握手阶段就失败，自动请求每次都白付一次尝试。显式指定或写进 `--fallback` 仍会尝试。
+- Agent 接入统一为 CLI + skill。MCP 服务不再是对外文档的一部分；`translatex mcp` 作为隐藏命令保留，供已有脚本使用。
 
 ### 修复
 
 - `config.toml` 与 `TRANSLATEX_CHAIN` 中的 `chain` 现在生效；此前引擎始终使用编译期默认链。
 - `--provider X --fallback A,B` 现在会真正降级到 fallback 列表。
 - MCP `tools/list` 输出对象 schema，`tools/call` 返回带 `isError` 的 `content`。
-- MCP 服务读取真实配置与凭据，并只构建一次引擎。
+- JSON-RPC 入口读取真实配置与凭据，并只构建一次引擎。
 - 保护片段打码不再把字节偏移当字符偏移，此前会破坏中文输入甚至 panic。
 - 无 Key 的 Provider 不再进入冷却而从链中悄悄消失。
 

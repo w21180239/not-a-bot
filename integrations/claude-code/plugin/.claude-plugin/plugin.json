@@ -1,6 +1,6 @@
 {
   "name": "translatex",
-  "description": "Translate text and rewrite machine-flavoured prose through a pivot language, using translation providers over MCP.",
+  "description": "Translate text and rewrite machine-flavoured prose through a pivot language with the translatex CLI.",
   "version": "0.1.0",
   "author": {
     "name": "w21180239"
@@ -8,5 +8,5 @@
   "homepage": "https://github.com/w21180239/translatex",
   "repository": "https://github.com/w21180239/translatex",
   "license": "MIT OR Apache-2.0",
-  "keywords": ["translation", "mcp", "i18n", "humanize"]
+  "keywords": ["translation", "cli", "i18n", "humanize"]
 }

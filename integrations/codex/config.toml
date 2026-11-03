@@ -1,5 +1,0 @@
-[mcp_servers.translatex]
-command = "translatex"
-args = ["mcp"]
-# A provider cascade can take a few seconds; leave headroom.
-tool_timeout_sec = 90

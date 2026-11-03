@@ -74,25 +74,7 @@ All field names are camelCase. Unknown fields are rejected with `INVALID_INPUT`,
 {"index":1,"ok":false,"error":{…}}
 ```
 
-### 2. MCP server
-
-```bash
-translatex mcp
-```
-
-| Tool | Input | Output |
-| --- | --- | --- |
-| `translate` | `TranslateRequest` | `TranslateResponse` |
-| `roundtrip` | `RoundtripRequest` | `RoundtripResponse` |
-| `providers` | `{}` | `{providers: ProviderInfo[]}` |
-| `languages` | `{provider?: string}` | `{provider, languages: string[]}` |
-| `health` | `{}` | `{healthy, providers: HealthRecord[]}` |
-
-Results follow the MCP contract: `content` with one text block, plus `structuredContent` carrying the same JSON. Failures set `isError: true` and put the typed error in `structuredContent`. The server reads the same config and credentials as the CLI and builds its engine once at startup — restart it after adding a key.
-
-The manifest is available from `translatex manifest --format json`.
-
-### 3. JSON Schema
+### 2. JSON Schema
 
 ```bash
 translatex schema --format json
@@ -177,6 +159,7 @@ source language and the response carries `pivotLang` and `pivotText`.
 - `--pivot ja` rewrites as strongly and keeps more grammar; use it for technical English.
 - Never round-trip legal text, API reference, configuration or anything whose numbers and names must survive: the second hop paraphrases.
 - Two provider calls minimum, three when Chinese input was guessed as the pivot.
+- It rewrites wording and keeps sentences. An AI opener or hedge survives every language; delete those clauses before translating and say which ones you removed.
 
 ## Installation
 
@@ -186,7 +169,7 @@ cargo install translatex
 # or: https://github.com/w21180239/translatex/releases/latest
 ```
 
-Single binary, no runtime dependencies. Per-harness MCP and skill setup:
+Single binary, no runtime dependencies. Per-harness CLI and skill setup:
 [`integrations/`](./integrations/README.md).
 
 ## Testing an integration

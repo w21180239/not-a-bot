@@ -40,7 +40,7 @@
 }
 ```
 
-所有进程读写的都是同一个文件，CLI 调用与 MCP 服务共享同一视图。`translatex keys --reset` 删除这些文件。
+所有进程读写的都是同一个文件，两个并发调用共享同一视图。`translatex keys --reset` 删除这些文件。
 
 ## 无 Key 的 Provider
 

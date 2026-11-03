@@ -2,7 +2,7 @@
 
 # API — 概览
 
-CLI 与 MCP 服务共用同一套线格式契约：一个请求对象进，一个响应或一个强类型错误出。字段名一律 camelCase。
+CLI 的每条命令共用同一套线格式契约：一个请求对象进，一个响应或一个强类型错误出。字段名一律 camelCase。
 
 ## 文件索引
 
@@ -15,10 +15,10 @@ CLI 与 MCP 服务共用同一套线格式契约：一个请求对象进，一�
 
 | 类型 | 使用方 | 用途 |
 | --- | --- | --- |
-| `TranslateRequest` | `translate`、`batch`、MCP | 翻译什么、怎么翻 |
+| `TranslateRequest` | `translate`、`batch`、`roundtrip` | 翻译什么、怎么翻 |
 | `TranslateResponse` | 成功路径 | 结果与来源信息 |
 | `ErrorResponse` | CLI 失败 | 强类型错误，可选尝试记录 |
-| `WireError` | `ErrorResponse` 与 MCP 内部 | 错误码、消息、重试提示 |
+| `WireError` | `ErrorResponse` 内部 | 错误码、消息、重试提示 |
 | `ProviderInfo` | `providers` | 能力与配置状态 |
 | `HealthRecord` | `health` | 单个 Provider 的探测结果 |
 | `AttemptRecord` | `--verbose` | 一跳尝试记录 |

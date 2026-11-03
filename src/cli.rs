@@ -27,7 +27,7 @@ use std::sync::Arc;
       translatex keys deepl --json\n  \n\
       translatex health\n  \
       translatex schema\n  \
-      translatex mcp\n\n\
+      translatex roundtrip \"In today's landscape, …\" --from en\n\n\
 EXIT CODES\n  \
   0 success  1 request error  2 config error  3 chain exhausted  4 network error"
 )]
@@ -185,10 +185,11 @@ pub enum Command {
     /// Print the JSON Schema for the request and response types.
     Schema,
 
-    /// Print the MCP tool manifest for agent discovery.
+    /// Print the tool manifest for agent discovery.
     Manifest,
 
-    /// Run as an MCP server over stdio.
+    /// Run as an MCP server over stdio. Hidden: the integration surface is the CLI.
+    #[command(hide = true)]
     Mcp,
 
     /// Print or write the default config file template.
@@ -853,6 +854,7 @@ fn schema_types() -> &'static [&'static str] {
     ]
 }
 
+/// Machine-readable description of the CLI operations an agent can call.
 pub fn manifest_document() -> Result<serde_json::Value> {
     let translate_schema = serde_json::to_value(schemars::schema_for!(TranslateRequest))
         .map_err(|e| Error::Internal(e.to_string()))?;
@@ -864,43 +866,40 @@ pub fn manifest_document() -> Result<serde_json::Value> {
         "name": "translatex",
         "version": crate::core::types::VERSION,
         "description": "Translation with web-first provider fallback, key rotation and structured output.",
-        "transport": "stdio",
-        "command": ["translatex", "mcp"],
-        "tools": [
+        "interface": "cli",
+        "skill": "https://github.com/w21180239/translatex/blob/main/integrations/skill/translatex/SKILL.md",
+        "commands": [
             {
                 "name": "translate",
+                "command": "translatex translate --json '{request}' --format json",
                 "description": "Translate text between languages. Falls back across providers and rotates API keys automatically.",
-                "inputSchema": translate_schema,
-                "annotations": { "readOnlyHint": true, "idempotentHint": true }
+                "inputSchema": translate_schema
             },
             {
                 "name": "roundtrip",
+                "command": "translatex roundtrip --json '{request}' --format json",
                 "description": "Translate through a pivot language and back into the source language, which rewrites the phrasing and strips machine-flavoured cadence.",
-                "inputSchema": roundtrip_schema,
-                "annotations": { "readOnlyHint": true, "idempotentHint": true }
+                "inputSchema": roundtrip_schema
             },
             {
                 "name": "providers",
-                "description": "List translation providers, their capabilities and whether credentials are configured.",
-                "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+                "command": "translatex providers --format json",
+                "description": "List translation providers, their capabilities and whether credentials are configured."
             },
             {
                 "name": "languages",
-                "description": "List supported language codes, optionally filtered by provider.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": { "provider": { "type": "string", "description": "Provider name or 'all'" } },
-                    "additionalProperties": false
-                }
+                "command": "translatex languages --provider <name> --format json",
+                "description": "List supported language codes, optionally filtered by provider."
             },
             {
                 "name": "health",
-                "description": "Probe configured providers and report latency and errors.",
-                "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+                "command": "translatex health --format json",
+                "description": "Probe configured providers and report latency and errors."
             }
         ],
         "install": {
             "cargo": "cargo install translatex",
+            "npm": "npm install -g translatex",
             "binary": "https://github.com/w21180239/translatex/releases/latest"
         }
     }))
@@ -952,16 +951,20 @@ mod tests {
     }
 
     #[test]
-    fn manifest_has_the_translate_tool() {
+    fn manifest_lists_cli_commands() {
         let doc = manifest_document().unwrap();
-        let tools = doc["tools"].as_array().expect("tools");
-        let names: Vec<&str> = tools
+        let names: Vec<&str> = doc["commands"]
+            .as_array()
+            .expect("commands")
             .iter()
             .filter_map(|t| t["name"].as_str())
             .collect();
         assert!(names.contains(&"translate"), "got {names:?}");
+        assert!(names.contains(&"roundtrip"));
         assert!(names.contains(&"providers"));
         assert_eq!(doc["name"], "translatex");
+        assert_eq!(doc["interface"], "cli");
+        assert!(doc.get("transport").is_none());
     }
 
     #[test]

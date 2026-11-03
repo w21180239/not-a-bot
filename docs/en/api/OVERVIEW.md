@@ -2,7 +2,7 @@
 
 # API — Overview
 
-The wire contract is the same for the CLI and the MCP server: one request object in, one response or one typed error out. All field names are camelCase.
+The wire contract is the same for every command: one request object in, one response or one typed error out. All field names are camelCase.
 
 ## File index
 
@@ -15,10 +15,10 @@ The wire contract is the same for the CLI and the MCP server: one request object
 
 | Type | Used by | Purpose |
 | --- | --- | --- |
-| `TranslateRequest` | `translate`, `batch`, MCP | What to translate and how |
+| `TranslateRequest` | `translate`, `batch`, `roundtrip` | What to translate and how |
 | `TranslateResponse` | success paths | Result plus provenance |
 | `ErrorResponse` | CLI failures | Typed error, optional attempts |
-| `WireError` | inside `ErrorResponse` and MCP | Code, message, retry hints |
+| `WireError` | inside `ErrorResponse` | Code, message, retry hints |
 | `ProviderInfo` | `providers` | Capability and configuration |
 | `HealthRecord` | `health` | Probe result per provider |
 | `AttemptRecord` | `--verbose` | One provider hop |

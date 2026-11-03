@@ -6,7 +6,6 @@
 src/
 ├── main.rs              entry point, hands off to cli::run
 ├── cli.rs               argument parsing, dispatch, registry construction
-├── mcp.rs               MCP server over stdio
 ├── retry.rs             exponential backoff with jitter
 ├── core/
 │   ├── config.rs        Settings, default chain, paths
@@ -17,7 +16,7 @@ src/
 │   ├── keys.rs          per-credential cooldown state, cross-process
 │   ├── lang.rs          canonical codes, aliases, per-provider tables
 │   ├── preserve.rs      regex masking and restoration
-│   ├── types.rs         wire types shared by CLI, MCP and providers
+│   ├── types.rs         wire types shared by the CLI and providers
 │   └── error.rs         error taxonomy, wire mapping, HTTP status mapping
 └── providers/           one module per backend plus registry and trait
 ```

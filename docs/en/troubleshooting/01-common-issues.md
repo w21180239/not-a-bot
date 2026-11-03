@@ -74,11 +74,11 @@ ls ~/.config/translatex/cache/
 
 If the directory is not writable, cooldowns are memory-only for that process and every call starts clean.
 
-## MCP client shows no tools
+## The agent translates by hand instead of calling the CLI
 
-1. `translatex mcp` must stay attached to stdio; do not run it detached.
-2. Check `translatex manifest --format json` for the catalogue.
-3. Restart the server after adding credentials — the engine is built once at startup.
+1. Confirm the skill or instructions file is in the path the harness documents.
+2. `translatex --version` must succeed in the same shell the agent uses; a GUI-launched agent often has a different `PATH`.
+3. Ask for a translation and check the reply for a `provider` name. A reply without one means the agent never ran the command.
 
 ## Navigation
 

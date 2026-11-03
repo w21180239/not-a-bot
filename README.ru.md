@@ -28,7 +28,7 @@
 | **Ротация ключей** | Несколько ключей на провайдера, round-robin, состояние cooldown общее для процессов в `~/.config/translatex/cache/`. |
 | **Структурированный вывод** | JSON/NDJSON в stdout, логи в stderr, коды возврата для ветвления в агенте. |
 | **Защита фрагментов** | Код, переменные и URL маскируются до перевода и восстанавливаются после; сбой восстановления запускает fallback. |
-| **MCP-сервер** | `translatex mcp` по stdio: `translate`, `providers`, `languages`, `health`. |
+| **CLI для агентов** | JSON в stdout, логи в stderr, коды возврата для ветвления. Подключение к harness — CLI плюс skill: [integrations/](./integrations/README.md). |
 | **Работающий таймаут** | `timeoutMs` из запроса (или `timeout_ms` в конфиге) ограничивает весь вызов провайдера. |
 | **Понятные ошибки** | `code`, `retryable`, `retryAfterSecs`, `suggestedAction` в каждом ответе об ошибке. |
 
@@ -94,27 +94,27 @@ translatex translate 'Run `make test` before pushing.' -t zh --preserve '`[^`]*`
 }
 ```
 
-## MCP-сервер
+## Подключение агента: CLI + skill
 
-```json
-{
-  "mcpServers": {
-    "translatex": {
-      "command": "translatex",
-      "args": ["mcp"]
-    }
-  }
-}
+Интеграция — это команда плюс один документ, который говорит агенту, когда её
+запускать. Сервер запускать не нужно.
+
+```bash
+# Claude Code
+mkdir -p .claude/skills/translatex && cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/
+
+# Codex / Gemini CLI (общий путь)
+mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/
+
+# OpenCode
+mkdir -p ~/.config/opencode/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/
+
+# Любой harness с файлом инструкций
+cat integrations/guidance/AGENTS.md >> AGENTS.md
 ```
 
-Сервер читает те же `config.toml` и `credentials.toml`, что и CLI. `tools/call` возвращает `content` и `structuredContent` по спецификации MCP; при ошибке выставляется `isError`.
-
-| Инструмент | Вход | Выход |
-| --- | --- | --- |
-| `translate` | `TranslateRequest` | `TranslateResponse` |
-| `roundtrip` | `RoundtripRequest` | `RoundtripResponse` |
-| `providers` | `{}` | `{providers: ProviderInfo[]}` |
-| `languages` | `{provider?: string}` | `{provider, languages: string[]}` |
+Один и тот же текст skill подходит всем; меняется только путь. Полная матрица:
+[integrations/README.md](./integrations/README.md).
 | `health` | `{}` | `{healthy, providers: HealthRecord[]}` |
 
 ## Провайдеры
@@ -198,8 +198,7 @@ api_key = "..."
 | `keys [PROVIDER]` | Состояние cooldown, `--reset` для сброса |
 | `health` | Проверка всех настроенных провайдеров |
 | `schema` | JSON Schema (draft 2020-12) |
-| `manifest` | Манифест инструментов MCP |
-| `mcp` | MCP-сервер по stdio |
+| `manifest` | Машиночитаемый список операций CLI |
 | `init` | Шаблон конфигурации |
 | `completions SHELL` | Автодополнение |
 

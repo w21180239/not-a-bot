@@ -28,7 +28,7 @@ Lower priority number means tried earlier. Every hop is recorded, so a failure t
 | **Key rotation** | Several credentials per provider, round-robin, with cooldowns shared across processes through `~/.config/translatex/cache/`. |
 | **Structured output** | JSON or NDJSON on stdout, logs on stderr, exit codes an agent can branch on. |
 | **Preserve patterns** | Regex spans (code, variables, URLs) are masked before translation and restored after; a corrupted restore triggers fallback. |
-| **MCP server** | `translatex mcp` speaks MCP over stdio with `translate`, `roundtrip`, `providers`, `languages`, `health`. |
+| **Agent-native CLI** | Every command emits JSON on stdout, logs on stderr, and exits with a code an agent can branch on. The recommended harness setup is this CLI plus a skill: [integrations/](./integrations/README.md). |
 | **Timeouts that hold** | `timeoutMs` from the request (or `timeout_ms` in config) caps the whole provider call, not just the socket read. |
 | **Honest errors** | `code`, `retryable`, `retryAfterSecs`, `suggestedAction` on every failure. |
 
@@ -102,31 +102,39 @@ Failures carry a machine-readable reason:
 }
 ```
 
-## MCP server
+## Agent setup: CLI + skill
 
-```json
-{
-  "mcpServers": {
-    "translatex": {
-      "command": "translatex",
-      "args": ["mcp"]
-    }
-  }
-}
+The integration is the command, plus one document that tells the agent when to
+run it. There is no server to start and no protocol to negotiate.
+
+```bash
+# Claude Code
+mkdir -p .claude/skills/translatex && cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/
+
+# Codex / Gemini CLI (shared cross-runtime location)
+mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/
+
+# OpenCode
+mkdir -p ~/.config/opencode/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/
+
+# Any harness with a project instructions file
+cat integrations/guidance/AGENTS.md >> AGENTS.md
 ```
 
-The server loads the same `config.toml` and `credentials.toml` as the CLI, so keys configured for the CLI are immediately available to your agent. `tools/call` returns spec-compliant `content` blocks plus `structuredContent`; `isError` is set on failure instead of a broken tool result.
+The same skill text works everywhere; only the destination changes. Per-harness
+paths for Claude Code, Codex, Gemini CLI, OpenCode, Cursor, Cline, Roo Code, Kilo
+Code, Continue, JetBrains AI, Zed, Aider, Qwen Code, Crush, Goose, DeepSeek
+Harness, MiMo Code, AtomCode, OpenClaw, Hermes Agent, Pi, Reasonix, ZCode,
+QwenPaw and anything else: [integrations/README.md](./integrations/README.md).
 
-| Tool | Input | Returns |
-| --- | --- | --- |
-| `translate` | `TranslateRequest` | `TranslateResponse` |
-| `roundtrip` | `RoundtripRequest` | `RoundtripResponse` |
-| `providers` | `{}` | `{providers: ProviderInfo[]}` |
-| `languages` | `{provider?: string}` | `{provider, languages: string[]}` |
-| `health` | `{}` | `{healthy, providers: HealthRecord[]}` |
+Agents that prefer a command reference over a skill can call the CLI directly:
 
-Per-harness setup (Claude Code plugin, OpenCode, Codex, Cursor, VS Code):
-[integrations/](./integrations/README.md).
+| Command | Purpose |
+| --- | --- |
+| `translatex translate "…" -t zh --format json` | One translation |
+| `translatex roundtrip "…" --from en --format json` | Out through a pivot and back |
+| `translatex providers --format json` | What can serve this machine |
+| `translatex health --format json` | Probe every configured provider |
 
 ## Round trip: de-AI prose
 
@@ -158,6 +166,9 @@ almost verbatim, Japanese rewrites as strongly as Chinese, and Russian rewrites
 the most but drifts the most. Use `--pivot ja` for technical English that has to
 stay precise, and never round-trip legal text, API docs or anything with numbers
 you cannot verify. Evidence and method: [docs/en/roundtrip/01-pivot-choice.md](./docs/en/roundtrip/01-pivot-choice.md).
+
+It rewrites wording and keeps sentences: an AI opener or hedge survives every
+language, so delete those clauses before translating and tell the user you did.
 
 ## Provider matrix
 
@@ -272,8 +283,7 @@ Resolution order: environment (`TRANSLATEX_<PROVIDER>_<FIELD>`) → credentials 
 | `keys [PROVIDER]` | Cooldown and failure state; `--reset` clears it |
 | `health` | Probe every configured provider |
 | `schema` | JSON Schema (draft 2020-12) for all wire types |
-| `manifest` | MCP tool manifest for agent discovery |
-| `mcp` | MCP server over stdio |
+| `manifest` | Machine-readable list of CLI operations |
 | `init` | Write a config template |
 | `completions SHELL` | Bash/zsh/fish/PowerShell completion |
 
@@ -313,7 +323,7 @@ Full reference: [docs/en/api/OVERVIEW.md](./docs/en/api/OVERVIEW.md).
 ## Development
 
 ```bash
-cargo test                # 253: 226 unit, 11 contract, 8 integration, 8 MCP
+cargo test                # 253 tests
 cargo build --release     # ~5 min with LTO
 cargo clippy --all-targets
 ```

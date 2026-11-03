@@ -1,51 +1,44 @@
-# Codex
+# Codex CLI
 
-Codex reads MCP servers from `~/.codex/config.toml` and project guidance from
-`AGENTS.md`.
+Codex reads two things: project instructions and cross-runtime skills. Use
+either or both; the binary is the same.
 
-## MCP server
+## Skill
 
-Add to `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.translatex]
-command = "translatex"
-args = ["mcp"]
+```bash
+mkdir -p ~/.agents/skills/translatex
+cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/SKILL.md
 ```
 
-Pass credentials without touching the host config:
+`~/.agents/skills/` is the cross-runtime alias Codex, Gemini CLI and Copilot CLI
+share, so one copy serves all three.
 
-```toml
-[mcp_servers.translatex]
-command = "translatex"
-args = ["mcp"]
+## Project instructions
 
-[mcp_servers.translatex.env]
-TRANSLATEX_DEEPL_API_KEY = "…"
+```bash
+cat integrations/guidance/AGENTS.md >> AGENTS.md
 ```
 
-Tool calls may be slow on a cascade: give the server enough time.
+Or for every repository:
 
-```toml
-[mcp_servers.translatex]
-command = "translatex"
-args = ["mcp"]
-tool_timeout_sec = 90
+```bash
+cat integrations/guidance/AGENTS.md >> ~/.codex/AGENTS.md
 ```
 
-## Project guidance
-
-Append [`AGENTS.md`](AGENTS.md) to the repository's `AGENTS.md` so Codex knows
-the CLI contract without a prompt. It documents the JSON shapes, the error
-codes and the round-trip rule.
-
-## CLI
-
-Codex can call the binary directly when it needs structured output:
+## Verify
 
 ```bash
 translatex translate "Deploy failed" -t zh --format json
-translatex roundtrip "$(cat draft.md)" --from en --format json
+codex exec "translate 'Deploy failed' to Chinese"
 ```
 
-Use `--format json` and read `text`; keep stderr for diagnostics.
+Codex should run the CLI rather than type a translation. If it answers from its
+own knowledge, the instructions file is in the wrong place — check that `AGENTS.md`
+sits at the repository root and that the session was started there.
+
+## Notes
+
+- The CLI is the whole integration: no server, no config entry, no restart.
+- The CLI is fast enough for interactive use: a cold run is ~40 ms plus one
+  network round trip.
+- Structured output is on by default; `--format json` makes it explicit.

@@ -223,37 +223,43 @@ fn retry_policy_matches_the_documented_table() {
 }
 
 #[test]
-fn manifest_and_mcp_advertise_the_same_tools() {
+fn manifest_describes_the_cli_surface() {
     let manifest = manifest_document().expect("manifest");
-    let mut manifest_names: Vec<&str> = manifest["tools"]
-        .as_array()
-        .expect("tools array")
-        .iter()
-        .map(|t| t["name"].as_str().expect("tool name"))
-        .collect();
-    manifest_names.sort_unstable();
+    assert_eq!(manifest["interface"], "cli");
+    assert!(
+        manifest.get("transport").is_none(),
+        "the manifest must not describe a server transport"
+    );
 
-    let mcp = translatex::mcp::Server::tools();
-    let mut mcp_names: Vec<&str> = mcp["tools"]
+    let mut names: Vec<&str> = manifest["commands"]
         .as_array()
-        .expect("tools array")
+        .expect("commands array")
         .iter()
-        .map(|t| t["name"].as_str().expect("tool name"))
+        .map(|c| c["name"].as_str().expect("command name"))
         .collect();
-    mcp_names.sort_unstable();
-
-    assert_eq!(manifest_names, mcp_names);
+    names.sort_unstable();
     assert_eq!(
-        manifest_names,
+        names,
         vec!["health", "languages", "providers", "roundtrip", "translate"]
     );
 
-    for tool in manifest["tools"].as_array().expect("tools array") {
+    for command in manifest["commands"].as_array().expect("commands array") {
         assert!(
-            tool["inputSchema"].is_object(),
-            "{} inputSchema must be an object",
-            tool["name"]
+            command["command"].as_str().is_some_and(|c| !c.is_empty()),
+            "{} has no command line",
+            command["name"]
         );
+    }
+
+    // `translate` and `roundtrip` carry their request schema for generators.
+    for name in ["translate", "roundtrip"] {
+        let command = manifest["commands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == name)
+            .unwrap();
+        assert_eq!(command["inputSchema"]["type"], "object");
     }
 }
 

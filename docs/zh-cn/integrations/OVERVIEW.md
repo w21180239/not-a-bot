@@ -2,7 +2,7 @@
 
 # 集成 — 概览
 
-`translatex` 是一个二进制、两种入口：CLI 与 MCP 服务。不同 harness 能消费的入口不同，所以两边都给了可直接复制的配置。
+`translatex` 的接入方式是一条命令加一份 skill：Agent 执行命令、读 JSON，文档告诉它何时执行。没有服务要启动，也没有协议要协商。
 
 ## 分发渠道
 
@@ -14,41 +14,28 @@
 
 npm 包本身只是壳：`postinstall` 从对应 GitHub Release 下载压缩包，`bin/translatex.js` 负责 exec。离线环境可以用 `TRANSLATEX_BINARY_PATH` 指向本地构建产物。
 
-## Harness 对照表
+## 两份文档，覆盖所有 harness
 
-| Harness | 推荐方式 | 文件 |
-| --- | --- | --- |
-| Claude Code | 插件（MCP + skill） | [`integrations/claude-code/`](../../../integrations/claude-code/README.md) |
-| OpenCode | MCP 服务 + skill | [`integrations/opencode/`](../../../integrations/opencode/README.md) |
-| Codex | MCP 服务 + `AGENTS.md` | [`integrations/codex/`](../../../integrations/codex/README.md) |
-| Cursor | 项目级 MCP 服务 | [`integrations/cursor/`](../../../integrations/cursor/README.md) |
-| VS Code / Copilot | 工作区 MCP 服务 | [`integrations/vscode/`](../../../integrations/vscode/README.md) |
-| 其它 MCP 客户端 | stdio JSON-RPC | [`integrations/generic/`](../../../integrations/generic/README.md) |
+| 文档 | 适用 |
+| --- | --- |
+| [`integrations/skill/translatex/SKILL.md`](../../../integrations/skill/translatex/SKILL.md) | 会加载 skill 的 harness：Claude Code、Codex、Gemini CLI、OpenCode |
+| [`integrations/guidance/AGENTS.md`](../../../integrations/guidance/AGENTS.md) | 任何读取项目指令或规则文件的 harness |
 
-已用真实 CLI 验证：Claude Code 2.1.317（`claude mcp list` → Connected；插件市场安装 → 1 个 skill + 1 个 MCP 服务）、Codex 0.164.0（`codex mcp get` → stdio）、OpenCode 2.2.5（`opencode mcp list` → connected，发现 5 个工具）。Cursor 与 VS Code 未安装，其配置按官方 schema 编写，未做实机验证。
-
-读取 `SKILL.md` 的 harness（Claude Code、OpenCode）：[`integrations/skill/SKILL.md`](../../../integrations/skill/SKILL.md)。
+完整矩阵（Claude Code、Codex CLI、Gemini CLI、OpenCode、Cursor、Cline、Roo Code、Kilo Code、Continue、JetBrains AI、Zed、Aider、Qwen Code、Crush、Goose、DeepSeek Harness、MiMo Code、AtomCode、OpenClaw、Hermes Agent、Pi、Reasonix、ZCode、QwenPaw）及各自的文件路径见 [`integrations/README.md`](../../../integrations/README.md)。
 
 ## 用哪个入口
 
-| 需求 | 入口 |
+| 需求 | 命令 |
 | --- | --- |
-| 模型在对话中翻译 | MCP `translate` |
-| 去掉机器味、改写 | MCP `roundtrip` |
-| 脚本、CI、pre-commit | CLI `--format json` |
-| 批量 | CLI `batch`（NDJSON 进、NDJSON 出） |
-| 查能力 | MCP `providers` / `languages` / `health` |
-
-两种入口读同一份 `config.toml` 和 `credentials.toml`，CLI 配好的 Key 重启 MCP 服务后即可用。
+| 模型在对话中翻译 | `translatex translate "…" -t <lang> --format json` |
+| 去掉机器味、改写 | `translatex roundtrip "…" --from <lang> --format json` |
+| 脚本、CI、pre-commit | 同一条 CLI，读 `text` |
+| 批量 | `translatex batch`（NDJSON 进、NDJSON 出） |
+| 查能力 | `translatex providers`、`translatex languages`、`translatex health` |
 
 ## Agent 环境里的凭据
 
-从图形界面启动的 Agent（Cursor、VS Code）经常拿不到 shell 环境变量。两个可靠做法：
-
-1. 写 `~/.config/translatex/credentials.toml`，两种入口都会读。
-2. 在 MCP 服务配置里加 `env` 块，支持 `mcpServers` 的客户端都认。
-
-只用免费网页接口时两者都不需要，只有官方 API 才要求配置。
+从图形界面启动的 Agent（Cursor、VS Code）经常拿不到 shell 环境变量。把凭据写进 `~/.config/translatex/credentials.toml`，任何进程都能读。只用免费网页接口时完全不需要凭据，装好二进制就能用。
 
 ## 导航
 

@@ -11,7 +11,7 @@
 | Установка и первый запрос | [README.ru.md](../../README.ru.md) |
 | Каталог провайдеров | [../en/providers/01-supported-providers.md](../en/providers/01-supported-providers.md) |
 | Ошибки и коды возврата | [../en/api/02-errors.md](../en/api/02-errors.md) |
-| MCP-сервер | [../en/mcp/OVERVIEW.md](../en/mcp/OVERVIEW.md) |
+| Подключение к агенту | [../en/integrations/OVERVIEW.md](../en/integrations/OVERVIEW.md) |
 | Интеграция с агентами | [../../AGENTS.md](../../AGENTS.md) |
 
 ## Структура
