@@ -45,7 +45,9 @@ impl Preserver {
                 let proposed_idx = idx_map.len();
                 idx_map.push(None);
                 // Check if this match contributes any new characters.
-                let contributes = matches[m.start()..m.end()].iter().any(|slot| slot.is_none());
+                let contributes = matches[m.start()..m.end()]
+                    .iter()
+                    .any(|slot| slot.is_none());
                 if contributes {
                     let actual_idx = self.tokens.len();
                     idx_map[proposed_idx] = Some(actual_idx);
