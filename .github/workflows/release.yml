@@ -155,6 +155,8 @@ jobs:
       - name: Publish the platform packages
         if: env.NPM_TOKEN != ''
         shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
         run: |
           set -euo pipefail
           for dir in npm/platforms/*/; do
@@ -165,4 +167,6 @@ jobs:
       - name: Publish the main package
         if: env.NPM_TOKEN != ''
         working-directory: npm
+        env:
+          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
         run: npm publish --access public --provenance
