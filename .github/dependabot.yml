@@ -8,13 +8,34 @@ updates:
       actions:
         patterns:
           - "*"
+    ignore:
+      # The ref is the pinned toolchain, not an action version; bumping it
+      # would silently change the MSRV job.
+      - dependency-name: dtolnay/rust-toolchain
 
   - package-ecosystem: cargo
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      patch-and-minor:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Major bumps of the crypto and encoding crates change traits and wire
+      # formats; they get done by hand with the code, not by a bot.
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: npm
     directory: /npm
     schedule:
       interval: weekly
+    groups:
+      patch-and-minor:
+        update-types:
+          - minor
+          - patch
