@@ -12,13 +12,15 @@ start and no protocol to negotiate.
 
 | Channel | Command | Notes |
 | --- | --- | --- |
-| npm | `npm install -g translatex` | Downloads the prebuilt binary for the platform at install time |
-| Cargo | `cargo install translatex --locked` | Builds from source; any platform with Rust 1.80+ |
+| npm | `npm install -g translatex` | Pulls the per-platform binary package; no install script runs |
+| Cargo | `cargo install translatex --locked` | Builds from source; any platform with Rust 1.89+ |
 | Release archive | [Releases](https://github.com/w21180239/translatex/releases/latest) | `translatex-<target>.tar.gz` with the binary at the root |
 
-The npm package is a shim: `postinstall` fetches the archive from the matching
-GitHub release, and `bin/translatex.js` execs it. Offline installs can set
-`TRANSLATEX_BINARY_PATH` to any local build.
+The npm package is a shim. The binary lives in a per-platform package
+(`translatex-linux-x64`, `translatex-darwin-arm64`, `translatex-windows-x64`, …)
+declared as an optional dependency, so npm installs the right one and nothing
+has to run at install time. `bin/translatex.js` execs it. Offline installs can
+set `TRANSLATEX_BINARY_PATH` to any local build.
 
 ## Two documents, every harness
 

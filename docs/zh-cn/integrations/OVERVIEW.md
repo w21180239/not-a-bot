@@ -10,11 +10,11 @@
 
 | 渠道 | 命令 | 说明 |
 | --- | --- | --- |
-| npm | `npm install -g translatex` | 安装时按平台下载预编译二进制 |
-| Cargo | `cargo install translatex --locked` | 源码构建；Rust 1.80+ 即可 |
+| npm | `npm install -g translatex` | 拉取对应平台的二进制包，安装期不执行任何脚本 |
+| Cargo | `cargo install translatex --locked` | 源码构建；Rust 1.89+ 即可 |
 | 发布包 | [Releases](https://github.com/w21180239/translatex/releases/latest) | `translatex-<target>.tar.gz`，二进制在根目录 |
 
-npm 包本身只是壳：`postinstall` 从对应 GitHub Release 下载压缩包，`bin/translatex.js` 负责 exec。离线环境可以用 `TRANSLATEX_BINARY_PATH` 指向本地构建产物。
+npm 包本身只是壳：二进制放在按平台的包里（`translatex-linux-x64`、`translatex-darwin-arm64`、`translatex-windows-x64` 等），以 optional 依赖声明，npm 会装对应平台那一个，安装期不跑任何脚本。`bin/translatex.js` 负责 exec；离线环境可以用 `TRANSLATEX_BINARY_PATH` 指向本地构建产物。
 
 ## 两份文档，覆盖所有 harness
 

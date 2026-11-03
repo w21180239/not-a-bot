@@ -8,7 +8,7 @@ Install the binary, run one request, and turn on shell completion.
 
 ## Requirements
 
-- Rust 1.80 or newer when building from source.
+- Rust 1.89 or newer when building from source.
 - No runtime dependencies: the release binary is self-contained.
 - Network access to the endpoint you want to use. Several web endpoints are region-sensitive.
 
