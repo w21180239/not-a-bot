@@ -4,7 +4,7 @@
 
 `npm install -g translatex` puts a 6 MB static binary on `PATH`. 26 translation
 providers raced in parallel, structured JSON out, one skill file for 24 coding
-agents. The binary ships in a per-platform package (`translatex-win32-x64`,
+agents. The binary ships in a per-platform package (`translatex-windows-x64`,
 `translatex-darwin-arm64`, …) pulled in as an optional dependency, so the
 install runs no scripts at all.
 

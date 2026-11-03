@@ -2,11 +2,18 @@
 
 文档修订历史。1.0 之前，应用变更也记录在此。
 
+## 0.1.2 — 2026-11-04
+
+### 修复
+
+- Windows 平台包以 `translatex-windows-x64` 发布：`translatex-win32-x64` 每次都会触发 npm 的垃圾过滤并返回 403，重试无效。shim 里把 `win32` 映射到这个包名。
+- npm 发布可以重跑了：某个版本已在 registry 上就跳过，发布中断后重跑会补齐剩下的，而不是对已发出的包清一色返回 409。
+
 ## 0.1.1 — 2026-11-04
 
 ### 调整
 
-- npm 分发改为按平台的二进制包（`translatex-win32-x64`、`translatex-linux-arm64` 等）作为 optional 依赖，安装期不再执行任何脚本 —— npm 12 默认禁止依赖执行安装脚本，原来的 `postinstall` 下载方式会装出空壳。
+- npm 分发改为按平台的二进制包（`translatex-windows-x64`、`translatex-linux-arm64` 等）作为 optional 依赖，安装期不再执行任何脚本 —— npm 12 默认禁止依赖执行安装脚本，原来的 `postinstall` 下载方式会装出空壳。
 - 声明的最低 Rust 版本改为 1.89（依赖图里最高的 `rust-version`），原来的 1.80 实际从未编译通过。
 - CI 覆盖 `cargo fmt --check`、`clippy -D warnings`、三大平台测试、MSRV 构建与 npm 打包检查；Dependabot 跟踪 actions、Cargo 与 npm 清单。
 

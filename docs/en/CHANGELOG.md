@@ -2,11 +2,18 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.1.2 — 2026-11-04
+
+### Fixed
+
+- The Windows platform package is published as `translatex-windows-x64`. npm's spam filter answers every attempt on `translatex-win32-x64` with a 403 that a retry does not clear; the shim maps `win32` to that name.
+- npm publishing is re-runnable. Each package is skipped when its exact version is already on the registry, so a release that fails halfway is finished by a re-run instead of answering 409 for everything it had already shipped.
+
 ## 0.1.1 — 2026-11-04
 
 ### Changed
 
-- npm distribution ships the binary in per-platform packages (`translatex-win32-x64`, `translatex-linux-arm64`, …) pulled in as optional dependencies. Installing runs no lifecycle script, which npm 12 blocks by default, so `npm install -g translatex` no longer depends on `postinstall` being allowed.
+- npm distribution ships the binary in per-platform packages (`translatex-windows-x64`, `translatex-linux-arm64`, …) pulled in as optional dependencies. Installing runs no lifecycle script, which npm 12 blocks by default, so `npm install -g translatex` no longer depends on `postinstall` being allowed.
 - Declared MSRV is 1.89, the highest `rust-version` in the dependency graph; the previous 1.80 claim never compiled.
 - CI covers `cargo fmt --check`, `clippy -D warnings`, tests on Linux/macOS/Windows, an MSRV build, and an npm packaging check. Dependabot tracks the actions, Cargo and npm manifests.
 
