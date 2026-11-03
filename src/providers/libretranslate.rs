@@ -1,4 +1,4 @@
-﻿//! LibreTranslate: free, self-hostable, no key required.
+//! LibreTranslate: free, self-hostable, no key required.
 
 use crate::core::creds::Credential;
 use crate::core::error::{Error, Result};
@@ -14,6 +14,7 @@ use std::time::Duration;
 const DEFAULT_INSTANCE: &str = "https://libretranslate.de";
 
 #[derive(Debug, Deserialize)]
+#[allow(non_snake_case)]
 struct Resp {
     translatedText: String,
     #[serde(rename = "detectedSourceLanguage")]
@@ -46,7 +47,8 @@ impl Provider for LibreTranslate {
         ProviderInfo {
             name: "libretranslate".into(),
             display_name: "LibreTranslate".into(),
-            kind: ProviderKind::Free,
+            kind: ProviderKind::Web,
+            priority: 12,
             needs_key: false,
             max_chars: 5000,
             auto_detect: true,
@@ -125,22 +127,6 @@ impl Provider for LibreTranslate {
 mod tests {
     use super::*;
     use crate::core::creds::Credential;
-    use crate::core::types::TranslateRequest;
-    use std::collections::BTreeMap;
-
-    fn req() -> TranslateRequest {
-        TranslateRequest {
-            text: "hello".into(),
-            source_lang: "en".into(),
-            target_lang: "zh".into(),
-            provider: None,
-            fallback_chain: Vec::new(),
-            preserve: Vec::new(),
-            timeout_ms: None,
-            idempotency_key: None,
-            metadata: BTreeMap::new(),
-        }
-    }
 
     #[test]
     fn info_contract() {

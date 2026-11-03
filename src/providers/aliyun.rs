@@ -1,4 +1,4 @@
-﻿//! Alibaba Cloud Machine Translation (RPC API, HMAC-SHA1 signature).
+//! Alibaba Cloud Machine Translation (RPC API, HMAC-SHA1 signature).
 
 use crate::core::config::ProviderSettings;
 use crate::core::creds::Credential;
@@ -66,8 +66,9 @@ impl Provider for Aliyun {
     fn info(&self) -> ProviderInfo {
         ProviderInfo {
             name: "aliyun".into(),
-            display_name: "Alibaba Cloud MT".into(),
-            kind: ProviderKind::Keyed,
+            display_name: "Alibaba Cloud MT (official)".into(),
+            kind: ProviderKind::Official,
+            priority: 23,
             needs_key: true,
             max_chars: 5000,
             auto_detect: false,

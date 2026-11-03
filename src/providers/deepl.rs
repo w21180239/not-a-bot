@@ -1,4 +1,4 @@
-﻿//! DeepL API. Highest quality for European language pairs.
+//! DeepL API. Highest quality for European language pairs.
 //! A `:fx` key is the free tier and must hit api-free.deepl.com, so the host
 //! is derived from the key rather than configured.
 
@@ -106,8 +106,9 @@ impl Provider for DeepL {
     fn info(&self) -> ProviderInfo {
         ProviderInfo {
             name: "deepl".into(),
-            display_name: "DeepL".into(),
-            kind: ProviderKind::Keyed,
+            display_name: "DeepL (official)".into(),
+            kind: ProviderKind::Official,
+            priority: 20,
             needs_key: true,
             max_chars: 5000,
             auto_detect: true,

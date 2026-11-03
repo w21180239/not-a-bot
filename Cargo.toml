@@ -3,11 +3,11 @@ name = "translatex"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.80"
-description = "Agent-first translation CLI and MCP server. Official APIs, structured JSON output, provider fallback and key rotation built in."
+description = "Agent-first translation CLI and MCP server. Free web endpoints first, official APIs as fallback, with provider fallback chains, key rotation and structured JSON output."
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourorg/translatex"
-homepage = "https://github.com/yourorg/translatex"
-documentation = "https://github.com/yourorg/translatex#readme"
+repository = "https://github.com/w21180239/translatex"
+homepage = "https://github.com/w21180239/translatex"
+documentation = "https://github.com/w21180239/translatex#readme"
 keywords = ["translation", "cli", "mcp", "agent", "i18n"]
 categories = ["command-line-utilities", "web-programming", "text-processing"]
 readme = "README.md"
@@ -21,15 +21,20 @@ name = "translatex"
 path = "src/main.rs"
 
 [dependencies]
+aes = "0.8"
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.22"
+cbc = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+cipher = { version = "0.4", features = ["alloc", "std"] }
 clap = { version = "4.5", features = ["derive", "env", "wrap_help"] }
 clap_complete = "4.5"
 config = { version = "0.14", default-features = false, features = ["toml"] }
 dashmap = "6"
+des = "0.8"
 directories = "5"
+ecb = "0.1"
 futures = "0.3"
 hex = "0.4"
 hmac = "0.12"

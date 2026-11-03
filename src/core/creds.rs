@@ -1,8 +1,7 @@
-﻿//! Credentials: multiple keys per provider, loaded from config file and env.
+//! Credentials: multiple keys per provider, loaded from config file and env.
 
 use crate::core::error::{Error, Result};
 use once_cell::sync::Lazy;
-use regex::Regex;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 

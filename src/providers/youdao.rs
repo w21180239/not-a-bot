@@ -1,4 +1,4 @@
-﻿//! Youdao open API. Signs with SHA-256 over appKey + input + salt + curtime + secret.
+//! Youdao open API. Signs with SHA-256 over appKey + input + salt + curtime + secret.
 
 use crate::core::creds::Credential;
 use crate::core::error::{Error, Result};
@@ -63,8 +63,9 @@ impl Provider for Youdao {
     fn info(&self) -> ProviderInfo {
         ProviderInfo {
             name: "youdao".into(),
-            display_name: "Youdao".into(),
-            kind: ProviderKind::Keyed,
+            display_name: "Youdao (official)".into(),
+            kind: ProviderKind::Official,
+            priority: 27,
             needs_key: true,
             max_chars: 5000,
             auto_detect: true,

@@ -1,4 +1,4 @@
-﻿//! Azure AI Translator. Regional endpoints; the region is a credential field
+//! Azure AI Translator. Regional endpoints; the region is a credential field
 //! because a key is bound to the resource that issued it.
 
 use crate::core::config::ProviderSettings;
@@ -10,7 +10,6 @@ use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
 use crate::providers::{Provider, ProviderKind};
 use async_trait::async_trait;
 use serde::Deserialize;
-use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 const ENDPOINT: &str = "https://api.cognitive.microsofttranslator.com";
@@ -57,8 +56,9 @@ impl Provider for Azure {
     fn info(&self) -> ProviderInfo {
         ProviderInfo {
             name: "azure".into(),
-            display_name: "Azure AI Translator".into(),
-            kind: ProviderKind::Keyed,
+            display_name: "Azure AI Translator (official)".into(),
+            kind: ProviderKind::Official,
+            priority: 22,
             needs_key: true,
             max_chars: 50_000,
             auto_detect: true,
@@ -143,6 +143,7 @@ impl Provider for Azure {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
 
     fn cred(fields: &[(&str, &str)]) -> Credential {
         Credential {

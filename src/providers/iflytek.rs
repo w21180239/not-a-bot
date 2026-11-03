@@ -1,4 +1,4 @@
-﻿//! Iflytek (讯飞) free web endpoint.
+//! Iflytek free web endpoint.
 
 use crate::core::creds::Credential;
 use crate::core::error::{Error, Result};
@@ -52,7 +52,8 @@ impl Provider for Iflytek {
         ProviderInfo {
             name: "iflytek".into(),
             display_name: "Iflytek".into(),
-            kind: ProviderKind::Free,
+            kind: ProviderKind::Web,
+            priority: 5,
             needs_key: false,
             max_chars: 5000,
             auto_detect: true,

@@ -65,6 +65,7 @@ pub struct ProviderInfo {
     pub name: String,
     pub display_name: String,
     pub kind: ProviderKind,
+    pub priority: u8,  // Lower = higher priority (web scraping first)
     pub needs_key: bool,
     pub max_chars: usize,
     pub auto_detect: bool,
@@ -76,9 +77,9 @@ pub struct ProviderInfo {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum ProviderKind {
-    Free,
-    Keyed,
-    Llm,
+    Web,      // Web scraping / reverse-engineered endpoints (PRIMARY)
+    Official, // Official APIs (FALLBACK)
+    Llm,      // LLM-based translation
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

@@ -1,8 +1,8 @@
-﻿//! Google Translate free web endpoint: no key, fallback only.
+//! Google Translate free web endpoint: no key, fallback only.
 
 use crate::core::creds::Credential;
 use crate::core::error::{Error, Result};
-use crate::core::http::{client, json, map_status};
+use crate::core::http::{client, map_status};
 use crate::core::lang;
 use crate::providers::{Provider, ProviderKind};
 use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
@@ -72,8 +72,9 @@ impl Provider for GoogleFree {
     fn info(&self) -> ProviderInfo {
         ProviderInfo {
             name: "google".into(),
-            display_name: "Google Translate (free)".into(),
-            kind: ProviderKind::Free,
+            display_name: "Google Translate (web)".into(),
+            kind: ProviderKind::Web,
+            priority: 1,
             needs_key: false,
             max_chars: 5000,
             auto_detect: true,

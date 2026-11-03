@@ -5,23 +5,25 @@ use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-/// Default `auto` chain. Ordered by measured quality and reliability, keyed
-/// providers before free web endpoints, billing providers last.
+/// Default `auto` chain: free web endpoints in priority order. Keyed providers
+/// are not listed; the registry appends whichever are configured, by ascending
+/// priority, after these. Keep this list and the provider `priority` fields in
+/// sync — web endpoints run before official APIs by design.
 pub const DEFAULT_AUTO_CHAIN: &[&str] = &[
-    "deepl",
-    "azure",
-    "googlecloud",
-    "youdao",
-    "caiyun",
-    "aliyun",
-    "volcengine",
-    "baidu",
-    "tencent",
-    "niutrans",
     "google",
-    "libretranslate",
-    "openai",
-    "anthropic",
+    "edge",
+    "iciba",
+    "iflyrec",
+    "modernmt",
+    "volcengine",
+    "lara",
+    "lingvanex",
+    "mirai",
+    "papago",
+    "reverso",
+    "sogou",
+    "mymemory",
+    "systran",
 ];
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -157,7 +159,9 @@ mod tests {
     fn defaults_produce_a_chain() {
         let s = Settings::default();
         let chain = s.chain();
-        assert!(chain.contains(&"deepl".to_string()));
+        // Web-first: the auto chain starts at free web endpoints, not keyed APIs.
+        assert_eq!(chain.first().map(String::as_str), Some("google"));
+        assert!(chain.contains(&"edge".to_string()));
         assert_eq!(s.retries(), 2);
         assert_eq!(s.timeout(), std::time::Duration::from_millis(20_000));
     }

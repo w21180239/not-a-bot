@@ -80,8 +80,11 @@ impl Preserver {
                 }
                 i = j;
             } else {
-                out.push(text.chars().nth(i).unwrap());
-                i += 1;
+                // `i` is a byte offset; advance by one whole UTF-8 character or
+                // multi-byte input gets indexed as if it were ASCII.
+                let ch = text[i..].chars().next().expect("byte offset on a char boundary");
+                out.push(ch);
+                i += ch.len_utf8();
             }
         }
         out
@@ -154,6 +157,19 @@ mod tests {
         assert!(!masked.contains("make test"));
         assert!(find_stray_token(&masked).is_some());
         assert_eq!(p.restore(&masked).unwrap(), "Run `make test` before you push.");
+    }
+
+    #[test]
+    fn multibyte_text_survives_masking() {
+        // Byte offsets and char offsets diverge here; indexing one as the other
+        // either panics or silently drops characters.
+        let mut p = Preserver::new(&[r"`[^`]*`".to_string()]).unwrap().unwrap();
+        let src = "推送前先跑 `make test` 再提交。";
+        let masked = p.mask(src);
+        assert!(!masked.contains("make test"));
+        assert!(masked.contains("推送前先跑"));
+        assert!(masked.contains("再提交。"));
+        assert_eq!(p.restore(&masked).unwrap(), src);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-﻿//! Baidu Fanyi API. Chinese-first, signs requests with MD5.
+//! Baidu Fanyi API. Chinese-first, signs requests with MD5.
 //! Baidu reports most failures in the body with HTTP 200, so `error_code`
 //! drives the typed error rather than the status line.
 
@@ -29,7 +29,6 @@ struct Resp {
 
 #[derive(Debug, Deserialize)]
 struct TransItem {
-    src: String,
     dst: String,
 }
 
@@ -94,8 +93,9 @@ impl Provider for Baidu {
     fn info(&self) -> ProviderInfo {
         ProviderInfo {
             name: "baidu".into(),
-            display_name: "Baidu Fanyi".into(),
-            kind: ProviderKind::Keyed,
+            display_name: "Baidu Fanyi (official)".into(),
+            kind: ProviderKind::Official,
+            priority: 20,
             needs_key: true,
             max_chars: 6000,
             auto_detect: true,
@@ -185,19 +185,6 @@ impl Provider for Baidu {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn cred() -> Credential {
-        Credential {
-            provider: "baidu".into(),
-            label: "default".into(),
-            fields: [
-                ("appid".to_string(), "20200101000000001".to_string()),
-                ("secret_key".to_string(), "sEcReT".to_string()),
-            ]
-            .into_iter()
-            .collect(),
-        }
-    }
 
     fn req(text: &str) -> TranslateRequest {
         TranslateRequest {

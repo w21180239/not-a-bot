@@ -86,7 +86,6 @@ const ALIASES: &[(&str, &str)] = &[
     ("japanese", "ja"),
     ("kr", "ko"),
     ("korean", "ko"),
-    ("klingon", "en"),
     ("iw", "he"),
     ("fil", "tl"),
     ("tgl", "tl"),
@@ -143,17 +142,10 @@ pub fn upstream(
     }
 }
 
-/// Whether a named provider accepts a canonical code. `"all"` and unknown
-/// providers fall back to the canonical list, so `--languages` stays useful.
-pub fn provider_supports(provider: &str, code: &str) -> bool {
-    let table: Option<&HashMap<&'static str, &'static str>> = match provider {
-        "baidu" => Some(&BAIDU),
-        _ => None,
-    };
-    match table {
-        Some(t) => t.contains_key(code),
-        None => is_known(code),
-    }
+/// Whether a named provider accepts a canonical code. Providers advertise `*`
+/// when they accept any code the endpoints understand.
+pub fn provider_accepts(languages: &[String], code: &str) -> bool {
+    languages.iter().any(|l| l == "*" || l == code)
 }
 
 /// Baidu accepts `auto` for detection and its own codes otherwise.
@@ -233,7 +225,7 @@ mod tests {
 
     #[test]
     fn unknown_codes_pass_through_lowercase() {
-        assert_eq!(normalize("Klingon"), "en");
+        assert_eq!(normalize("Klingon"), "klingon");
         assert_eq!(normalize("xx"), "xx");
         assert!(!is_known("xx"));
         assert!(is_known("auto"));

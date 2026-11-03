@@ -1,21 +1,24 @@
-﻿//! Fallback engine: chain providers, rotate keys, mask preserve spans, retry.
+//! Fallback engine: chain providers, rotate keys, mask preserve spans, retry.
 
+use crate::core::config::Settings;
 use crate::core::creds::CredentialStore;
 use crate::core::error::{Error, Result};
 use crate::core::keys::KeyRing;
 use crate::core::preserve::Preserver;
+use crate::core::types::{AttemptRecord, TranslateRequest, TranslateResponse};
 use crate::providers::Registry;
 use crate::retry::backoff;
-use crate::core::types::{AttemptRecord, TranslateRequest, TranslateResponse};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 pub struct Engine {
     registry: Arc<Registry>,
     creds: CredentialStore,
     cache_dir: Option<std::path::PathBuf>,
-    retries: u32,
+    settings: Settings,
+    /// Resolved once: the configured chain changes only when the process restarts.
+    chain: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -29,9 +32,10 @@ impl Engine {
         registry: Arc<Registry>,
         creds: CredentialStore,
         cache_dir: Option<std::path::PathBuf>,
-        retries: u32,
+        settings: Settings,
     ) -> Self {
-        Self { registry, creds, cache_dir, retries }
+        let chain = settings.chain();
+        Self { registry, creds, cache_dir, settings, chain }
     }
 
     pub fn registry(&self) -> &Registry {
@@ -40,6 +44,10 @@ impl Engine {
 
     pub fn creds(&self) -> &CredentialStore {
         &self.creds
+    }
+
+    pub fn settings(&self) -> &Settings {
+        &self.settings
     }
 
     pub async fn translate(&self, req: &TranslateRequest) -> Result<Outcome> {
@@ -75,14 +83,21 @@ impl Engine {
         let chain = self.registry.chain(
             req.provider.as_deref(),
             &req.fallback_chain,
-            &crate::core::config::Settings::default().chain(),
+            &self.chain,
+            &req.source_lang,
             &target,
         )?;
+        let pinned = req.provider.is_some();
+        // Per-request timeout wins over the configured default.
+        let budget_ms = req.timeout_ms.or(self.settings.timeout_ms).unwrap_or(20_000);
+        let budget = Duration::from_millis(budget_ms);
 
         let mut attempts = Vec::new();
         let mut failures: Vec<String> = Vec::new();
         let mut last: Option<Error> = None;
         let mut any_tried = false;
+        // Providers skipped because every configured key is on cooldown.
+        let mut cooling: Vec<(String, u64)> = Vec::new();
 
         for provider in chain {
             let info = provider.info();
@@ -96,13 +111,28 @@ impl Engine {
             if info.needs_key && labels.is_empty() {
                 continue;
             }
-            let path = crate::core::keys::state_path(self.cache_dir.as_deref(), &info.name);
-            let ring = KeyRing::new(labels.clone(), path);
+            // Cooldown only helps when there is another key to rotate to. A
+            // keyless provider has one pseudo-credential, so cooling it would
+            // take the channel offline for an hour instead of rotating.
+            let ring = if info.needs_key {
+                let path = crate::core::keys::state_path(self.cache_dir.as_deref(), &info.name);
+                KeyRing::new(labels.clone(), path)
+            } else {
+                KeyRing::unmanaged(labels.clone())
+            };
             let rounds = labels.len().max(1);
 
             for _ in 0..rounds {
                 let now = chrono::Utc::now();
-                let Some(idx) = ring.pick(now) else { break };
+                let Some(idx) = ring.pick(now) else {
+                    if ring.all_cooling(now) {
+                        cooling.push((
+                            info.name.clone(),
+                            ring.next_available(now).unwrap_or(0),
+                        ));
+                    }
+                    break;
+                };
                 let label = labels[idx].clone();
                 let Some(cred) = self.creds.keys(&info.name).get(idx).cloned().or_else(|| {
                     (!info.needs_key).then(|| crate::core::creds::Credential {
@@ -118,7 +148,15 @@ impl Engine {
                 let mut attempt = 0u32;
                 loop {
                     let started = Instant::now();
-                    let result = provider.translate_once(&inner, &cred).await;
+                    let result = match tokio::time::timeout(
+                        budget,
+                        provider.translate_once(&inner, &cred),
+                    )
+                    .await
+                    {
+                        Ok(r) => r,
+                        Err(_) => Err(Error::Timeout { timeout_ms: budget_ms }),
+                    };
                     let latency_ms = started.elapsed().as_millis() as u64;
 
                     match result {
@@ -156,6 +194,10 @@ impl Engine {
                             };
                             resp.request_id = request_id.clone();
                             resp.target_lang = target.clone();
+                            // Providers report their own dialect of the source
+                            // code (`zh-CN`, `chi`); the wire contract promises
+                            // the canonical one.
+                            resp.detected_source = crate::core::lang::normalize(&resp.detected_source);
                             if resp.chars.is_none() {
                                 resp.chars = Some(req.text.chars().count());
                             }
@@ -173,8 +215,12 @@ impl Engine {
                             failures.push(format!("{}: {err}", info.name));
                             last = Some(err);
 
-                            if last.as_ref().is_some_and(|e| e.retryable()) && attempt < self.retries
-                            {
+                            // A timeout means this endpoint exceeded the budget;
+                            // retrying it just burns another full budget. Move on.
+                            let retry_same = last.as_ref().is_some_and(|e| e.retryable())
+                                && !matches!(last, Some(Error::Timeout { .. }))
+                                && attempt < self.settings.retries();
+                            if retry_same {
                                 let secs = last.as_ref().and_then(|e| e.retry_after_secs());
                                 attempt += 1;
                                 tokio::time::sleep(backoff(attempt, secs)).await;
@@ -191,7 +237,18 @@ impl Engine {
         }
 
         Err(if !any_tried {
-            Error::NoProvider
+            // Keys exist but every one is on cooldown: that is a rate limit with
+            // a known recovery time, not a missing provider.
+            match cooling.iter().map(|(_, secs)| *secs).max() {
+                Some(secs) => Error::RateLimited {
+                    provider: cooling[0].0.clone(),
+                    retry_after_secs: Some(secs),
+                },
+                None => Error::NoProvider,
+            }
+        } else if pinned {
+            // A pinned provider has no chain to exhaust; report its own error.
+            last.unwrap_or(Error::ChainExhausted)
         } else {
             match last {
                 Some(Error::Upstream { provider, .. }) => Error::ChainExhaustedWith {
@@ -230,7 +287,8 @@ mod tests {
             ProviderInfo {
                 name: self.name.into(),
                 display_name: self.name.into(),
-                kind: if self.name == "free" { ProviderKind::Free } else { ProviderKind::Keyed },
+                kind: if self.name == "free" { ProviderKind::Web } else { ProviderKind::Official },
+                priority: if self.name == "free" { 30 } else { 1 },
                 needs_key: self.name != "free",
                 max_chars: 5000,
                 auto_detect: true,
@@ -257,7 +315,7 @@ mod tests {
                     body: "boom".into(),
                 }),
                 None => Ok(TranslateResponse {
-                    text: if self.info().kind == ProviderKind::Free {
+                    text: if self.info().kind == ProviderKind::Web {
                         req.text.clone()
                     } else {
                         format!("{}:{}", self.name, req.text)
@@ -314,6 +372,11 @@ mod tests {
         store
     }
 
+    /// Retries off: these tests count calls, not backoff behaviour.
+    fn test_settings() -> Settings {
+        Settings { retries: Some(0), ..Default::default() }
+    }
+
     fn dir() -> tempfile::TempDir {
         tempfile::TempDir::new().unwrap()
     }
@@ -330,7 +393,7 @@ mod tests {
             Arc::new(reg),
             creds_with("deepl", &["k1"]),
             Some(home.path().to_path_buf()),
-            0,
+            test_settings(),
         );
 
         let out = engine.translate(&request(None)).await.unwrap();
@@ -351,7 +414,7 @@ mod tests {
             Arc::new(reg),
             creds_with("deepl", &["k1", "k2"]),
             Some(home.path().to_path_buf()),
-            0,
+            test_settings(),
         );
 
         let out = engine.translate(&request(None)).await.unwrap();
@@ -371,7 +434,7 @@ mod tests {
             Arc::new(reg),
             creds_with("deepl", &["k1", "k2"]),
             Some(home.path().to_path_buf()),
-            0,
+            test_settings(),
         );
         engine.translate(&request(None)).await.unwrap();
         assert_eq!(calls.load(Ordering::SeqCst), 2);
@@ -388,8 +451,12 @@ mod tests {
         let (p, calls) = stub("free", vec![]);
         let mut reg = Registry::new();
         reg.register(p);
-        let engine =
-            Engine::new(Arc::new(reg), CredentialStore::default(), Some(home.path().to_path_buf()), 0);
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(home.path().to_path_buf()),
+            test_settings(),
+        );
 
         let mut req = request(None);
         req.text = "run make test now".into();
@@ -410,7 +477,7 @@ mod tests {
             Arc::new(reg),
             CredentialStore::default(),
             Some(home.path().to_path_buf()),
-            0,
+            test_settings(),
         );
         let err = engine.translate(&request(Some("nope"))).await.unwrap_err();
         assert_eq!(err.code(), "PROVIDER_NOT_FOUND");
@@ -423,7 +490,7 @@ mod tests {
             Arc::new(Registry::new()),
             CredentialStore::default(),
             Some(home.path().to_path_buf()),
-            0,
+            test_settings(),
         );
         let err = engine.translate(&request(None)).await.unwrap_err();
         assert_eq!(err.code(), "NO_PROVIDER");
@@ -439,10 +506,144 @@ mod tests {
             Arc::new(reg),
             CredentialStore::default(),
             Some(home.path().to_path_buf()),
-            0,
+            test_settings(),
         );
         let err = engine.translate(&request(None)).await.unwrap_err();
         assert_eq!(err.code(), "NO_PROVIDER");
         assert_eq!(calls.load(Ordering::SeqCst), 0, "no request for missing keys");
+    }
+
+    #[tokio::test]
+    async fn configured_chain_overrides_registration_order() {
+        let home = dir();
+        let (api, _) = stub("deepl", vec![]);
+        let (web, _) = stub("free", vec![]);
+        let mut reg = Registry::new();
+        // Registered first and highest priority, but the config chain names the
+        // other provider, so `free` must serve the request.
+        reg.register(api);
+        reg.register(web);
+        let settings = Settings {
+            chain: Some(vec!["free".to_string()]),
+            retries: Some(0),
+            ..Default::default()
+        };
+        let engine = Engine::new(
+            Arc::new(reg),
+            creds_with("deepl", &["k1"]),
+            Some(home.path().to_path_buf()),
+            settings,
+        );
+        let out = engine.translate(&request(None)).await.unwrap();
+        assert_eq!(out.response.provider, "free");
+    }
+
+    /// Slow provider used to prove the engine enforces the request budget.
+    struct Slow;
+
+    #[async_trait]
+    impl Provider for Slow {
+        fn info(&self) -> ProviderInfo {
+            ProviderInfo {
+                name: "slow".into(),
+                display_name: "slow".into(),
+                kind: ProviderKind::Web,
+                priority: 1,
+                needs_key: false,
+                max_chars: 5000,
+                auto_detect: true,
+                languages: vec!["*".into()],
+                free_tier: None,
+                configured: true,
+            }
+        }
+        async fn translate_once(&self, req: &TR, _cred: &Credential) -> R<TranslateResponse> {
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            Ok(TranslateResponse {
+                text: req.text.clone(),
+                detected_source: "en".into(),
+                target_lang: req.target_lang.clone(),
+                provider: "slow".into(),
+                engine: "slow".into(),
+                latency_ms: 300,
+                request_id: String::new(),
+                chars: None,
+                warnings: Vec::new(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn request_timeout_is_enforced() {
+        let home = dir();
+        let mut reg = Registry::new();
+        reg.register(Arc::new(Slow));
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(home.path().to_path_buf()),
+            test_settings(),
+        );
+        let mut req = request(None);
+        req.provider = Some("slow".into());
+        req.timeout_ms = Some(30);
+        let started = Instant::now();
+        let err = engine.translate(&req).await.unwrap_err();
+        assert_eq!(err.code(), "TIMEOUT");
+        assert!(
+            started.elapsed() < std::time::Duration::from_millis(250),
+            "engine must cut the call at the budget, not at the endpoint timeout"
+        );
+    }
+
+    /// Reports `zh-CN` the way several web endpoints do.
+    struct Dialect;
+
+    #[async_trait]
+    impl Provider for Dialect {
+        fn info(&self) -> ProviderInfo {
+            ProviderInfo {
+                name: "dialect".into(),
+                display_name: "dialect".into(),
+                kind: ProviderKind::Web,
+                priority: 1,
+                needs_key: false,
+                max_chars: 5000,
+                auto_detect: true,
+                languages: vec!["*".into()],
+                free_tier: None,
+                configured: true,
+            }
+        }
+        async fn translate_once(&self, req: &TR, _cred: &Credential) -> R<TranslateResponse> {
+            Ok(TranslateResponse {
+                text: "x".into(),
+                detected_source: "zh-CN".into(),
+                target_lang: req.target_lang.clone(),
+                provider: "dialect".into(),
+                engine: "dialect".into(),
+                latency_ms: 0,
+                request_id: String::new(),
+                chars: None,
+                warnings: Vec::new(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn detected_source_is_canonicalised() {
+        let home = dir();
+        let mut reg = Registry::new();
+        reg.register(Arc::new(Dialect));
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(home.path().to_path_buf()),
+            test_settings(),
+        );
+        let mut req = request(None);
+        req.provider = Some("dialect".into());
+        let out = engine.translate(&req).await.unwrap();
+        assert_eq!(out.response.detected_source, "zh");
     }
 }

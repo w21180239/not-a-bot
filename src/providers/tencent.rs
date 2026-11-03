@@ -1,4 +1,4 @@
-﻿//! Tencent Cloud Text Translation (TC3-HMAC-SHA256 signature).
+//! Tencent Cloud Text Translation (TC3-HMAC-SHA256 signature).
 
 use crate::core::config::ProviderSettings;
 use crate::core::creds::Credential;
@@ -9,7 +9,6 @@ use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
 use crate::providers::{Provider, ProviderKind};
 use async_trait::async_trait;
 use serde::Deserialize;
-use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 const HOST: &str = "tmt.tencentcloudapi.com";
@@ -18,6 +17,7 @@ const ACTION: &str = "TextTranslate";
 const VERSION: &str = "2018-03-21";
 
 #[derive(Debug, Deserialize)]
+#[allow(non_snake_case)]
 struct Wrapper {
     Response: Response,
 }
@@ -87,8 +87,9 @@ impl Provider for Tencent {
     fn info(&self) -> ProviderInfo {
         ProviderInfo {
             name: "tencent".into(),
-            display_name: "Tencent Cloud MT".into(),
-            kind: ProviderKind::Keyed,
+            display_name: "Tencent Cloud MT (official)".into(),
+            kind: ProviderKind::Official,
+            priority: 26,
             needs_key: true,
             max_chars: 5000,
             auto_detect: false,
@@ -196,6 +197,7 @@ impl Provider for Tencent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
 
     #[test]
     fn string_to_sign_has_the_tc3_shape() {

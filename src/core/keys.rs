@@ -73,6 +73,17 @@ impl KeyRing {
         }
     }
 
+    /// A ring that never cools down, for keyless providers whose single
+    /// pseudo-credential cannot be rotated: a cooldown there would take the
+    /// whole channel offline instead of moving to another key.
+    pub fn unmanaged(labels: Vec<String>) -> Self {
+        Self {
+            labels,
+            state: Mutex::new(KeyState::default()),
+            path: None,
+        }
+    }
+
     /// Index of the next usable credential, or `None` when all are cooling.
     /// Selection is round-robin: start after the last used slot so keys take
     /// turns at equal priority.
@@ -88,6 +99,11 @@ impl KeyRing {
             }
         }
         None
+    }
+
+    /// True when every label is cooling, i.e. `pick` returns `None` for `now`.
+    pub fn all_cooling(&self, now: DateTime<Utc>) -> bool {
+        !self.labels.is_empty() && self.pick(now).is_none()
     }
 
     /// Earliest moment a cooling credential becomes usable again.

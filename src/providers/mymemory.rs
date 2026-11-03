@@ -1,8 +1,8 @@
-﻿//! MyMemory free translation API. No key required, generous free tier.
+//! MyMemory free translation API. No key required, generous free tier.
 
 use crate::core::creds::Credential;
 use crate::core::error::{Error, Result};
-use crate::core::http::{client, json};
+use crate::core::http::client;
 use crate::core::lang;
 use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
 use crate::providers::{Provider, ProviderKind};
@@ -12,6 +12,17 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 const ENDPOINT: &str = "https://api.mymemory.translated.net/get";
+
+/// MyMemory wants RFC3066 region tags and does NOT support "auto" source.
+/// If source is "auto", use the default target language (zh-CN).
+pub fn to_mymemory_code(code: &str) -> String {
+    match code {
+        "zh" | "zh-CN" | "zh-Hans" => "zh-CN".into(),
+        "zh-TW" | "zh-Hant" => "zh-TW".into(),
+        "en" => "en-GB".into(),
+        other => other.into(),
+    }
+}
 
 #[derive(Debug, Deserialize)]
 struct Resp {
@@ -27,8 +38,6 @@ struct Resp {
 struct ResponseData {
     #[serde(rename = "translatedText")]
     translated_text: String,
-    #[serde(rename = "match")]
-    match_score: f32,
 }
 
 pub struct MyMemory {
@@ -57,10 +66,11 @@ impl Provider for MyMemory {
         ProviderInfo {
             name: "mymemory".into(),
             display_name: "MyMemory".into(),
-            kind: ProviderKind::Free,
+            kind: ProviderKind::Web,
+            priority: 11,
             needs_key: false,
             max_chars: 5000,
-            auto_detect: true,
+            auto_detect: false,
             languages: vec!["*".into()],
             free_tier: Some("10000 chars/day with email, 1000 chars/day anonymous".into()),
             configured: true,
@@ -76,8 +86,14 @@ impl Provider for MyMemory {
         req: &TranslateRequest,
         _cred: &Credential,
     ) -> Result<TranslateResponse> {
-        let to = lang::normalize(&req.target_lang);
-        let from = lang::normalize(&req.source_lang);
+        let to = to_mymemory_code(&lang::normalize(&req.target_lang));
+        let from_raw = lang::normalize(&req.source_lang);
+        // The endpoint rejects "auto"; mirror the reference by using target as source fallback.
+        let from = if from_raw == "auto" {
+            to.clone()
+        } else {
+            to_mymemory_code(&from_raw)
+        };
 
         let mut params: BTreeMap<String, String> = BTreeMap::new();
         params.insert("q".into(), req.text.clone());

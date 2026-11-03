@@ -10,7 +10,13 @@ pub enum Error {
     #[error("provider not found: {name}")]
     ProviderNotFound { name: String },
 
-    #[error("language pair not supported by {{provider}}: {from_lang} -> {{target}}")]
+    #[error("provider {name} is implemented but not configured; add credentials or a base_url")]
+    ProviderNotConfigured { name: String },
+
+    #[error("{provider} cannot detect the source language; pass an explicit source")]
+    AutoDetectUnsupported { provider: String },
+
+    #[error("language pair not supported by {provider}: {from_lang} -> {target}")]
     LanguagePairNotSupported {
         from_lang: String,
         target: String,
@@ -74,6 +80,8 @@ impl Error {
     pub fn code(&self) -> &'static str {
         match self {
             Error::ProviderNotFound { .. } => "PROVIDER_NOT_FOUND",
+            Error::ProviderNotConfigured { .. } => "PROVIDER_NOT_CONFIGURED",
+            Error::AutoDetectUnsupported { .. } => "AUTO_DETECT_UNSUPPORTED",
             Error::LanguagePairNotSupported { .. } => "LANGUAGE_PAIR_NOT_SUPPORTED",
             Error::QuotaExhausted { .. } => "QUOTA_EXHAUSTED",
             Error::RateLimited { .. } => "RATE_LIMITED",
@@ -128,6 +136,8 @@ impl Error {
     pub fn suggested_action(&self) -> &'static str {
         match self {
             Error::ProviderNotFound { .. } => "check_provider_name",
+            Error::ProviderNotConfigured { .. } => "configure_a_provider",
+            Error::AutoDetectUnsupported { .. } => "pass_an_explicit_source",
             Error::LanguagePairNotSupported { .. } => "change_provider_or_language",
             Error::QuotaExhausted { .. } => "switch_key_or_upgrade_plan",
             Error::RateLimited { .. } => "backoff_and_retry",

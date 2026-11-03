@@ -105,6 +105,14 @@ pub fn now_secs() -> u64 {
         .unwrap_or(0)
 }
 
+/// UTC now in unix milliseconds; several web endpoints use this as a cache-buster.
+pub fn now_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
 /// MD5 hex digest. Baidu and Youdao sign with MD5 over a concatenated secret.
 /// Crates.io package `md-5` imports as `md5`.
 pub fn md5_hex(input: &str) -> String {

@@ -1,4 +1,4 @@
-﻿//! NiuTrans. Broad language coverage, form POST with an apikey field.
+//! NiuTrans. Broad language coverage, form POST with an apikey field.
 
 use crate::core::config::ProviderSettings;
 use crate::core::creds::Credential;
@@ -52,8 +52,9 @@ impl Provider for Niutrans {
     fn info(&self) -> ProviderInfo {
         ProviderInfo {
             name: "niutrans".into(),
-            display_name: "NiuTrans".into(),
-            kind: ProviderKind::Keyed,
+            display_name: "NiuTrans (official)".into(),
+            kind: ProviderKind::Official,
+            priority: 25,
             needs_key: true,
             // NiuTrans rejects requests above 5000 bytes.
             max_chars: 5000,

@@ -1,4 +1,4 @@
-﻿//! Caiyun (LingoCloud) small translation API. Bearer token, JSON body.
+//! Caiyun (LingoCloud) small translation API. Bearer token, JSON body.
 
 use crate::core::config::ProviderSettings;
 use crate::core::creds::Credential;
@@ -9,7 +9,6 @@ use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
 use crate::providers::{Provider, ProviderKind};
 use async_trait::async_trait;
 use serde::Deserialize;
-use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 const ENDPOINT: &str = "https://api.intertrans.com/api/web/v2/translate/text";
@@ -58,8 +57,9 @@ impl Provider for Caiyun {
     fn info(&self) -> ProviderInfo {
         ProviderInfo {
             name: "caiyun".into(),
-            display_name: "Caiyun".into(),
-            kind: ProviderKind::Keyed,
+            display_name: "Caiyun (official)".into(),
+            kind: ProviderKind::Official,
+            priority: 24,
             needs_key: true,
             // The web API caps a single request at 2000 characters.
             max_chars: 2000,
@@ -132,6 +132,7 @@ impl Provider for Caiyun {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
 
     #[test]
     fn parses_success_shape() {

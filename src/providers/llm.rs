@@ -102,6 +102,12 @@ impl Provider for Llm {
             name: self.name.clone(),
             display_name: self.display.clone(),
             kind: ProviderKind::Llm,
+            priority: match self.name.as_str() {
+                "openai" => 40,
+                "anthropic" => 41,
+                "deepseek" => 42,
+                _ => 50,
+            },
             needs_key: true,
             max_chars: 8000,
             auto_detect: true,

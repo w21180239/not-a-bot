@@ -1,4 +1,4 @@
-﻿//! Command line surface. stdout carries machine-readable output only;
+//! Command line surface. stdout carries machine-readable output only;
 //! diagnostics go to stderr so agents can pipe results directly.
 
 use crate::core::config::{Settings, CONFIG_TEMPLATE};
@@ -205,14 +205,8 @@ fn init_tracing(level: Option<&str>) {
 
 async fn dispatch(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Schema => {
-            emit_json(cli, &schema_document()?);
-            Ok(())
-        }
-        Command::Manifest => {
-            emit_json(cli, &manifest_document()?);
-            Ok(())
-        }
+        Command::Schema => emit_json(cli, &schema_document()?),
+        Command::Manifest => emit_json(cli, &manifest_document()?),
         Command::Init { path } => {
             match path {
                 Some(p) => {
@@ -248,7 +242,7 @@ async fn dispatch(cli: &Cli) -> Result<()> {
                 Command::Translate { .. } => cmd_translate(cli, &ctx).await,
                 Command::Batch { .. } => cmd_batch(cli, &ctx).await,
                 Command::Providers => cmd_providers(cli, &ctx),
-                Command::Languages { provider } => cmd_languages(cli, provider),
+                Command::Languages { provider } => cmd_languages(cli, &ctx, provider),
                 Command::Keys { provider, reset } => cmd_keys(cli, &ctx, provider.as_deref(), *reset),
                 Command::Health => cmd_health(cli, &ctx).await,
                 _ => unreachable!("handled above"),
@@ -266,9 +260,14 @@ pub fn build_registry(creds: &CredentialStore, settings: &Settings) -> Registry 
     use crate::providers::*;
     let mut reg = Registry::new();
 
-    reg.register(Arc::new(libretranslate::LibreTranslate::new(
-        settings.provider("libretranslate").base_url.as_deref(),
-    )));
+    // LibreTranslate is self-hosted software and no public instance is live, so
+    // it is registered only when a base_url is configured.
+    match settings.provider("libretranslate").base_url.as_deref() {
+        Some(base) if !base.trim().is_empty() => {
+            reg.register(Arc::new(libretranslate::LibreTranslate::new(Some(base))));
+        }
+        _ => {}
+    }
     reg.register(Arc::new(google::GoogleFree::new()));
     reg.register(Arc::new(volcengine::Volcengine::new()));
     // New free providers
@@ -281,8 +280,12 @@ pub fn build_registry(creds: &CredentialStore, settings: &Settings) -> Registry 
     reg.register(Arc::new(papago::Papago::new()));
     reg.register(Arc::new(reverso::Reverso::new()));
     reg.register(Arc::new(sogou::Sogou::new()));
-    reg.register(Arc::new(iflytek::Iflytek::new()));
     reg.register(Arc::new(iflyrec::Iflyrec::new()));
+    reg.register(Arc::new(lara::Lara::new()));
+    reg.register(Arc::new(modernmt::ModernMt::new()));
+    // fanyi.xfyun.cn now needs a logged-in account, so the old `iflytek` web
+    // endpoints are gone; iflyrec is iFlytek's open one. Same move as the fork.
+    reg.alias("iflytek", "iflyrec");
     build_keyed(&mut reg, creds, settings);
     reg
 }
@@ -347,7 +350,7 @@ impl Ctx {
             registry.clone(),
             creds,
             crate::core::config::cache_dir(),
-            settings.retries(),
+            settings,
         );
         Ok(Self { engine, registry })
     }
@@ -407,10 +410,10 @@ async fn cmd_translate(cli: &Cli, ctx: &Ctx) -> Result<()> {
         Ok(out) => {
             if cli.format == Format::Text {
                 println!("{}", out.response.text);
+                Ok(())
             } else {
-                emit_json(cli, &render_success(cli, &out));
+                emit_json(cli, &render_success(cli, &out))
             }
-            Ok(())
         }
         Err(err) => Err(err),
     }
@@ -452,7 +455,8 @@ async fn cmd_batch(cli: &Cli, ctx: &Ctx) -> Result<()> {
     let mut lines: Vec<(usize, TranslateRequest)> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
     for (i, line) in raw.lines().enumerate() {
-        let line = line.trim();
+        // Strip BOM (U+FEFF) that may appear at the start of the first line
+        let line = line.trim_start_matches('\u{FEFF}').trim();
         if line.is_empty() {
             continue;
         }
@@ -520,20 +524,43 @@ fn cmd_providers(cli: &Cli, ctx: &Ctx) -> Result<()> {
     emit_json(cli, &serde_json::json!({ "providers": rows }))
 }
 
-fn cmd_languages(cli: &Cli, provider: &str) -> Result<()> {
+fn cmd_languages(cli: &Cli, ctx: &Ctx, provider: &str) -> Result<()> {
+    // Provider capabilities come from the registry, not a static table: a
+    // provider that advertises `*` genuinely accepts any canonical code.
     let codes: Vec<String> = if provider == "all" {
-        crate::core::lang::LANGUAGES.iter().map(|(c, _)| c.to_string()).collect()
-    } else {
         crate::core::lang::LANGUAGES
             .iter()
-            .filter(|(c, _)| crate::core::lang::provider_supports(provider, c))
             .map(|(c, _)| c.to_string())
             .collect()
+    } else {
+        let info = ctx
+            .registry
+            .get(provider)
+            .ok_or_else(|| {
+                if crate::providers::is_known_provider(provider) {
+                    Error::ProviderNotConfigured { name: provider.into() }
+                } else {
+                    Error::ProviderNotFound { name: provider.into() }
+                }
+            })?
+            .info();
+        if info.languages.iter().any(|l| l == "*") {
+            crate::core::lang::LANGUAGES
+                .iter()
+                .map(|(c, _)| c.to_string())
+                .collect()
+        } else {
+            info.languages
+                .iter()
+                .filter(|c| crate::core::lang::is_known(c))
+                .cloned()
+                .collect()
+        }
     };
-    if provider != "all" && codes.is_empty() {
-        return Err(Error::ProviderNotFound { name: provider.into() });
-    }
-    emit_json(cli, &serde_json::json!({ "provider": provider, "languages": codes }))
+    emit_json(
+        cli,
+        &serde_json::json!({ "provider": provider, "languages": codes }),
+    )
 }
 
 fn cmd_keys(cli: &Cli, ctx: &Ctx, provider: Option<&str>, reset: bool) -> Result<()> {
@@ -626,14 +653,13 @@ async fn cmd_health(cli: &Cli, ctx: &Ctx) -> Result<()> {
 }
 
 fn emit_json(cli: &Cli, value: &serde_json::Value) -> Result<()> {
-    let out = serde_json::to_string_pretty(value)
-        .or_else(|_| serde_json::to_string(value))
-        .map_err(|e| Error::Internal(e.to_string()))?;
-    if cli.quiet {
-        print!("{}", out.replace('\n', " "));
+    let out = if cli.quiet {
+        serde_json::to_string(value)
     } else {
-        println!("{out}");
+        serde_json::to_string_pretty(value)
     }
+    .map_err(|e| Error::Internal(e.to_string()))?;
+    println!("{out}");
     Ok(())
 }
 
@@ -705,6 +731,7 @@ pub fn schema_document() -> Result<serde_json::Value> {
     Ok(serde_json::Value::Object(doc))
 }
 
+#[cfg(test)]
 fn schema_types() -> &'static [&'static str] {
     &[
         "TranslateRequest",
@@ -717,17 +744,19 @@ fn schema_types() -> &'static [&'static str] {
 }
 
 pub fn manifest_document() -> Result<serde_json::Value> {
+    let translate_schema = serde_json::to_value(schemars::schema_for!(TranslateRequest))
+        .map_err(|e| Error::Internal(e.to_string()))?;
     Ok(serde_json::json!({
         "name": "translatex",
         "version": crate::core::types::VERSION,
-        "description": "Translation with provider fallback, key rotation and structured output.",
+        "description": "Translation with web-first provider fallback, key rotation and structured output.",
         "transport": "stdio",
+        "command": ["translatex", "mcp"],
         "tools": [
             {
                 "name": "translate",
                 "description": "Translate text between languages. Falls back across providers and rotates API keys automatically.",
-                "inputSchema": "#/definitions/TranslateRequest",
-                "outputSchema": "#/definitions/TranslateResponse",
+                "inputSchema": translate_schema,
                 "annotations": { "readOnlyHint": true, "idempotentHint": true }
             },
             {
@@ -752,8 +781,7 @@ pub fn manifest_document() -> Result<serde_json::Value> {
         ],
         "install": {
             "cargo": "cargo install translatex",
-            "homebrew": "brew install translatex",
-            "binary": "https://github.com/yourorg/translatex/releases/latest"
+            "binary": "https://github.com/w21180239/translatex/releases/latest"
         }
     }))
 }

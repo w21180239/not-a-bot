@@ -1,4 +1,4 @@
-﻿//! Google Cloud Translation v2 (Basic). Broad language coverage, 500k chars free.
+//! Google Cloud Translation v2 (Basic). Broad language coverage, 500k chars free.
 
 use crate::core::config::ProviderSettings;
 use crate::core::creds::Credential;
@@ -60,8 +60,9 @@ impl Provider for GoogleCloud {
     fn info(&self) -> ProviderInfo {
         ProviderInfo {
             name: "googlecloud".into(),
-            display_name: "Google Cloud Translation".into(),
-            kind: ProviderKind::Keyed,
+            display_name: "Google Cloud Translation (official)".into(),
+            kind: ProviderKind::Official,
+            priority: 21,
             needs_key: true,
             max_chars: 30_000,
             auto_detect: true,

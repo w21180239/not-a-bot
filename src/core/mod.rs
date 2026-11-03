@@ -1,5 +1,6 @@
 pub mod config;
 pub mod creds;
+pub mod crypto;
 pub mod engine;
 pub mod error;
 pub mod http;
