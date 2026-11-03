@@ -2,6 +2,8 @@
 
 # CLI — 配置与凭据文件
 
+[← 领域概览](OVERVIEW.md) · [文档索引](../README.md)
+
 ## 位置
 
 | 文件 | 默认路径 | 覆盖方式 |
@@ -40,7 +42,7 @@ region = "eastasia"
 规则：
 
 - 开启了 `deny_unknown_fields`。拼错字段会直接得到 `CONFIG_ERROR`，不会被静默忽略。
-- `chain` 中的 Provider 按书写顺序排到最前；其余已注册的按优先级升序追加，因此网页接口仍然排在官方 API 之前。
+- `chain` 中的 Provider 按书写顺序排在最前，与优先级无关；其余已注册的按优先级升序追加。
 - `timeout_ms`、`retries` 是请求默认值；请求里的 `timeoutMs` 覆盖超时。
 - `race_width` 控制同时在飞的 Provider 数；`1` 恢复严格串行。`--race` 参数覆盖单次调用。
 - 请求里写 `"pivot": "auto"` 时，`roundtrip_pivot` 就是默认中转语言。
@@ -72,11 +74,12 @@ secret_key = "..."
 
 ## 优先级
 
-后者覆盖前者：
+四种来源，依次是：
 
-1. 内置免费接口（不涉及凭据）。
-2. `~/.config/translatex/credentials.toml`。
-3. `TRANSLATEX_<PROVIDER>_<FIELD>` 环境变量。
+1. 内置免费接口，不需要凭据。
+2. `~/.config/translatex/credentials.toml` 里的标签，按文件顺序轮换。
+3. `TRANSLATEX_<PROVIDER>_<FIELD>` 环境变量，合并成一个 `env` 标签，排在文件标签之后。
+4. 字段写成 `@keyring` 时，加载文件时从系统钥匙串读取。
 
 字段名沿用 Provider 自己的命名：`TRANSLATEX_DEEPL_API_KEY`、`TRANSLATEX_AZURE_REGION`、`TRANSLATEX_BAIDU_SECRET_KEY`。
 

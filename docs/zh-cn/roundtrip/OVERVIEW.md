@@ -2,6 +2,8 @@
 
 # 往返翻译 — 概览
 
+[← 文档索引](../README.md)
+
 `roundtrip` 先把文本翻译到中转语言，再翻回原语言：
 
 ```
@@ -46,7 +48,7 @@ translatex roundtrip "<中文文本>" --from zh --format json   # 再去中文�
 
 ```bash
 translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
-translatex roundtrip draft.md --pivot ja          # 别名：translatex polish
+translatex roundtrip --from en --pivot ja < draft.md   # 别名：translatex polish
 ```
 
 ```json

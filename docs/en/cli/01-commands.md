@@ -2,6 +2,8 @@
 
 # CLI — Command reference
 
+[← Domain overview](OVERVIEW.md) · [Documentation index](../README.md)
+
 ## `translate`
 
 ```bash
@@ -16,7 +18,7 @@ echo "Hello" | translatex translate -t ja
 | `-t, --to` | required | Target language code |
 | `-s, --from` | `auto` | Source language or `auto` |
 | `-p, --provider` | `auto` | Pin one provider, or walk the chain |
-| `--fallback` | empty | Comma-separated providers tried after the pinned one |
+| `--fallback` | empty | Comma-separated providers tried first; with `--provider`, tried after it |
 | `--preserve` | empty | Regex for spans to keep verbatim; repeatable |
 | `--timeout-ms` | config | Per-request budget in milliseconds |
 | `--request-id` | generated | Correlation id, echoed and used for cooldowns |
@@ -25,6 +27,7 @@ echo "Hello" | translatex translate -t ja
 Semantics worth knowing:
 
 - `--provider deepl --fallback google,edge` tries DeepL, then Google, then Edge. A pinned provider that cannot serve the request (no auto-detection, unsupported pair) hands over to the fallback list instead of failing.
+- `--fallback google,edge` without `--provider` puts those two at the front of the chain, in the order written, before the configured chain.
 - `--preserve` runs before the chain. A restore failure counts as a failed attempt and moves to the next provider.
 - `--from auto` requires the provider to support detection. Providers with `autoDetect: false` are skipped; pinning one returns `AUTO_DETECT_UNSUPPORTED`.
 
@@ -32,7 +35,7 @@ Semantics worth knowing:
 
 ```bash
 translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
-translatex polish draft.md --pivot ja
+translatex roundtrip --from en --pivot ja < draft.md
 ```
 
 | Flag | Default | Meaning |
@@ -94,7 +97,7 @@ translatex languages --provider google     # that provider's advertised set
 ```bash
 translatex keys                    # cooldown and failure state for configured providers
 translatex keys deepl              # one provider
-translatex keys --reset            # clear every cooldown file
+translatex keys --reset            # clear cooldown state for configured providers
 ```
 
 ## `health`

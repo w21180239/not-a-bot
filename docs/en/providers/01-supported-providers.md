@@ -2,6 +2,8 @@
 
 # Providers — Supported backends
 
+[← Domain overview](OVERVIEW.md) · [Documentation index](../README.md)
+
 `chars` is the adapter's request limit before splitting. `auto` marks whether the endpoint can detect the source language. Status reflects a live sweep, not the code path.
 
 ## Free web endpoints

@@ -12,6 +12,7 @@
 | Learn every command and flag | [cli/OVERVIEW.md](cli/OVERVIEW.md) |
 | Know which providers exist and in what order | [providers/OVERVIEW.md](providers/OVERVIEW.md) |
 | Wire it into Claude Code, Codex, OpenCode or another agent | [integrations/OVERVIEW.md](integrations/OVERVIEW.md) |
+| See the 24 supported harnesses with their paths | [integrations/02-supported-harnesses.md](integrations/02-supported-harnesses.md) |
 | Parse the output safely | [api/OVERVIEW.md](api/OVERVIEW.md) |
 | Fix a failing channel | [troubleshooting/OVERVIEW.md](troubleshooting/OVERVIEW.md) |
 

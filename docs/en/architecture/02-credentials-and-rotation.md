@@ -2,6 +2,8 @@
 
 # Architecture — Credentials and rotation
 
+[← Domain overview](OVERVIEW.md) · [Documentation index](../README.md)
+
 ## Resolution
 
 `CredentialStore::load` reads three sources and layers them:

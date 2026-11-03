@@ -2,6 +2,8 @@
 
 # CLI — 概览
 
+[← 文档索引](../README.md)
+
 stdout 只承载机器可读输出；日志、警告、进度都走 stderr，所以 `translatex … | jq` 永远可用。
 
 ## 命令索引
@@ -16,8 +18,8 @@ stdout 只承载机器可读输出；日志、警告、进度都走 stderr，所
 | `keys` | 冷却状态，`--reset` 清空 | [01-commands.md](01-commands.md) |
 | `health` | 探测已配置 Provider | [01-commands.md](01-commands.md) |
 | `schema` | 全部线格式类型的 JSON Schema | [01-commands.md](01-commands.md) |
-| `manifest` | 工具清单 | [01-commands.md](01-commands.md) |
-| `init` | 配置模板 | [02-config-files.md](02-config-files.md) |
+| `manifest` | 机器可读的 CLI 操作清单 | [01-commands.md](01-commands.md) |
+| `init` | 写出配置模板 | [01-commands.md](01-commands.md) |
 | `completions` | Shell 补全脚本 | [01-commands.md](01-commands.md) |
 
 ## 全局参数

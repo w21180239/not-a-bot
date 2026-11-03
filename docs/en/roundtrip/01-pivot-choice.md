@@ -2,6 +2,8 @@
 
 # Round trip — Choosing the pivot
 
+[← Domain overview](OVERVIEW.md) · [Documentation index](../README.md)
+
 The pivot has to be far enough from the source language to force a rewrite, and
 well enough supported that both hops succeed. Those pull in opposite directions,
 so the choice was measured rather than guessed.
@@ -94,4 +96,7 @@ Every request:
 roundtrip_pivot = "zh"
 ```
 
-Navigation: ← [Round trip overview](OVERVIEW.md) · ↑ [Documentation index](../README.md)
+## Navigation
+
+- ← [Round trip overview](OVERVIEW.md)
+- ↑ [Documentation index](../README.md)

@@ -87,7 +87,7 @@ Draft 2020-12 definitions for `TranslateRequest`, `TranslateResponse`, `ErrorRes
 | `code` | Retryable | Agent action |
 | --- | --- | --- |
 | `RATE_LIMITED` | yes | Wait `retryAfterSecs`, retry |
-| `QUOTA_EXHAUSTED` | yes | Rotate credential or wait |
+| `QUOTA_EXHAUSTED` | no | Rotate credential or wait for the quota window |
 | `NETWORK_ERROR` | yes | Exponential backoff |
 | `UPSTREAM_ERROR` | 5xx only | Retry on 5xx, fix input on 4xx |
 | `TIMEOUT` | yes | Raise `timeoutMs` and retry, or switch provider |

@@ -2,6 +2,8 @@
 
 # API — 错误契约
 
+[← 领域概览](OVERVIEW.md) · [文档索引](../README.md)
+
 每个失败都携带足够信息，让 Agent 不必猜测就能决策。
 
 ```json
@@ -22,14 +24,14 @@
 | 错误码 | 可重试 | `suggestedAction` | 原因 |
 | --- | --- | --- | --- |
 | `RATE_LIMITED` | 是 | `backoff_and_retry` | 按 IP 或按 Key 限流 |
-| `QUOTA_EXHAUSTED` | 是 | `switch_key_or_upgrade_plan` | 套餐额度用尽 |
+| `QUOTA_EXHAUSTED` | 否 | `switch_key_or_upgrade_plan` | 套餐额度用尽 |
 | `AUTH_FAILED` | 否 | `refresh_credentials` | 凭据错误或过期 |
 | `NETWORK_ERROR` | 是 | `retry_with_backoff` | DNS、TLS、连接重置 |
 | `TIMEOUT` | 是 | `increase_timeout_and_retry` | 预算耗尽 |
 | `UPSTREAM_ERROR` | 仅 5xx | `retry_later` / `fix_request` | Provider 返回错误状态 |
 | `BAD_RESPONSE` | 否 | `report_bug_or_upgrade` | 响应体不符合预期结构 |
 | `CHAIN_EXHAUSTED` | 否 | `check_credentials_or_network` | 每一跳都失败 |
-| `NO_PROVIDER` | 否 | `configure_a_provider` | 没有可用的已注册 Provider |
+| `NO_PROVIDER` | 否 | `configure_a_provider` | 已注册的 Provider 没有一个能服务这次请求 |
 | `PROVIDER_NOT_FOUND` | 否 | `check_provider_name` | 未知 Provider id |
 | `PROVIDER_NOT_CONFIGURED` | 否 | `configure_a_provider` | 已实现但缺少凭据 |
 | `AUTO_DETECT_UNSUPPORTED` | 否 | `pass_an_explicit_source` | 指定 Provider 不支持检测 |
@@ -55,7 +57,7 @@
 
 ## 尝试记录
 
-`--verbose` 会附带逐跳记录，`CHAIN_EXHAUSTED` 才有可诊断性：
+`--verbose` 会附带逐跳记录，成功路径靠它看明细；失败的链本身就会带上已经试过的跳，`CHAIN_EXHAUSTED` 因此可直接诊断：
 
 ```json
 {
@@ -66,6 +68,8 @@
   ]
 }
 ```
+
+数组在没有任何 Provider 被触达时省略：请求非法、Provider 名不存在或凭据缺失，都在链开始前就失败了。成功响应只有加 `--verbose` 才带 `attempts`。
 
 ## 退出码
 

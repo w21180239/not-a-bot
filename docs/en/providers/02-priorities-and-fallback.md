@@ -2,6 +2,8 @@
 
 # Providers — Priorities and fallback
 
+[← Domain overview](OVERVIEW.md) · [Documentation index](../README.md)
+
 ## Building the chain
 
 `Registry::chain` assembles the attempt list in this order:
@@ -56,7 +58,7 @@ For each provider the engine can make up to `retries + 1` calls:
 | Error class | Inline retry | Key cooldown | Next provider |
 | --- | --- | --- | --- |
 | `RATE_LIMITED` | yes, after backoff | yes | yes |
-| `QUOTA_EXHAUSTED` | yes | yes | yes |
+| `QUOTA_EXHAUSTED` | no | yes | yes |
 | `AUTH_FAILED` | no | yes | yes |
 | `UPSTREAM_ERROR` 5xx | yes | no | yes |
 | `UPSTREAM_ERROR` 4xx | no | no | yes |

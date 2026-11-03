@@ -2,6 +2,8 @@
 
 # CLI — Overview
 
+[← Documentation index](../README.md)
+
 stdout carries machine-readable output only. Logs, warnings, and progress go to stderr, so `translatex … | jq` always works.
 
 ## Command index
@@ -16,8 +18,8 @@ stdout carries machine-readable output only. Logs, warnings, and progress go to 
 | `keys` | Cooldown state, `--reset` | [01-commands.md](01-commands.md) |
 | `health` | Probe configured providers | [01-commands.md](01-commands.md) |
 | `schema` | JSON Schema for all wire types | [01-commands.md](01-commands.md) |
-| `manifest` | Tool manifest for agent discovery | [01-commands.md](01-commands.md) |
-| `init` | Config template | [02-config-files.md](02-config-files.md) |
+| `manifest` | Machine-readable list of CLI operations | [01-commands.md](01-commands.md) |
+| `init` | Write a config template | [01-commands.md](01-commands.md) |
 | `completions` | Shell completion script | [01-commands.md](01-commands.md) |
 
 ## Global flags

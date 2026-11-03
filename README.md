@@ -1,10 +1,32 @@
+<div align="center">
+
 # translatex
 
 **Web-first translation for agents.** One static binary that scrapes free translation endpoints first, falls back to official APIs when you have keys, and answers every request with structured JSON.
 
 [English](./README.md) · [简体中文](./README.zh-cn.md) · [Русский](./README.ru.md) · [Docs](./docs/README.md)
 
+`translate "…" -t zh` · `roundtrip "…" --from en` · `translatex manifest --format json`
+
+</div>
+
 ---
+
+## Contents
+
+- [Why web-first](#why-web-first)
+- [Features](#features)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Supported harnesses](#supported-harnesses)
+- [Round trip: de-AI prose](#round-trip-de-ai-prose)
+- [Provider matrix](#provider-matrix)
+- [Live channel status](#live-channel-status)
+- [Configuration](#configuration)
+- [CLI reference](#cli-reference)
+- [Error contract](#error-contract)
+- [Documentation](#documentation)
+- [Development](#development)
 
 ## Why web-first
 
@@ -28,7 +50,7 @@ Lower priority number means tried earlier. Every hop is recorded, so a failure t
 | **Key rotation** | Several credentials per provider, round-robin, with cooldowns shared across processes through `~/.config/translatex/cache/`. |
 | **Structured output** | JSON or NDJSON on stdout, logs on stderr, exit codes an agent can branch on. |
 | **Preserve patterns** | Regex spans (code, variables, URLs) are masked before translation and restored after; a corrupted restore triggers fallback. |
-| **Agent-native CLI** | Every command emits JSON on stdout, logs on stderr, and exits with a code an agent can branch on. The recommended harness setup is this CLI plus a skill: [integrations/](./integrations/README.md). |
+| **24 harnesses** | Claude Code, Codex, Cursor, Zed and 20 more read one skill or instructions block; no server to run. Paths: [integrations/](./integrations/README.md). |
 | **Timeouts that hold** | `timeoutMs` from the request (or `timeout_ms` in config) caps the whole provider call, not just the socket read. |
 | **Honest errors** | `code`, `retryable`, `retryAfterSecs`, `suggestedAction` on every failure. |
 
@@ -102,30 +124,70 @@ Failures carry a machine-readable reason:
 }
 ```
 
-## Agent setup: CLI + skill
+## Supported harnesses
 
-The integration is the command, plus one document that tells the agent when to
-run it. There is no server to start and no protocol to negotiate.
+The integration is the command plus one document that tells the agent when to
+run it: a skill where the harness loads skills, a rule file where it reads rules,
+an instructions block where it keeps project instructions. No server, no protocol.
+
+<div align="center">
+<table>
+<tr>
+<td align="center" width="150"><img src="repo-assets/agents/claude-code.png" width="44" alt="Claude Code"><br/><b>Claude Code</b><br/><sub>skill · plugin</sub></td>
+<td align="center" width="150"><img src="repo-assets/agents/codex.png" width="44" alt="Codex CLI"><br/><b>Codex CLI</b><br/><sub>skill · AGENTS.md</sub></td>
+<td align="center" width="150"><img src="repo-assets/agents/gemini-cli.png" width="44" alt="Gemini CLI"><br/><b>Gemini CLI</b><br/><sub>skill · GEMINI.md</sub></td>
+<td align="center" width="150"><img src="repo-assets/agents/opencode.png" width="44" alt="OpenCode"><br/><b>OpenCode</b><br/><sub>skill · AGENTS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/cursor.png" width="44" alt="Cursor"><br/><b>Cursor</b><br/><sub>.cursor/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/cline.png" width="44" alt="Cline"><br/><b>Cline</b><br/><sub>.clinerules</sub></td>
+<td align="center"><img src="repo-assets/agents/roo-code.png" width="44" alt="Roo Code"><br/><b>Roo Code</b><br/><sub>.roo/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/kilo-code.png" width="44" alt="Kilo Code"><br/><b>Kilo Code</b><br/><sub>.kilocode/rules</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/continue.png" width="44" alt="Continue"><br/><b>Continue</b><br/><sub>.continue/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/jetbrains.png" width="44" alt="JetBrains AI"><br/><b>JetBrains AI</b><br/><sub>.aiassistant/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/zed.png" width="44" alt="Zed"><br/><b>Zed</b><br/><sub>.rules</sub></td>
+<td align="center"><img src="repo-assets/agents/aider.png" width="44" alt="Aider"><br/><b>Aider</b><br/><sub>CONVENTIONS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/qwen-code.png" width="44" alt="Qwen Code"><br/><b>Qwen Code</b><br/><sub>QWEN.md</sub></td>
+<td align="center"><img src="repo-assets/agents/crush.png" width="44" alt="Crush"><br/><b>Crush</b><br/><sub>CRUSH.md</sub></td>
+<td align="center"><img src="repo-assets/agents/goose.png" width="44" alt="Goose"><br/><b>Goose</b><br/><sub>instructions</sub></td>
+<td align="center"><img src="repo-assets/agents/deepseek-harness.png" width="44" alt="DeepSeek Harness"><br/><b>DeepSeek Harness</b><br/><sub>AGENTS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/mimo-code.svg" width="44" alt="MiMo Code"><br/><b>MiMo Code</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/atomcode.png" width="44" alt="AtomCode"><br/><b>AtomCode</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/openclaw.png" width="44" alt="OpenClaw"><br/><b>OpenClaw</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/hermes-agent.png" width="44" alt="Hermes Agent"><br/><b>Hermes Agent</b><br/><sub>AGENTS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/pi.png" width="44" alt="Pi"><br/><b>Pi</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/reasonix.png" width="44" alt="Reasonix"><br/><b>Reasonix</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/zcode.png" width="44" alt="ZCode"><br/><b>ZCode</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/qwenpaw.svg" width="44" alt="QwenPaw"><br/><b>QwenPaw</b><br/><sub>instructions</sub></td>
+</tr>
+</table>
+
+<i>24 harnesses, two documents. Anything else that can run a shell uses the CLI directly.</i>
+</div>
 
 ```bash
-# Claude Code
+# Skill harnesses
 mkdir -p .claude/skills/translatex && cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/
-
-# Codex / Gemini CLI (shared cross-runtime location)
-mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/
-
-# OpenCode
 mkdir -p ~/.config/opencode/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/
+mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/   # Codex, Gemini CLI
 
-# Any harness with a project instructions file
+# Everything else reads the same block under its own filename
 cat integrations/guidance/AGENTS.md >> AGENTS.md
 ```
 
-The same skill text works everywhere; only the destination changes. Per-harness
-paths for Claude Code, Codex, Gemini CLI, OpenCode, Cursor, Cline, Roo Code, Kilo
-Code, Continue, JetBrains AI, Zed, Aider, Qwen Code, Crush, Goose, DeepSeek
-Harness, MiMo Code, AtomCode, OpenClaw, Hermes Agent, Pi, Reasonix, ZCode,
-QwenPaw and anything else: [integrations/README.md](./integrations/README.md).
+| Need | Read |
+| --- | --- |
+| Exact path and command per harness | [integrations/README.md](./integrations/README.md) |
+| Why a skill beats an instructions file | [docs/en/integrations/02-supported-harnesses.md](./docs/en/integrations/02-supported-harnesses.md) |
+| One-command plugin install for Claude Code | [integrations/claude-code/README.md](./integrations/claude-code/README.md) |
 
 Agents that prefer a command reference over a skill can call the CLI directly:
 
@@ -244,6 +306,7 @@ default_target = "zh"
 timeout_ms = 20000
 retries = 1
 race_width = 3
+roundtrip_pivot = "auto"
 log = "warn"
 
 [provider.libretranslate]
@@ -269,7 +332,7 @@ region = "eastasia"
 api_key = "..."
 ```
 
-Resolution order: environment (`TRANSLATEX_<PROVIDER>_<FIELD>`) → credentials file → OS keyring (`@keyring` placeholder) → free endpoints.
+Resolution: `credentials.toml` labels are tried in file order, a `TRANSLATEX_<PROVIDER>_<FIELD>` variable adds an `env` label after them, and a field set to `@keyring` is read from the OS keyring. Free endpoints need none of this.
 
 ## CLI reference
 
@@ -296,7 +359,7 @@ Exit codes: `0` success, `1` request error, `2` config error, `3` chain exhauste
 | `code` | Retryable | Agent action |
 | --- | --- | --- |
 | `RATE_LIMITED` | yes | Wait `retryAfterSecs`, then retry |
-| `QUOTA_EXHAUSTED` | yes | Rotate key or wait |
+| `QUOTA_EXHAUSTED` | no | Rotate key or wait for the quota window |
 | `NETWORK_ERROR` | yes | Exponential backoff |
 | `UPSTREAM_ERROR` | 5xx only | Retry on 5xx, fix input on 4xx |
 | `TIMEOUT` | yes | Raise `timeoutMs` and retry, or switch provider |
@@ -323,7 +386,7 @@ Full reference: [docs/en/api/OVERVIEW.md](./docs/en/api/OVERVIEW.md).
 ## Development
 
 ```bash
-cargo test                # 243 tests
+cargo test                # 245 tests
 cargo build --release     # ~5 min with LTO
 cargo clippy --all-targets
 ```

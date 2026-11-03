@@ -2,6 +2,8 @@
 
 # CLI — Config and credential files
 
+[← Domain overview](OVERVIEW.md) · [Documentation index](../README.md)
+
 ## Locations
 
 | File | Default path | Override |
@@ -40,7 +42,7 @@ region = "eastasia"
 Rules:
 
 - `deny_unknown_fields` is on. A typo is a `CONFIG_ERROR`, not a silently ignored line.
-- Providers named in `chain` move to the front in exactly that order. Anything else registered is appended by ascending priority, so web endpoints still run before keyed APIs.
+- Providers named in `chain` run first, in exactly that order, whatever their priority. Everything else registered is appended by ascending priority.
 - `timeout_ms` and `retries` set request defaults; `timeoutMs` in a request overrides the timeout.
 - `race_width` sets how many providers may be in flight; `1` restores the strict sequential walk. The `--race` flag overrides it for one invocation.
 - `roundtrip_pivot` is the default bridge for `roundtrip` when the request says `"pivot": "auto"`.
@@ -72,11 +74,12 @@ The section is `<provider>.<label>`. Labels are the rotation order and appear in
 
 ## Precedence
 
-Later wins:
+Four sources, in this order:
 
-1. Built-in free endpoints (no credentials involved).
-2. `~/.config/translatex/credentials.toml`.
-3. `TRANSLATEX_<PROVIDER>_<FIELD>` environment variables.
+1. Built-in free endpoints, which need no credentials.
+2. Labels from `~/.config/translatex/credentials.toml`, tried in file order.
+3. `TRANSLATEX_<PROVIDER>_<FIELD>` environment variables, which become one extra `env` label tried after the file's labels.
+4. A field whose value is `@keyring` is read from the OS keyring when the file loads.
 
 Field names are the provider's own: `TRANSLATEX_DEEPL_API_KEY`, `TRANSLATEX_AZURE_REGION`, `TRANSLATEX_BAIDU_SECRET_KEY`.
 

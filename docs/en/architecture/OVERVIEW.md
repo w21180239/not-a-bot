@@ -2,6 +2,8 @@
 
 # Architecture — Overview
 
+[← Documentation index](../README.md)
+
 ```
 src/
 ├── main.rs              entry point, hands off to cli::run

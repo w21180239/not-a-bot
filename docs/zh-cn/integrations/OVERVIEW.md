@@ -2,6 +2,8 @@
 
 # 集成 — 概览
 
+[← 文档索引](../README.md)
+
 `translatex` 的接入方式是一条命令加一份 skill：Agent 执行命令、读 JSON，文档告诉它何时执行。没有服务要启动，也没有协议要协商。
 
 ## 分发渠道
@@ -21,7 +23,11 @@ npm 包本身只是壳：`postinstall` 从对应 GitHub Release 下载压缩包�
 | [`integrations/skill/translatex/SKILL.md`](../../../integrations/skill/translatex/SKILL.md) | 会加载 skill 的 harness：Claude Code、Codex、Gemini CLI、OpenCode |
 | [`integrations/guidance/AGENTS.md`](../../../integrations/guidance/AGENTS.md) | 任何读取项目指令或规则文件的 harness |
 
-完整矩阵（Claude Code、Codex CLI、Gemini CLI、OpenCode、Cursor、Cline、Roo Code、Kilo Code、Continue、JetBrains AI、Zed、Aider、Qwen Code、Crush、Goose、DeepSeek Harness、MiMo Code、AtomCode、OpenClaw、Hermes Agent、Pi、Reasonix、ZCode、QwenPaw）及各自的文件路径见 [`integrations/README.md`](../../../integrations/README.md)。
+24 家 harness 的名单、图标与各自的文件路径见 [02-supported-harnesses.md](02-supported-harnesses.md)；仓库内的安装清单与逐家页面见 [`integrations/README.md`](../../../integrations/README.md)。
+
+| 页面 | 内容 |
+| --- | --- |
+| [02-supported-harnesses.md](02-supported-harnesses.md) | 图标网格、四条接入通道、每家的路径与命令、验证方法 |
 
 ## 用哪个入口
 

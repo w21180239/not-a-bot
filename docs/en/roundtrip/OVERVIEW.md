@@ -2,6 +2,8 @@
 
 # Round trip — Overview
 
+[← Documentation index](../README.md)
+
 `roundtrip` translates text out through a pivot language and back into the
 source language:
 
@@ -57,7 +59,7 @@ can be audited.
 
 ```bash
 translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
-translatex roundtrip draft.md --pivot ja          # alias: translatex polish
+translatex roundtrip --from en --pivot ja < draft.md   # alias: translatex polish
 ```
 
 ```json

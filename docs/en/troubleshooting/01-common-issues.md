@@ -2,6 +2,8 @@
 
 # Troubleshooting — Common issues
 
+[← Domain overview](OVERVIEW.md) · [Documentation index](../README.md)
+
 ## `NO_PROVIDER`
 
 Nothing in the chain can serve this request.
@@ -22,7 +24,7 @@ translatex providers --format json | jq '.providers[] | select(.name=="baidu")'
 
 ## `AUTO_DETECT_UNSUPPORTED`
 
-You pinned a provider that cannot detect the source: `lingvanex`, `mymemory`, `systran`, `reverso`. Either pass `-s <code>` or drop `--provider` so the chain can pick a detecting provider.
+You pinned a provider that cannot detect the source: `lingvanex`, `mymemory`, `systran`, `reverso`, and the keyed `aliyun`, `niutrans` and `tencent` adapters. Either pass `-s <code>` or drop `--provider` so the chain can pick a detecting provider.
 
 ## `RATE_LIMITED` on a free endpoint
 

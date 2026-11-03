@@ -2,6 +2,8 @@
 
 # Architecture — Request flow
 
+[← Domain overview](OVERVIEW.md) · [Documentation index](../README.md)
+
 ## Steps
 
 1. **Normalise** — `source_lang` and `target_lang` go through `lang::normalize`. Unknown targets are `INVALID_INPUT`; equal source and target is also rejected.

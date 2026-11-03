@@ -2,6 +2,8 @@
 
 # Provider — 新增后端
 
+[← 领域概览](OVERVIEW.md) · [文档索引](../README.md)
+
 ## 1. 实现 trait
 
 新建 `src/providers/<name>.rs`：
@@ -9,6 +11,7 @@
 ```rust
 use crate::core::creds::Credential;
 use crate::core::error::{Error, Result};
+use crate::core::http::{body_text, map_status};
 use crate::core::types::{ProviderInfo, TranslateRequest, TranslateResponse};
 use crate::providers::{Provider, ProviderKind};
 use async_trait::async_trait;

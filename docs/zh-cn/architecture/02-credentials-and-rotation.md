@@ -2,6 +2,8 @@
 
 # 架构 — 凭据与轮换
 
+[← 领域概览](OVERVIEW.md) · [文档索引](../README.md)
+
 ## 解析
 
 `CredentialStore::load` 读取三个来源并逐层覆盖：

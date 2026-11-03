@@ -2,6 +2,8 @@
 
 # CLI — 命令参考
 
+[← 领域概览](OVERVIEW.md) · [文档索引](../README.md)
+
 ## `translate`
 
 ```bash

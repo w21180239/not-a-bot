@@ -1,10 +1,31 @@
+<div align="center">
+
 # translatex
 
 **Перевод для агентов: сначала веб-эндпоинты, официальные API — как резерв.** Один статический бинарник: бесплатные веб-эндпоинты в приоритете, платные API подключаются при наличии ключей, ответ всегда в структурированном JSON.
 
 [English](./README.md) · [简体中文](./README.zh-cn.md) · [Русский](./README.ru.md) · [Документация](./docs/README.md)
 
+`translate "…" -t zh` · `roundtrip "…" --from en` · `translatex manifest --format json`
+
+</div>
+
 ---
+
+## Содержание
+
+- [Почему веб-эндпоинты первыми](#почему-веб-эндпоинты-первыми)
+- [Возможности](#возможности)
+- [Установка](#установка)
+- [Быстрый старт](#быстрый-старт)
+- [Поддерживаемые harness](#поддерживаемые-harness)
+- [Обратный перевод](#обратный-перевод)
+- [Провайдеры](#провайдеры)
+- [Статус каналов](#статус-каналов-на-2026-11-03)
+- [Конфигурация](#конфигурация)
+- [CLI](#cli)
+- [Ошибки](#ошибки)
+- [Документация и лицензия](#документация-и-лицензия)
 
 ## Почему веб-эндпоинты первыми
 
@@ -28,7 +49,7 @@
 | **Ротация ключей** | Несколько ключей на провайдера, round-robin, состояние cooldown общее для процессов в `~/.config/translatex/cache/`. |
 | **Структурированный вывод** | JSON/NDJSON в stdout, логи в stderr, коды возврата для ветвления в агенте. |
 | **Защита фрагментов** | Код, переменные и URL маскируются до перевода и восстанавливаются после; сбой восстановления запускает fallback. |
-| **CLI для агентов** | JSON в stdout, логи в stderr, коды возврата для ветвления. Подключение к harness — CLI плюс skill: [integrations/](./integrations/README.md). |
+| **24 harness** | Claude Code, Codex, Cursor, Zed и ещё 20 читают один skill или блок инструкций; сервер запускать не нужно. Пути: [integrations/](./integrations/README.md). |
 | **Работающий таймаут** | `timeoutMs` из запроса (или `timeout_ms` в конфиге) ограничивает весь вызов провайдера. |
 | **Понятные ошибки** | `code`, `retryable`, `retryAfterSecs`, `suggestedAction` в каждом ответе об ошибке. |
 
@@ -94,58 +115,136 @@ translatex translate 'Run `make test` before pushing.' -t zh --preserve '`[^`]*`
 }
 ```
 
-## Подключение агента: CLI + skill
+## Поддерживаемые harness
 
-Интеграция — это команда плюс один документ, который говорит агенту, когда её
-запускать. Сервер запускать не нужно.
+Интеграция — это команда плюс один документ: skill там, где хост умеет skills,
+файл правил там, где читают правила, блок инструкций там, где держат инструкции
+проекта. Сервер запускать не нужно.
+
+<div align="center">
+<table>
+<tr>
+<td align="center" width="150"><img src="repo-assets/agents/claude-code.png" width="44" alt="Claude Code"><br/><b>Claude Code</b><br/><sub>skill · плагин</sub></td>
+<td align="center" width="150"><img src="repo-assets/agents/codex.png" width="44" alt="Codex CLI"><br/><b>Codex CLI</b><br/><sub>skill · AGENTS.md</sub></td>
+<td align="center" width="150"><img src="repo-assets/agents/gemini-cli.png" width="44" alt="Gemini CLI"><br/><b>Gemini CLI</b><br/><sub>skill · GEMINI.md</sub></td>
+<td align="center" width="150"><img src="repo-assets/agents/opencode.png" width="44" alt="OpenCode"><br/><b>OpenCode</b><br/><sub>skill · AGENTS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/cursor.png" width="44" alt="Cursor"><br/><b>Cursor</b><br/><sub>.cursor/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/cline.png" width="44" alt="Cline"><br/><b>Cline</b><br/><sub>.clinerules</sub></td>
+<td align="center"><img src="repo-assets/agents/roo-code.png" width="44" alt="Roo Code"><br/><b>Roo Code</b><br/><sub>.roo/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/kilo-code.png" width="44" alt="Kilo Code"><br/><b>Kilo Code</b><br/><sub>.kilocode/rules</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/continue.png" width="44" alt="Continue"><br/><b>Continue</b><br/><sub>.continue/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/jetbrains.png" width="44" alt="JetBrains AI"><br/><b>JetBrains AI</b><br/><sub>.aiassistant/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/zed.png" width="44" alt="Zed"><br/><b>Zed</b><br/><sub>.rules</sub></td>
+<td align="center"><img src="repo-assets/agents/aider.png" width="44" alt="Aider"><br/><b>Aider</b><br/><sub>CONVENTIONS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/qwen-code.png" width="44" alt="Qwen Code"><br/><b>Qwen Code</b><br/><sub>QWEN.md</sub></td>
+<td align="center"><img src="repo-assets/agents/crush.png" width="44" alt="Crush"><br/><b>Crush</b><br/><sub>CRUSH.md</sub></td>
+<td align="center"><img src="repo-assets/agents/goose.png" width="44" alt="Goose"><br/><b>Goose</b><br/><sub>инструкции</sub></td>
+<td align="center"><img src="repo-assets/agents/deepseek-harness.png" width="44" alt="DeepSeek Harness"><br/><b>DeepSeek Harness</b><br/><sub>AGENTS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/mimo-code.svg" width="44" alt="MiMo Code"><br/><b>MiMo Code</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/atomcode.png" width="44" alt="AtomCode"><br/><b>AtomCode</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/openclaw.png" width="44" alt="OpenClaw"><br/><b>OpenClaw</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/hermes-agent.png" width="44" alt="Hermes Agent"><br/><b>Hermes Agent</b><br/><sub>AGENTS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/pi.png" width="44" alt="Pi"><br/><b>Pi</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/reasonix.png" width="44" alt="Reasonix"><br/><b>Reasonix</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/zcode.png" width="44" alt="ZCode"><br/><b>ZCode</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/qwenpaw.svg" width="44" alt="QwenPaw"><br/><b>QwenPaw</b><br/><sub>инструкции</sub></td>
+</tr>
+</table>
+
+<i>24 harness, два документа. Любой другой хост просто вызывает CLI.</i>
+</div>
 
 ```bash
-# Claude Code
+# Хосты со skills
 mkdir -p .claude/skills/translatex && cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/
-
-# Codex / Gemini CLI (общий путь)
-mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/
-
-# OpenCode
 mkdir -p ~/.config/opencode/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/
+mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/   # Codex, Gemini CLI
 
-# Любой harness с файлом инструкций
+# Остальные читают тот же текст под своим именем файла
 cat integrations/guidance/AGENTS.md >> AGENTS.md
 ```
 
-Один и тот же текст skill подходит всем; меняется только путь. Полная матрица:
-[integrations/README.md](./integrations/README.md).
-| `health` | `{}` | `{healthy, providers: HealthRecord[]}` |
+| Что нужно | Где смотреть |
+| --- | --- |
+| Точный путь и команда для каждого harness | [integrations/README.md](./integrations/README.md) |
+| Четыре канала и проверка установки | [docs/en/integrations/02-supported-harnesses.md](./docs/en/integrations/02-supported-harnesses.md) |
+| Установка плагина Claude Code одной командой | [integrations/claude-code/README.md](./integrations/claude-code/README.md) |
+
+## Обратный перевод
+
+Перевод через язык с другим строем и обратно заставляет текст пересобраться,
+поэтому шаблонные формулировки не выживают:
+
+```bash
+translatex roundtrip "Our comprehensive solution leverages cutting-edge technology to empower teams." --from en --format json
+```
+
+По умолчанию промежуточный язык — китайский для некитайского текста и английский
+для китайского. Выбор сделан замерами: немецкий, французский и испанский
+возвращают текст почти дословно, японский переписывает так же сильно, как
+китайский, русский — сильнее всех, но и уводит дальше всех. `--pivot ja` — для
+технического английского. Юридические тексты, API-справки и всё, где важны
+цифры и имена, через roundtrip не прогоняйте.
+
+Он переписывает формулировки, но сохраняет предложения: вводная фраза или
+страховка вроде «it's important to note» переживает любой язык. Такие куски
+удаляют до перевода и говорят, что именно удалили.
 
 ## Провайдеры
 
-Приоритет определяет порядок в цепочке. `символы` — лимит одного запроса до разбиения.
+Приоритет определяет порядок в цепочке. `Символы` — лимит одного запроса до разбиения.
 
 ### Бесплатные веб-эндпоинты
 
-| # | Провайдер | ID | Автоопределение | Символы |
-| --- | --- | --- | --- | --- |
-| 1 | Google Translate (web) | `google` | да | 5 000 |
-| 2 | Microsoft Edge Translator | `edge` | да | 50 000 |
-| 3 | Iciba | `iciba` | да | 3 000 |
-| 4 | iFlytek iFlyrec | `iflyrec` | да | 2 000 |
-| 4 | ModernMT | `modernmt` | да | 5 000 |
-| 5 | Volcengine | `volcengine` | да | 5 000 |
-| 5 | Lara Translate | `lara` | да | 500 |
-| 6 | Lingvanex | `lingvanex` | нет | 1 000 |
-| 7 | Mirai Translate | `mirai` | да | 500 | пары только с японским |
-| 8 | Papago (Naver) | `papago` | да | 1 000 |
-| 9 | Reverso Context | `reverso` | нет | 2 000 | не входит в авто-цепочку |
-| 10 | Sogou | `sogou` | да | 5 000 |
-| 11 | MyMemory | `mymemory` | нет | 5 000 |
-| 12 | SysTran | `systran` | нет | 5 000 |
-| — | LibreTranslate | `libretranslate` | да | 5 000 |
+| # | Провайдер | ID | Автоопределение | Символы | Примечание |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Google Translate (web) | `google` | да | 5 000 | `translate_a/single`, best effort |
+| 2 | Microsoft Edge Translator | `edge` | да | 50 000 | без ключа |
+| 3 | Iciba | `iciba` | да | 3 000 | подпись AES-ECB |
+| 4 | iFlytek iFlyrec | `iflyrec` | да | 2 000 | только пары с китайским |
+| 4 | ModernMT | `modernmt` | да | 5 000 | md5 + timestamp |
+| 5 | Volcengine | `volcengine` | да | 5 000 | `crx/translate/v1/` |
+| 5 | Lara Translate | `lara` | да | 500 | дневной лимит на IP |
+| 6 | Lingvanex | `lingvanex` | нет | 1 000 | `API_BEARER_TOKEN` |
+| 7 | Mirai Translate | `mirai` | да | 500 | только пары с японским, пробный ключ на каждый вызов |
+| 8 | Papago (Naver) | `papago` | да | 1 000 | cookie-primed detect + form POST |
+| 9 | Reverso Context | `reverso` | нет | 2 000 | трёхбуквенные коды; не входит в авто-цепочку |
+| 10 | Sogou | `sogou` | да | 5 000 | md5-подпись; лимит на IP даёт `RATE_LIMITED` |
+| 11 | MyMemory | `mymemory` | нет | 5 000 | коды RFC 3066, дневной лимит |
+| 12 | SysTran | `systran` | нет | 5 000 | OAuth client credentials из бандла |
+| — | LibreTranslate | `libretranslate` | да | 5 000 | только свой сервер: `[provider.libretranslate] base_url` |
 
-Ограничения: `iflyrec` работает только с парами «китайский ↔ другой», `mirai` ориентирован на японский, `libretranslate` требует собственный `base_url`.
+### Официальные API — резерв при наличии ключей
 
-### Официальные API (20-27) и LLM (40-42)
+| # | Провайдер | ID | Учётные данные |
+| --- | --- | --- | --- |
+| 20 | DeepL | `deepl` | `api_key` |
+| 20 | Baidu | `baidu` | `appid`, `secret_key` |
+| 21 | Google Cloud Translation | `googlecloud` | `api_key` |
+| 22 | Azure Translator | `azure` | `api_key`, `region` |
+| 23 | Alibaba Cloud | `aliyun` | `access_key_id`, `access_key_secret` |
+| 24 | Caiyun | `caiyun` | `token` |
+| 25 | Niutrans | `niutrans` | `apikey` |
+| 26 | Tencent | `tencent` | `secret_id`, `secret_key` |
+| 27 | Youdao | `youdao` | `app_key`, `app_secret` |
 
-`deepl`, `baidu`, `googlecloud`, `azure`, `aliyun`, `caiyun`, `niutrans`, `tencent`, `youdao` — при наличии ключей. `openai`, `anthropic`, `deepseek` — последний резерв.
+### LLM — последний резерв
+
+| # | Провайдер | ID | Учётные данные |
+| --- | --- | --- | --- |
+| 40 | OpenAI | `openai` | `api_key`, опционально `base_url`, `model` |
+| 41 | Anthropic | `anthropic` | `api_key`, опционально `model` |
+| 42 | DeepSeek | `deepseek` | `api_key`, опционально `model` |
 
 ## Статус каналов на 2026-11-03
 
@@ -169,6 +268,9 @@ chain = ["edge", "google", "iciba", "deepl", "openai"]
 default_target = "zh"
 timeout_ms = 20000
 retries = 1
+race_width = 3
+roundtrip_pivot = "auto"
+log = "warn"
 
 [provider.libretranslate]
 base_url = "http://localhost:5000"
@@ -184,7 +286,7 @@ api_key = "..."
 api_key = "..."
 ```
 
-Порядок разрешения: переменные окружения → файл учётных данных → системный keyring (`@keyring`) → бесплатные эндпоинты.
+Порядок: ярлыки из `credentials.toml` идут в порядке файла, переменная `TRANSLATEX_<PROVIDER>_<FIELD>` добавляет ярлык `env` после них, а поле со значением `@keyring` читается из системного keyring. Бесплатным эндпоинтам ничего из этого не нужно.
 
 ## CLI
 
@@ -204,10 +306,31 @@ api_key = "..."
 
 Коды возврата: `0` успех, `1` ошибка запроса, `2` ошибка конфигурации, `3` цепочка исчерпана, `4` сетевая ошибка.
 
+## Ошибки
+
+| `code` | Повтор | Что делать агенту |
+| --- | --- | --- |
+| `RATE_LIMITED` | да | Подождать `retryAfterSecs` и повторить |
+| `QUOTA_EXHAUSTED` | нет | Сменить ключ или дождаться квоты |
+| `NETWORK_ERROR` | да | Экспоненциальная пауза |
+| `UPSTREAM_ERROR` | только 5xx | Повтор на 5xx, исправить вход на 4xx |
+| `TIMEOUT` | да | Увеличить `timeoutMs` или сменить провайдера |
+| `AUTH_FAILED` | нет | Обновить учётные данные |
+| `PROVIDER_NOT_CONFIGURED` | нет | Добавить ключ |
+| `PROVIDER_NOT_FOUND` | нет | Исправить имя провайдера |
+| `AUTO_DETECT_UNSUPPORTED` | нет | Передать `sourceLang` |
+| `LANGUAGE_PAIR_NOT_SUPPORTED` | нет | Сменить провайдера или язык |
+| `INVALID_INPUT` | нет | Исправить запрос |
+| `CHAIN_EXHAUSTED` | нет | Смотреть `attempts` в `--verbose` |
+
+Полный справочник: [docs/en/api/OVERVIEW.md](./docs/en/api/OVERVIEW.md).
+
 ## Документация и лицензия
 
 - [docs/en/OVERVIEW.md](./docs/en/OVERVIEW.md) — английская документация
 - [docs/zh-cn/OVERVIEW.md](./docs/zh-cn/OVERVIEW.md) — китайская документация
+- [docs/en/roundtrip/01-pivot-choice.md](./docs/en/roundtrip/01-pivot-choice.md) — замеры промежуточного языка
+- [integrations/README.md](./integrations/README.md) — подключение к 24 harness
 - [AGENTS.md](./AGENTS.md) — интеграция с агентами
 
 MIT OR Apache-2.0

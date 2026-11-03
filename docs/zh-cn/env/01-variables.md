@@ -2,6 +2,8 @@
 
 # 环境变量 — 参考
 
+[← 领域概览](OVERVIEW.md) · [文档索引](../README.md)
+
 ## 路径
 
 | 变量 | 作用 | 默认 |
@@ -19,6 +21,7 @@
 | --- | --- | --- |
 | `TRANSLATEX_CHAIN` | 替换内置链。未列出的 Provider 之后按优先级追加 | `edge,google,deepl` |
 | `TRANSLATEX_TIMEOUT_MS` | 默认单次预算；请求里的 `timeoutMs` 覆盖它 | `8000` |
+| `TRANSLATEX_ROUNDTRIP_PIVOT` | 请求写 `auto` 时 `roundtrip` 的默认中转语言；`--pivot` 优先 | `ja` |
 | `TRANSLATEX_LOG` | stderr 日志级别 | `debug` |
 
 ## 凭据
@@ -44,9 +47,13 @@
 
 ## 优先级
 
+没有单一赢家：几种来源往同一份轮换表里加 Key。
+
+```text
+credentials.toml 的标签  ──▶  env 标签（排在最后）  ──▶  免费网页接口（完全不需要凭据）
 ```
-环境变量  >  credentials.toml  >  系统钥匙串（@keyring）  >  内置免费接口
-```
+
+`TRANSLATEX_<PROVIDER>_<FIELD>` 会在文件标签之后追加一个 `env` 凭据，所以文件里的 Key 先试，环境变量是该 Provider 的最后一路。`credentials.toml` 里写成 `@keyring` 的字段在加载时从系统钥匙串读取。
 
 变量只设置了一部分（例如只有 `TRANSLATEX_BAIDU_APPID`）时凭据不完整，该 Provider 不会注册。`translatex providers --format json` 能看到最终的 `configured` 状态。
 

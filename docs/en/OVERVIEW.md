@@ -2,6 +2,8 @@
 
 # Overview
 
+[← Documentation index](../README.md)
+
 `translatex` answers translation requests by walking a priority-ordered list of providers. Free web endpoints come first; official APIs join only when credentials exist; LLM providers sit at the end.
 
 ## What the binary does

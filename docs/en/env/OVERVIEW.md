@@ -2,6 +2,8 @@
 
 # Environment — Overview
 
+[← Documentation index](../README.md)
+
 Environment variables are the lowest-friction way to configure a container or a CI job. Every variable has a file-based equivalent; the environment wins.
 
 ## File index

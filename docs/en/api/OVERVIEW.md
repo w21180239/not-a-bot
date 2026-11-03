@@ -2,6 +2,8 @@
 
 # API — Overview
 
+[← Documentation index](../README.md)
+
 The wire contract is the same for every command: one request object in, one response or one typed error out. All field names are camelCase.
 
 ## File index
@@ -15,13 +17,15 @@ The wire contract is the same for every command: one request object in, one resp
 
 | Type | Used by | Purpose |
 | --- | --- | --- |
-| `TranslateRequest` | `translate`, `batch`, `roundtrip` | What to translate and how |
+| `TranslateRequest` | `translate`, `batch` | What to translate and how |
 | `TranslateResponse` | success paths | Result plus provenance |
-| `ErrorResponse` | CLI failures | Typed error, optional attempts |
+| `RoundtripRequest` | `roundtrip` | Text plus the pivot language |
+| `RoundtripResponse` | `roundtrip` success | Final text, pivot text, both hops |
+| `ErrorResponse` | CLI failures | Typed error, plus the hops already tried |
 | `WireError` | inside `ErrorResponse` | Code, message, retry hints |
 | `ProviderInfo` | `providers` | Capability and configuration |
 | `HealthRecord` | `health` | Probe result per provider |
-| `AttemptRecord` | `--verbose` | One provider hop |
+| `AttemptRecord` | `--verbose`, failed chains | One provider hop |
 
 Generate the schema from the binary rather than copying it:
 

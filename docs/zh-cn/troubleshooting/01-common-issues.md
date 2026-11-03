@@ -2,6 +2,8 @@
 
 # 故障排查 — 常见问题
 
+[← 领域概览](OVERVIEW.md) · [文档索引](../README.md)
+
 ## `NO_PROVIDER`
 
 链中没有任何 Provider 能处理这次请求。
@@ -22,7 +24,7 @@ translatex providers --format json | jq '.providers[] | select(.name=="baidu")'
 
 ## `AUTO_DETECT_UNSUPPORTED`
 
-你指定的 Provider 不能检测源语言：`lingvanex`、`mymemory`、`systran`、`reverso`。要么加 `-s <code>`，要么去掉 `--provider`，让链自己挑一个能检测的。
+你指定的 Provider 不能检测源语言：`lingvanex`、`mymemory`、`systran`、`reverso`，以及需要 Key 的 `aliyun`、`niutrans`、`tencent`。要么加 `-s <code>`，要么去掉 `--provider`，让链自己挑一个能检测的。
 
 ## 免费接口返回 `RATE_LIMITED`
 

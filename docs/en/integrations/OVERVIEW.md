@@ -2,6 +2,8 @@
 
 # Integrations — Overview
 
+[← Documentation index](../README.md)
+
 `translatex` integrates as a CLI plus a skill. The agent runs one command and
 reads JSON; a short document tells it when to run it. There is no server to
 start and no protocol to negotiate.
@@ -30,6 +32,10 @@ Roo Code, Kilo Code, Continue, JetBrains AI, Zed, Aider, Qwen Code, Crush, Goose
 DeepSeek Harness, MiMo Code, AtomCode, OpenClaw, Hermes Agent, Pi, Reasonix,
 ZCode, QwenPaw — with the file path for each is
 [`integrations/README.md`](../../../integrations/README.md).
+
+| Page | Contents |
+| --- | --- |
+| [02-supported-harnesses.md](02-supported-harnesses.md) | Logo grid, the four channels, and a path plus command for each of the 24 harnesses |
 
 ## Which surface
 

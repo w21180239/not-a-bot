@@ -2,6 +2,8 @@
 
 # Providers — Overview
 
+[← Documentation index](../README.md)
+
 A provider is one translation backend. Every provider reports a stable id, a kind, a priority, a language set, an optional character limit, and whether it can detect the source language.
 
 ## File index

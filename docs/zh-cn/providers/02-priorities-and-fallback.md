@@ -2,6 +2,8 @@
 
 # Provider — 优先级与回退
 
+[← 领域概览](OVERVIEW.md) · [文档索引](../README.md)
+
 ## 链的组装
 
 `Registry::chain` 按以下顺序生成尝试列表：
@@ -33,7 +35,7 @@
 | --- | --- | --- |
 | 1-3 | 快且质量高的网页接口 | Google、Edge、爱词霸覆盖大部分流量 |
 | 4-8 | 专用网页接口 | iFlyrec（中文）、ModernMT、火山、Lara、Lingvanex、Mirai、Papago |
-| 9-12 | 兜底网页接口 | Reverso、搜狗、MyMemory、SysTran |
+| 9-12 | 尾部网页接口 | Reverso、搜狗、MyMemory、SysTran |
 | 20-27 | 官方 API | 稳定、有 SLA，但需要 Key |
 | 40-42 | LLM | 成本最高、延迟最大、最不可控 |
 
@@ -56,7 +58,7 @@
 | 错误类别 | 同 Provider 重试 | Key 冷却 | 换下一个 |
 | --- | --- | --- | --- |
 | `RATE_LIMITED` | 是，退避后 | 是 | 是 |
-| `QUOTA_EXHAUSTED` | 是 | 是 | 是 |
+| `QUOTA_EXHAUSTED` | 否 | 是 | 是 |
 | `AUTH_FAILED` | 否 | 是 | 是 |
 | `UPSTREAM_ERROR` 5xx | 是 | 否 | 是 |
 | `UPSTREAM_ERROR` 4xx | 否 | 否 | 是 |

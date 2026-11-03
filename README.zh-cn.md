@@ -1,10 +1,32 @@
+<div align="center">
+
 # translatex
 
 **面向 Agent 的网页优先翻译工具。** 一个静态二进制：先打免费网页接口，有 Key 时再回退到官方 API，所有请求都以结构化 JSON 返回。
 
 [English](./README.md) · [简体中文](./README.zh-cn.md) · [Русский](./README.ru.md) · [文档](./docs/README.md)
 
+`translate "…" -t zh` · `roundtrip "…" --from en` · `translatex manifest --format json`
+
+</div>
+
 ---
+
+## 目录
+
+- [为什么网页优先](#为什么网页优先)
+- [能力](#能力)
+- [安装](#安装)
+- [快速开始](#快速开始)
+- [支持的 harness](#支持的-harness)
+- [往返改写：去 AI 味](#往返改写去-ai-味)
+- [Provider 一览](#provider-一览)
+- [实测状态](#实测状态)
+- [配置](#配置)
+- [CLI 参考](#cli-参考)
+- [错误契约](#错误契约)
+- [文档](#文档)
+- [开发](#开发)
 
 ## 为什么网页优先
 
@@ -25,10 +47,10 @@
 | **26 个 Provider** | 14 个免费网页接口、9 个官方 API、3 个 LLM。LibreTranslate 通过 `base_url` 按需启用。 |
 | **回退链** | 按优先级排序；默认最多三个 Provider 同时在飞，慢接口拖不住后面健康的通道。`--fallback` 顺序原样保留。 |
 | **往返改写** | `roundtrip` 经中转语言翻出再翻回，逼出改写，去掉机器味。中转语言经实测选定：非中文用 `zh`，中文用 `en`。 |
-| **密钥轮换** | 单 Provider 多密钥轮询，冷却状态跨进程共享于 `~/.config/translatex/cache/`。 |
+| **Key 轮换** | 单 Provider 多 Key 轮询，冷却状态跨进程共享在 `~/.config/translatex/cache/`。 |
 | **结构化输出** | stdout 只输出 JSON / NDJSON，日志走 stderr，退出码可直接分支。 |
 | **保护片段** | 正则匹配的代码、变量、URL 在翻译前打码，翻译后还原；还原失败会触发回退。 |
-| **面向 Agent 的 CLI** | 每条命令都在 stdout 输出 JSON、stderr 输出日志，退出码可直接分支。推荐的 harness 接入方式是 CLI + skill：[integrations/](./integrations/README.md)。 |
+| **24 家 harness** | Claude Code、Codex、Cursor、Zed 等 24 家共用同一份 skill 或指令块，无需启动服务。路径见 [integrations/](./integrations/README.md)。 |
 | **真实超时** | 请求里的 `timeoutMs`（或配置里的 `timeout_ms`）限制整个 Provider 调用，不只是一次读。 |
 | **诚实的错误** | 每个失败都带 `code`、`retryable`、`retryAfterSecs`、`suggestedAction`。 |
 
@@ -102,25 +124,68 @@ translatex roundtrip "In today's fast-paced landscape, it's important to note th
 }
 ```
 
-## Agent 接入：CLI + skill
+## 支持的 harness
 
-接入方式就是这条命令，外加一份告诉 Agent 何时调用的文档。没有服务要启动，也没有协议要协商。
+接入方式是一条命令加一份文档：宿主会加载 skill 就给 skill，读项目规则就给规则文件，读项目指令就追加一段。没有服务要启动，也没有协议要协商。
+
+<div align="center">
+<table>
+<tr>
+<td align="center" width="150"><img src="repo-assets/agents/claude-code.png" width="44" alt="Claude Code"><br/><b>Claude Code</b><br/><sub>skill · 插件</sub></td>
+<td align="center" width="150"><img src="repo-assets/agents/codex.png" width="44" alt="Codex CLI"><br/><b>Codex CLI</b><br/><sub>skill · AGENTS.md</sub></td>
+<td align="center" width="150"><img src="repo-assets/agents/gemini-cli.png" width="44" alt="Gemini CLI"><br/><b>Gemini CLI</b><br/><sub>skill · GEMINI.md</sub></td>
+<td align="center" width="150"><img src="repo-assets/agents/opencode.png" width="44" alt="OpenCode"><br/><b>OpenCode</b><br/><sub>skill · AGENTS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/cursor.png" width="44" alt="Cursor"><br/><b>Cursor</b><br/><sub>.cursor/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/cline.png" width="44" alt="Cline"><br/><b>Cline</b><br/><sub>.clinerules</sub></td>
+<td align="center"><img src="repo-assets/agents/roo-code.png" width="44" alt="Roo Code"><br/><b>Roo Code</b><br/><sub>.roo/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/kilo-code.png" width="44" alt="Kilo Code"><br/><b>Kilo Code</b><br/><sub>.kilocode/rules</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/continue.png" width="44" alt="Continue"><br/><b>Continue</b><br/><sub>.continue/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/jetbrains.png" width="44" alt="JetBrains AI"><br/><b>JetBrains AI</b><br/><sub>.aiassistant/rules</sub></td>
+<td align="center"><img src="repo-assets/agents/zed.png" width="44" alt="Zed"><br/><b>Zed</b><br/><sub>.rules</sub></td>
+<td align="center"><img src="repo-assets/agents/aider.png" width="44" alt="Aider"><br/><b>Aider</b><br/><sub>CONVENTIONS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/qwen-code.png" width="44" alt="Qwen Code"><br/><b>Qwen Code</b><br/><sub>QWEN.md</sub></td>
+<td align="center"><img src="repo-assets/agents/crush.png" width="44" alt="Crush"><br/><b>Crush</b><br/><sub>CRUSH.md</sub></td>
+<td align="center"><img src="repo-assets/agents/goose.png" width="44" alt="Goose"><br/><b>Goose</b><br/><sub>指令</sub></td>
+<td align="center"><img src="repo-assets/agents/deepseek-harness.png" width="44" alt="DeepSeek Harness"><br/><b>DeepSeek Harness</b><br/><sub>AGENTS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/mimo-code.svg" width="44" alt="MiMo Code"><br/><b>MiMo Code</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/atomcode.png" width="44" alt="AtomCode"><br/><b>AtomCode</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/openclaw.png" width="44" alt="OpenClaw"><br/><b>OpenClaw</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/hermes-agent.png" width="44" alt="Hermes Agent"><br/><b>Hermes Agent</b><br/><sub>AGENTS.md</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="repo-assets/agents/pi.png" width="44" alt="Pi"><br/><b>Pi</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/reasonix.png" width="44" alt="Reasonix"><br/><b>Reasonix</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/zcode.png" width="44" alt="ZCode"><br/><b>ZCode</b><br/><sub>AGENTS.md</sub></td>
+<td align="center"><img src="repo-assets/agents/qwenpaw.svg" width="44" alt="QwenPaw"><br/><b>QwenPaw</b><br/><sub>指令</sub></td>
+</tr>
+</table>
+
+<i>24 家 harness，两份文档。其它只要能执行 shell，就直接走 CLI。</i>
+</div>
 
 ```bash
-# Claude Code
+# 会加载 skill 的宿主
 mkdir -p .claude/skills/translatex && cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/
-
-# Codex / Gemini CLI（共享的跨运行时位置）
-mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/
-
-# OpenCode
 mkdir -p ~/.config/opencode/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/
+mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/   # Codex、Gemini CLI
 
-# 任何读取项目指令文件的 harness
+# 其余宿主按自己的文件名读同一段内容
 cat integrations/guidance/AGENTS.md >> AGENTS.md
 ```
 
-同一份 skill 文本适用于所有 harness，只是存放位置不同。Claude Code、Codex、Gemini CLI、OpenCode、Cursor、Cline、Roo Code、Kilo Code、Continue、JetBrains AI、Zed、Aider、Qwen Code、Crush、Goose、DeepSeek Harness、MiMo Code、AtomCode、OpenClaw、Hermes Agent、Pi、Reasonix、ZCode、QwenPaw 以及其它 harness 的具体路径：[integrations/README.md](./integrations/README.md)。
+| 想了解 | 阅读 |
+| --- | --- |
+| 每家的确切路径与命令 | [integrations/README.md](./integrations/README.md) |
+| 四条通道的区别与验证方法 | [docs/zh-cn/integrations/02-supported-harnesses.md](./docs/zh-cn/integrations/02-supported-harnesses.md) |
+| Claude Code 的一条命令插件安装 | [integrations/claude-code/README.md](./integrations/claude-code/README.md) |
 
 偏好命令参考而非 skill 的 Agent，可以直接调用 CLI：
 
@@ -230,6 +295,7 @@ default_target = "zh"
 timeout_ms = 20000
 retries = 1
 race_width = 3
+roundtrip_pivot = "auto"
 log = "warn"
 
 [provider.libretranslate]
@@ -255,7 +321,7 @@ region = "eastasia"
 api_key = "..."
 ```
 
-解析顺序：环境变量（`TRANSLATEX_<PROVIDER>_<FIELD>`）→ 凭据文件 → 系统钥匙串（`@keyring` 占位符）→ 免费接口。
+解析顺序：`credentials.toml` 里的 Key 标签按文件顺序轮换，`TRANSLATEX_<PROVIDER>_<FIELD>` 在其后追加一个 `env` 标签，字段写成 `@keyring` 时从系统钥匙串读取。免费接口三者都不需要。
 
 ## CLI 参考
 
@@ -282,7 +348,7 @@ api_key = "..."
 | `code` | 可重试 | Agent 应采取 |
 | --- | --- | --- |
 | `RATE_LIMITED` | 是 | 等待 `retryAfterSecs` 后重试 |
-| `QUOTA_EXHAUSTED` | 是 | 换 Key 或等待 |
+| `QUOTA_EXHAUSTED` | 否 | 换 Key 或等配额窗口恢复 |
 | `NETWORK_ERROR` | 是 | 指数退避重试 |
 | `UPSTREAM_ERROR` | 仅 5xx | 5xx 重试，4xx 修输入 |
 | `TIMEOUT` | 是 | 提高 `timeoutMs` 后重试，或换 Provider |
@@ -309,7 +375,7 @@ api_key = "..."
 ## 开发
 
 ```bash
-cargo test                # 243 个测试
+cargo test                # 245 个测试
 cargo build --release     # 开 LTO 约 5 分钟
 cargo clippy --all-targets
 ```

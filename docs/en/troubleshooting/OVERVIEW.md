@@ -2,6 +2,8 @@
 
 # Troubleshooting — Overview
 
+[← Documentation index](../README.md)
+
 Start with two commands. They answer most questions before you read any further:
 
 ```bash

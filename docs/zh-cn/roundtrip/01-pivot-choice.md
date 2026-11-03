@@ -2,6 +2,8 @@
 
 # 往返翻译 — 中转语言的选择
 
+[← 领域概览](OVERVIEW.md) · [文档索引](../README.md)
+
 中转语言要离原文足够远，才能逼出改写；同时又要有足够多的 Provider 支持，两跳都能成功。这两个要求方向相反，所以是实测出来的，不是拍的。
 
 ## 方法
@@ -11,6 +13,12 @@
 - **词重合度** —— 输入与结果实词（去停用词）的 Jaccard 相似度，越低说明改写越多。
 - **长度变化** —— 长度绝对变化的平均值。
 - **延迟** —— 两跳总耗时。
+
+自己复现：一条命令即可。
+
+```bash
+translatex roundtrip "In today's fast-paced digital landscape, …" --from en --pivot ja --format json
+```
 
 ## 结果
 
@@ -47,15 +55,15 @@ de     Our comprehensive solution leverages cutting-edge technology to empower
 
 `auto` 就是这张表。
 
-**日文是官方备选。** 它改写略多、保留的语法结构更多，对中文会丢掉冠词和单复数的技术类文本更合适：
+**日文是文档给出的备选。** 它改写略多、保留的语法结构更多，因此更适合技术类英文——以中文为中转会丢掉冠词和单复数：
 
 ```bash
-translatex roundtrip api-notes.md --from en --pivot ja
+translatex roundtrip --from en --pivot ja < api-notes.md
 ```
 
 **俄文改写最多，但漂移最明显**，所以不是默认：样本里它把 "comprehensive" 换成了 "end-to-end" 并丢了限定词。只有在"改写优先于保真"时才用。
 
-## auto 的回退逻辑
+## auto 中转的重试逻辑
 
 `sourceLang: "auto"` 时选中转语言还不知道原文是什么，所以 `auto` 先押中文，拿到 `detectedSource` 后再判断。如果原文就是中文，说明押的中转等于原文，第一跳会用英文重做一次。只有中文输入会多花一次调用，其它语言都是两跳。
 
@@ -74,4 +82,7 @@ translatex roundtrip api-notes.md --from en --pivot ja
 roundtrip_pivot = "zh"
 ```
 
-导航：← [往返翻译概览](OVERVIEW.md) · ↑ [文档索引](../README.md)
+## 导航
+
+- ← [往返翻译概览](OVERVIEW.md)
+- ↑ [文档索引](../README.md)

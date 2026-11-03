@@ -2,6 +2,8 @@
 
 # 架构 — 概览
 
+[← 文档索引](../README.md)
+
 ```
 src/
 ├── main.rs              入口，交给 cli::run

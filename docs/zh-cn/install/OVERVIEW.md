@@ -2,6 +2,10 @@
 
 # 安装 — 概览
 
+[← 文档索引](../README.md)
+
+装好二进制、跑通第一条请求、打开命令补全。
+
 ## 要求
 
 - 从源码构建需要 Rust 1.80 或更高。
@@ -44,11 +48,17 @@ translatex health --format json
 translatex completions bash       > /etc/bash_completion.d/translatex
 translatex completions zsh        > ~/.zfunc/_translatex
 translatex completions fish       > ~/.config/fish/completions/translatex.fish
-translatex completions powershell > $PROFILE.d/translatex.ps1
 ```
 
-## 下一步
+PowerShell 需要把生成的脚本从 profile 里点源引入：
 
-- [Agent 集成](../../../AGENTS.md)
-- [CLI 参考](../cli/OVERVIEW.md)
-- [Provider 目录](../providers/01-supported-providers.md)
+```powershell
+translatex completions powershell > "$HOME\Documents\PowerShell\translatex-completion.ps1"
+Add-Content $PROFILE '. "$HOME\Documents\PowerShell\translatex-completion.ps1"'
+```
+
+## 导航
+
+- ← [文档索引](../README.md)
+- → [CLI 参考](../cli/OVERVIEW.md)
+- → [Agent 集成](../../../AGENTS.md)

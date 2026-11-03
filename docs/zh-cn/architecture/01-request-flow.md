@@ -2,6 +2,8 @@
 
 # 架构 — 请求流程
 
+[← 领域概览](OVERVIEW.md) · [文档索引](../README.md)
+
 ## 步骤
 
 1. **规范化** —— `source_lang` 与 `target_lang` 经过 `lang::normalize`。未知目标返回 `INVALID_INPUT`；源目标相同同样拒绝。

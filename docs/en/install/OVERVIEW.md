@@ -2,6 +2,10 @@
 
 # Install — Overview
 
+[← Documentation index](../README.md)
+
+Install the binary, run one request, and turn on shell completion.
+
 ## Requirements
 
 - Rust 1.80 or newer when building from source.
@@ -44,11 +48,17 @@ translatex health --format json
 translatex completions bash       > /etc/bash_completion.d/translatex
 translatex completions zsh        > ~/.zfunc/_translatex
 translatex completions fish       > ~/.config/fish/completions/translatex.fish
-translatex completions powershell > $PROFILE.d/translatex.ps1
 ```
 
-## Next
+PowerShell needs the generated script dot-sourced from the profile:
 
-- [Clients and agents](../../../AGENTS.md)
-- [CLI reference](../cli/OVERVIEW.md)
-- [Provider catalogue](../providers/01-supported-providers.md)
+```powershell
+translatex completions powershell > "$HOME\Documents\PowerShell\translatex-completion.ps1"
+Add-Content $PROFILE '. "$HOME\Documents\PowerShell\translatex-completion.ps1"'
+```
+
+## Navigation
+
+- ← [Documentation index](../README.md)
+- → [CLI reference](../cli/OVERVIEW.md)
+- → [Clients and agents](../../../AGENTS.md)

@@ -12,6 +12,7 @@
 | 查所有命令与参数 | [cli/OVERVIEW.md](cli/OVERVIEW.md) |
 | 知道有哪些 Provider、顺序如何 | [providers/OVERVIEW.md](providers/OVERVIEW.md) |
 | 接入 Claude Code、Codex、OpenCode 等 Agent | [integrations/OVERVIEW.md](integrations/OVERVIEW.md) |
+| 看 24 家 harness 的图标与各自路径 | [integrations/02-supported-harnesses.md](integrations/02-supported-harnesses.md) |
 | 安全地解析输出 | [api/OVERVIEW.md](api/OVERVIEW.md) |
 | 排查某个通道失败 | [troubleshooting/OVERVIEW.md](troubleshooting/OVERVIEW.md) |
 

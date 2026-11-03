@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44" role="img" aria-label="MiMo Code">
+  <defs>
+    <linearGradient id="mimo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF9A4D"/>
+      <stop offset="1" stop-color="#F05A00"/>
+    </linearGradient>
+  </defs>
+  <rect width="44" height="44" rx="11" fill="url(#mimo)"/>
+  <path d="M11 31V13h4.6l6.4 10.4L28.4 13H33v18h-4.5V20.6L22.9 31h-1.8L15.5 20.6V31z" fill="#fff"/>
+</svg>

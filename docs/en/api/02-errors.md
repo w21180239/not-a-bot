@@ -2,6 +2,8 @@
 
 # API — Error contract
 
+[← Domain overview](OVERVIEW.md) · [Documentation index](../README.md)
+
 Every failure carries enough information for an agent to decide without guessing.
 
 ```json
@@ -22,7 +24,7 @@ Every failure carries enough information for an agent to decide without guessing
 | Code | Retryable | `suggestedAction` | Cause |
 | --- | --- | --- | --- |
 | `RATE_LIMITED` | yes | `backoff_and_retry` | Per-IP or per-key throttle |
-| `QUOTA_EXHAUSTED` | yes | `switch_key_or_upgrade_plan` | Plan limit reached |
+| `QUOTA_EXHAUSTED` | no | `switch_key_or_upgrade_plan` | Plan limit reached |
 | `AUTH_FAILED` | no | `refresh_credentials` | Bad or expired credentials |
 | `NETWORK_ERROR` | yes | `retry_with_backoff` | DNS, TLS, connection reset |
 | `TIMEOUT` | yes | `increase_timeout_and_retry` | Budget exhausted |
@@ -55,7 +57,7 @@ Every failure carries enough information for an agent to decide without guessing
 
 ## Attempts
 
-`--verbose` adds per-hop records so a `CHAIN_EXHAUSTED` result is diagnosable:
+A failed chain carries the hops that were tried, so `CHAIN_EXHAUSTED` is diagnosable without a second run:
 
 ```json
 {
@@ -66,6 +68,8 @@ Every failure carries enough information for an agent to decide without guessing
   ]
 }
 ```
+
+The array is omitted when no provider was reached: a bad request, an unknown provider name or a missing credential fails before the chain starts. Successful responses carry `attempts` only with `--verbose`.
 
 ## Exit codes
 
