@@ -30,6 +30,19 @@ pub struct Outcome {
     pub attempts: Vec<AttemptRecord>,
 }
 
+/// A chain that produced no translation, with the hops that were tried.
+#[derive(Debug)]
+pub struct ChainFailure {
+    pub error: Error,
+    pub attempts: Vec<AttemptRecord>,
+}
+
+impl ChainFailure {
+    fn new(error: Error) -> Self {
+        Self { error, attempts: Vec::new() }
+    }
+}
+
 /// Everything one provider's attempt loop produced, merged by the driver.
 struct ProviderRun {
     name: String,
@@ -72,42 +85,64 @@ impl Engine {
     }
 
     pub async fn translate(&self, req: &TranslateRequest) -> Result<Outcome> {
+        self.translate_inner(req).await.map_err(|failure| failure.error)
+    }
+
+    /// Translate and keep the hop records when the chain fails, so a caller can
+    /// report which providers were consulted and why each one declined.
+    pub async fn translate_with_attempts(
+        &self,
+        req: &TranslateRequest,
+    ) -> (Result<Outcome>, Vec<AttemptRecord>) {
+        match self.translate_inner(req).await {
+            Ok(outcome) => (Ok(outcome), Vec::new()),
+            Err(failure) => (Err(failure.error), failure.attempts),
+        }
+    }
+
+    async fn translate_inner(&self, req: &TranslateRequest) -> std::result::Result<Outcome, ChainFailure> {
         let request_id = req
             .idempotency_key
             .clone()
             .unwrap_or_else(|| Uuid::new_v4().to_string());
 
         if req.text.trim().is_empty() {
-            return Err(Error::InvalidInput("text is empty".into()));
+            return Err(ChainFailure::new(Error::InvalidInput("text is empty".into())));
         }
         let target = crate::core::lang::normalize(&req.target_lang);
         let source = crate::core::lang::normalize(&req.source_lang);
         if !crate::core::lang::is_known(&target) {
-            return Err(Error::InvalidInput(format!("unknown target language {}", req.target_lang)));
+            return Err(ChainFailure::new(Error::InvalidInput(format!(
+                "unknown target language {}",
+                req.target_lang
+            ))));
         }
         if target == source {
-            return Err(Error::InvalidInput(format!(
+            return Err(ChainFailure::new(Error::InvalidInput(format!(
                 "source and target are both {target}"
-            )));
+            ))));
         }
         let mut inner = req.clone();
         inner.target_lang = target.clone();
         inner.source_lang = source.clone();
 
-        let mut preserver = Preserver::new(&req.preserve)?;
+        let mut preserver = Preserver::new(&req.preserve).map_err(ChainFailure::new)?;
         let payload = match &mut preserver {
             Some(p) => p.mask(&inner.text),
             None => inner.text.clone(),
         };
         inner.text = payload;
 
-        let chain = self.registry.chain(
-            req.provider.as_deref(),
-            &req.fallback_chain,
-            &self.chain,
-            &req.source_lang,
-            &target,
-        )?;
+        let chain = self
+            .registry
+            .chain(
+                req.provider.as_deref(),
+                &req.fallback_chain,
+                &self.chain,
+                &req.source_lang,
+                &target,
+            )
+            .map_err(ChainFailure::new)?;
         let pinned = req.provider.is_some();
         // Per-request timeout wins over the configured default.
         let budget_ms = req.timeout_ms.or(self.settings.timeout_ms).unwrap_or(20_000);
@@ -164,14 +199,14 @@ impl Engine {
                     // Invalid input or a bad pattern: another provider cannot
                     // help, so stop the window instead of burning more calls.
                     if !err.skip_to_next_provider() {
-                        return Err(err);
+                        return Err(ChainFailure { error: err, attempts });
                     }
                     last = Some(err);
                 }
             }
         }
 
-        Err(if !any_tried {
+        let error = if !any_tried {
             // Keys exist but every one is on cooldown: that is a rate limit with
             // a known recovery time, not a missing provider.
             match cooling.iter().map(|(_, secs)| *secs).max() {
@@ -193,7 +228,8 @@ impl Engine {
                 Some(other) => other,
                 None => Error::ChainExhausted,
             }
-        })
+        };
+        Err(ChainFailure { error, attempts })
     }
 
     /// Round trip: source -> pivot -> source.
@@ -213,7 +249,15 @@ impl Engine {
             return Err(Error::InvalidInput("text is empty".into()));
         }
 
-        let requested_pivot = crate::core::lang::normalize(&req.pivot);
+        // `auto` keeps the measured defaults; a configured pivot replaces the
+        // guess without touching an explicit `--pivot`.
+        let requested_pivot = match crate::core::lang::normalize(&req.pivot) {
+            p if p == "auto" => self
+                .settings
+                .pivot_override()
+                .unwrap_or_else(|| "auto".to_string()),
+            p => p,
+        };
         let source = crate::core::lang::normalize(&req.source_lang);
         let mut pivot = if requested_pivot == "auto" {
             crate::core::lang::default_pivot(&source).to_string()
@@ -223,7 +267,7 @@ impl Engine {
         if !crate::core::lang::is_known(&pivot) || pivot == "auto" {
             return Err(Error::InvalidInput(format!(
                 "unknown pivot language {}",
-                req.pivot
+                requested_pivot
             )));
         }
         // Sending text to its own language is not a round trip.
@@ -1008,6 +1052,33 @@ mod tests {
         assert!(out.attempts[1].ok);
     }
 
+    #[tokio::test]
+    async fn a_failed_chain_still_reports_its_hops() {
+        let home = dir();
+        let (bad, _calls) = stub("free", vec![Some("up")]);
+        let mut reg = Registry::new();
+        reg.register(bad);
+        let settings = Settings {
+            chain: Some(vec!["free".into()]),
+            retries: Some(0),
+            race_width: Some(1),
+            ..Default::default()
+        };
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(home.path().to_path_buf()),
+            settings,
+        );
+
+        let (result, attempts) = engine.translate_with_attempts(&request(None)).await;
+
+        assert!(result.is_err(), "the only provider fails");
+        assert_eq!(attempts.len(), 1, "the failed hop travels with the error");
+        assert!(!attempts[0].ok);
+        assert_eq!(attempts[0].provider, "free");
+    }
+
     /// Records every hop and rewrites the text, so the round trip is visible.
     struct Recorder {
         calls: Arc<std::sync::Mutex<Vec<(String, String, String)>>>,
@@ -1109,6 +1180,33 @@ mod tests {
         assert_eq!(out.response.providers, vec!["recorder", "recorder"]);
         assert_eq!(out.response.request_id, "rt-1");
         assert_eq!(out.attempts.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn roundtrip_pivot_from_config_replaces_the_guess() {
+        let home = dir();
+        let (rec, calls) = recorder("en");
+        let mut reg = Registry::new();
+        reg.register(rec);
+        let settings = Settings {
+            roundtrip_pivot: Some("ja".into()),
+            ..test_settings()
+        };
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(home.path().to_path_buf()),
+            settings,
+        );
+
+        engine
+            .roundtrip(&roundtrip_req("en", "auto"))
+            .await
+            .expect("roundtrip");
+
+        let calls = calls.lock().unwrap().clone();
+        assert_eq!(calls[0].1, "ja", "the configured pivot beats the default");
+        assert_eq!(calls[1].1, "en");
     }
 
     #[tokio::test]

@@ -46,6 +46,8 @@ pub struct Settings {
     pub concurrency: Option<usize>,
     /// Provider attempts kept in flight at once. `1` is strictly sequential.
     pub race_width: Option<usize>,
+    /// Default pivot for `roundtrip` when the request says `auto`.
+    pub roundtrip_pivot: Option<String>,
     pub log: Option<String>,
     /// provider -> extra knobs (base_url, model, instance, ...).
     pub provider: BTreeMap<String, ProviderSettings>,
@@ -95,6 +97,9 @@ impl Settings {
         if let Ok(v) = std::env::var("TRANSLATEX_LOG") {
             self.log = Some(v);
         }
+        if let Ok(v) = std::env::var("TRANSLATEX_ROUNDTRIP_PIVOT") {
+            self.roundtrip_pivot = Some(v);
+        }
         self
     }
 
@@ -120,6 +125,15 @@ impl Settings {
     /// restores the strict sequential walk.
     pub fn race_width(&self) -> usize {
         self.race_width.unwrap_or(DEFAULT_RACE_WIDTH).max(1)
+    }
+
+    /// `roundtrip_pivot` when it names a language; `auto` and blank values
+    /// leave the per-request default in charge.
+    pub fn pivot_override(&self) -> Option<String> {
+        self.roundtrip_pivot
+            .as_deref()
+            .map(|p| p.trim().to_lowercase())
+            .filter(|p| !p.is_empty() && p != "auto")
     }
 
     pub fn provider(&self, name: &str) -> ProviderSettings {
@@ -159,6 +173,7 @@ pub const CONFIG_TEMPLATE: &str = r#"# translatex config
 # timeout_ms = 20000
 # retries = 2
 # race_width = 3   # provider attempts in flight; 1 is strictly sequential
+# roundtrip_pivot = "zh"   # "auto" picks zh for non-Chinese text, en for Chinese
 # log = "warn"
 
 # [provider.googlecloud]

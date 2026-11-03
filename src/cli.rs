@@ -6,7 +6,7 @@ use crate::core::creds::CredentialStore;
 use crate::core::engine::Engine;
 use crate::core::error::{Error, Result};
 use crate::providers::Registry;
-use crate::core::types::{ErrorResponse, HealthRecord, TranslateRequest};
+use crate::core::types::{AttemptRecord, ErrorResponse, HealthRecord, TranslateRequest};
 use clap::{Parser, Subcommand};
 use std::io::Write;
 use std::sync::Arc;
@@ -224,10 +224,22 @@ pub async fn run(cli: Cli) -> i32 {
     init_tracing(cli.log.as_deref());
     match dispatch(&cli).await {
         Ok(()) => exit::OK,
-        Err(err) => {
-            emit_error(&cli, &err);
-            exit_code(&err)
+        Err(failure) => {
+            emit_error(&cli, &failure.error, failure.attempts);
+            exit_code(&failure.error)
         }
+    }
+}
+
+/// A failed command: the error plus the provider hops that preceded it.
+struct Failure {
+    error: Error,
+    attempts: Vec<AttemptRecord>,
+}
+
+impl From<Error> for Failure {
+    fn from(error: Error) -> Self {
+        Self { error, attempts: Vec::new() }
     }
 }
 
@@ -243,10 +255,10 @@ fn init_tracing(level: Option<&str>) {
         .try_init();
 }
 
-async fn dispatch(cli: &Cli) -> Result<()> {
+async fn dispatch(cli: &Cli) -> std::result::Result<(), Failure> {
     match &cli.command {
-        Command::Schema => emit_json(cli, &schema_document()?),
-        Command::Manifest => emit_json(cli, &manifest_document()?),
+        Command::Schema => emit_json(cli, &schema_document()?).map_err(Failure::from),
+        Command::Manifest => emit_json(cli, &manifest_document()?).map_err(Failure::from),
         Command::Init { path } => {
             match path {
                 Some(p) => {
@@ -279,12 +291,16 @@ async fn dispatch(cli: &Cli) -> Result<()> {
             let ctx = Ctx::build(cli)?;
             match other {
                 Command::Translate { .. } => cmd_translate(cli, &ctx).await,
-                Command::Roundtrip { .. } => cmd_roundtrip(cli, &ctx).await,
-                Command::Batch { .. } => cmd_batch(cli, &ctx).await,
-                Command::Providers => cmd_providers(cli, &ctx),
-                Command::Languages { provider } => cmd_languages(cli, &ctx, provider),
-                Command::Keys { provider, reset } => cmd_keys(cli, &ctx, provider.as_deref(), *reset),
-                Command::Health => cmd_health(cli, &ctx).await,
+                Command::Roundtrip { .. } => cmd_roundtrip(cli, &ctx).await.map_err(Failure::from),
+                Command::Batch { .. } => cmd_batch(cli, &ctx).await.map_err(Failure::from),
+                Command::Providers => cmd_providers(cli, &ctx).map_err(Failure::from),
+                Command::Languages { provider } => {
+                    cmd_languages(cli, &ctx, provider).map_err(Failure::from)
+                }
+                Command::Keys { provider, reset } => {
+                    cmd_keys(cli, &ctx, provider.as_deref(), *reset).map_err(Failure::from)
+                }
+                Command::Health => cmd_health(cli, &ctx).await.map_err(Failure::from),
                 _ => unreachable!("handled above"),
             }
         }
@@ -412,7 +428,7 @@ fn read_stdin_text() -> Result<String> {
     Ok(text)
 }
 
-async fn cmd_translate(cli: &Cli, ctx: &Ctx) -> Result<()> {
+async fn cmd_translate(cli: &Cli, ctx: &Ctx) -> std::result::Result<(), Failure> {
     let Command::Translate {
         text,
         to,
@@ -449,16 +465,17 @@ async fn cmd_translate(cli: &Cli, ctx: &Ctx) -> Result<()> {
         }
     };
 
-    match ctx.engine.translate(&req).await {
+    let (result, attempts) = ctx.engine.translate_with_attempts(&req).await;
+    match result {
         Ok(out) => {
             if cli.format == Format::Text {
                 println!("{}", out.response.text);
                 Ok(())
             } else {
-                emit_json(cli, &render_success(cli, &out))
+                emit_json(cli, &render_success(cli, &out)).map_err(Failure::from)
             }
         }
-        Err(err) => Err(err),
+        Err(err) => Err(Failure { error: err, attempts }),
     }
 }
 
@@ -757,10 +774,10 @@ fn emit_json(cli: &Cli, value: &serde_json::Value) -> Result<()> {
     Ok(())
 }
 
-fn emit_error(cli: &Cli, err: &Error) {
+fn emit_error(cli: &Cli, err: &Error, attempts: Vec<AttemptRecord>) {
     let body = ErrorResponse {
         error: err.wire(),
-        attempts: Vec::new(),
+        attempts,
         request_id: String::new(),
     };
     match serde_json::to_string(&body) {
