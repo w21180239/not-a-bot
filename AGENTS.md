@@ -12,7 +12,7 @@ An agent should never parse human-oriented output or guess a retry strategy. Rea
 
 ```bash
 translatex translate "Hello world" -t zh --format json
-translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
+translatex roundtrip "In today's fast-paced landscape, …" --from en --preset llm --preserve @code --format json
 translatex batch --file jobs.ndjson --parallel 4
 translatex providers --format json
 translatex languages --provider google --format json
@@ -104,7 +104,7 @@ Exit codes: `0` success, `1` request error, `2` config error, `3` chain exhauste
 
 ## Provider order
 
-Free web endpoints occupy priorities 1-12 and are always available. Official APIs occupy 20-27 and are registered only when credentials exist. LLM providers occupy 40-42. Lower is tried first.
+Free web endpoints occupy priorities 1-12 and are always available. Official APIs occupy 20-27 and are registered only when credentials exist. LLM providers occupy 40-42; the local agent CLIs `claude-cli` and `opencode-cli` occupy 60-61. Lower is tried first.
 
 Inspect the live set rather than assuming:
 
@@ -112,6 +112,8 @@ Inspect the live set rather than assuming:
 translatex providers --format json
 translatex health --format json
 ```
+
+`claude-cli` and `opencode-cli` run the local Claude Code or OpenCode CLI on the user's subscription (slow, spends quota); like `reverso` they never join the automatic chain and run only when named.
 
 `reverso` is registered but excluded from the automatic chain: its endpoint rejects this client's TLS fingerprint, so an automatic request would always pay for a failed attempt. Pin it with `--provider reverso`, list it in `--fallback`, or name it in `chain` to try it anyway.
 
@@ -147,19 +149,27 @@ Full list: `translatex languages --format json`.
 
 ## Preserve patterns
 
-`preserve` takes Rust `regex` patterns. Matched spans are masked before translation and restored afterwards. A provider that drops or duplicates a token fails the attempt and the chain moves on — that is deliberate, so corrupted output never reaches the caller.
+`preserve` takes Rust `regex` patterns, or the named patterns `@code` and `@url`. For machine translation providers, matched spans are masked before translation and restored afterwards; a provider that drops or duplicates a token fails the attempt and the chain moves on, so corrupted output never reaches the caller. LLM providers get the text unmasked plus the list of spans to keep verbatim; a span missing from their output adds a `preserve: <provider> dropped <span>` warning instead of failing.
 
 ## Round trips
 
-`roundtrip` translates out through a pivot language and back. Use it when the
+`roundtrip` translates out through one or more hops and back. Use it when the
 user wants prose that reads less like a model wrote it. The result is in the
-source language and the response carries `pivotLang` and `pivotText`.
+source language; the response carries `chain` (languages visited), `hops`
+(per-hop `from`, `to`, `provider`, `text`, `latencyMs`, and `edits` on a repair
+hop), `provider` (final hop), `missingFacts`, `warnings`, `latencyMs`,
+`requestId` and `chars`.
 
-- Default pivot: Chinese for non-Chinese input, English for Chinese input.
+- Hop selection, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, configured `roundtrip_preset` (default `mt`).
+- `--chain "claude-cli:zh,google:fi,edge:en"`: hops `[engine:]lang`; no engine races the fallback chain; a named MT engine is preferred, and a retryable failure (`RATE_LIMITED`, `TIMEOUT`, `NETWORK_ERROR`, `QUOTA_EXHAUSTED`) hands the hop to the automatic chain, avoiding the previous hop's provider, with a `hop <n>: <engine> failed (<code>), served by <other>` warning; named LLM engines never fall back; a hop back to the source is appended when needed. `engine:fix` (LLM engines only) stays in the current language and repairs meaning against the original.
+- `fix` hop edits carry `kind`: `fact` edits restore a lost name, number or other fact and always apply; `meaning` edits share one budget, so together they cannot copy the original back.
+- `--depth 1-3`: machine translation only, zh -> ja -> fi (en -> ja -> fi for Chinese). The default preset `mt` is depth 2.
+- Presets: `mt` (default, two machine hops), `mt-deep` (three), `llm` (out and back through `roundtrip_llm`, default `opencode-cli`, alternative `claude-cli`), `lynote` (LLM zh, LLM ja, google fi, edge back), `lynote-fix` (`lynote` plus a final repair hop). Config `roundtrip_preset` (default `mt`), env `TRANSLATEX_ROUNDTRIP_PRESET`, `TRANSLATEX_ROUNDTRIP_LLM`.
+- LLM hops rewrite in humanize style; later LLM hops also get the previous LLM hop as history and the original text.
+- Machine hops change words but keep sentence shapes ("not just X, it's Y" survives) and respell names (Aroha -> Aloha). Read `missingFacts` (also a `fact check:` warning) and `warnings`, and report them; names are checked as whole words in Latin-script text, and a name that doubles as a common sentence-starting word can slip through.
+- LLM presets rebuild the sentences and remove the structural tells; `lynote-fix` rewrites most. Use `--preserve @code` and `--preserve @url` for code and links. No preset is a claim about AI detectors.
 - `--pivot ja` rewrites as strongly and keeps more grammar; use it for technical English.
-- Never round-trip legal text, API reference, configuration or anything whose numbers and names must survive: the second hop paraphrases.
-- Two provider calls minimum, three when Chinese input was guessed as the pivot.
-- It rewrites wording and keeps sentences. An AI opener or hedge survives every language; delete those clauses before translating and say which ones you removed.
+- Never round-trip legal text, API reference, configuration or numbers the reader will check; the fact guard is a heuristic.
 
 ## Installation
 

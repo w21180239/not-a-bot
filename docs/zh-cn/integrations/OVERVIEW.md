@@ -34,7 +34,7 @@ npm 包本身只是壳：二进制放在按平台的包里（`translatex-linux-x
 | 需求 | 命令 |
 | --- | --- |
 | 模型在对话中翻译 | `translatex translate "…" -t <lang> --format json` |
-| 去掉机器味、改写 | `translatex roundtrip "…" --from <lang> --format json` |
+| 人性化改写 AI 味文字 | `translatex roundtrip "…" --from <lang> --preset llm --preserve @code --format json` |
 | 脚本、CI、pre-commit | 同一条 CLI，读 `text` |
 | 批量 | `translatex batch`（NDJSON 进、NDJSON 出） |
 | 查能力 | `translatex providers`、`translatex languages`、`translatex health` |

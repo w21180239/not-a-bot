@@ -27,37 +27,55 @@ translatex --version        # missing? npm install -g translatex, or cargo insta
 | The user wants | Run |
 | --- | --- |
 | Text in another language | `translatex translate "<text>" -t <lang> --format json` |
-| The same language, less machine cadence | `translatex roundtrip "<text>" --from <lang> --format json` |
+| The same language, humanised (AI-sounding prose rewritten to read like a person) | `translatex roundtrip "<text>" --from <lang> --preset llm --preserve @code --format json` |
+| The same language, quickly and with no subscription | `translatex roundtrip "<text>" --from <lang> --format json` (default `mt`) |
 | Many strings | `translatex batch --file jobs.ndjson --format json` |
 | To know what can serve a pair | `translatex providers --format json` |
 | To know whether anything is broken | `translatex health --format json` |
 
 Read `text` from the JSON. `provider` and `detectedSource` tell you what actually
-happened.
+happened. A round trip also returns `chain`, `hops`, `missingFacts` and
+`warnings`.
 
 ## Choosing the order
 
 | Task | Do |
 | --- | --- |
 | Translate into language L | `translate -t L` |
-| De-AI text that is already in L | `roundtrip --from L` |
-| Translate into L **and** de-AI it | `translate -t L` first, then `roundtrip --from L` on the result |
+| Humanise text that is already in L | `roundtrip --from L --preset llm` |
+| Translate into L **and** humanise it | `translate -t L` first, then `roundtrip --from L --preset llm` on the result |
 
-`roundtrip` returns text in the language it started from, so it can only de-AI
+`roundtrip` returns text in the language it started from, so it can only humanise
 the target language once the text is already in it.
+
+## Choosing the preset
+
+| Goal | Preset | Cost |
+| --- | --- | --- |
+| Humanise AI-sounding prose (default choice) | `--preset llm` | One LLM hop out and one back on the user's Claude or OpenCode subscription, 8 to 14 s |
+| Maximum rewriting | `--preset lynote-fix` | About 25 s; LLM hops, machine-translation hops, then a repair hop |
+| Speed, or no subscription | `mt` (default), `mt-deep` | Free, about 1 s; changes words, keeps sentence structure |
+
+`claude-cli` and `opencode-cli` run the local CLI, need no API key and never join
+the automatic chain; `roundtrip_llm` (default `opencode-cli`) picks the engine for
+`llm` and `lynote`. Measured on 10 texts, one run: `mt` left 5 of 10 structural
+tells and lost 5 facts; `llm` left 0 and lost 0; `lynote-fix` left 0 or 1 and
+lost 1. No preset makes text undetectable by AI detectors; do not promise that.
 
 ## The boundary: wording versus content
 
-`roundtrip` rewrites wording. It keeps the sentences. An opener like "In
-today's fast-paced digital landscape", a hedge like "it's important to note",
-and a scaffold like "not just X but Y" are content: they survive translation
-into every language, so a round trip preserves them.
+The machine-translation presets (`mt`, `mt-deep`, `--depth`, `--pivot`) rewrite
+wording and keep the sentences. An opener like "In today's fast-paced digital
+landscape", a hedge like "it's important to note", and a scaffold like "not just
+X but Y" survive them in every language. The LLM presets (`llm`, `lynote`,
+`lynote-fix`) rebuild the sentences and remove most of these.
 
 When the user asks for that filler to be gone:
 
-1. Delete those clauses yourself.
-2. Run the tool on what remains.
-3. Say which sentences you removed.
+1. Prefer an LLM preset.
+2. With a machine-translation preset, delete those clauses yourself first, run the
+   tool on what remains, and say which sentences you removed.
+3. Check the result for tells that are still there and report them.
 
 Presenting an edited text as a straight translation hides a decision the user
 did not see.
@@ -66,27 +84,39 @@ did not see.
 
 1. **Identify the operation and the order** from the table above.
 2. **Protect what must not change.** Code, identifiers, paths, URLs and version
-   strings go through `--preserve`:
+   strings go through `--preserve`. Use the named patterns `@code` (inline and
+   fenced code) and `@url`; on Windows a regex such as `` `[^`]*` `` loses its `^`
+   when a program spawns the npm `.cmd` shim without a shell. Add a regex for
+   anything else:
 
    ```bash
    translatex translate "Run \`make test\` before pushing to v2.4.0." -t zh \
-     --preserve '`[^`]*`' --preserve 'v[0-9]+\.[0-9]+\.[0-9]+' --format json
+     --preserve @code --preserve 'v[0-9]+\.[0-9]+\.[0-9]+' --format json
    ```
 
 3. **Run it.** One command. Do not pre-split the text unless it exceeds the
    provider limit shown by `providers`.
-4. **Report.** Give the final text, name the provider when it matters, and
-   disclose any sentences you removed. Add `--verbose` only when debugging a
-   failure.
+4. **Check and report.** Give the final text, name the provider when it matters,
+   and disclose any sentences you removed. After a round trip read `missingFacts`
+   (names, numbers, IDs, URLs and code spans of the source that are absent from
+   the result) and `warnings` (`fact check:`, `preserve:`, engine fallback), and
+   tell the user about every entry. If `missingFacts` is not empty, restore the
+   token by hand or re-run with `--preset lynote-fix`, whose repair hop restores
+   lost facts. Add `--verbose` only when debugging a failure.
 
 ## Round trip options
 
+- `--preset mt|mt-deep|llm|lynote|lynote-fix`, `--depth 1-3` (machine translation only), `--chain "<[engine:]lang,...>"`, `--pivot <lang>`. First match wins in that order, then the configured `roundtrip_preset` (default `mt`, two machine-translation hops).
 - Default pivot: Chinese for non-Chinese text, English for Chinese text.
 - `--pivot ja` rewrites as strongly and keeps more grammar; the better choice
   for technical English that must stay precise.
+- A third machine-translation hop (`mt-deep`) loses more facts than it gains in
+  rewriting; prefer `llm` over it.
 - **Never round-trip** legal text, contracts, API reference, configuration,
-  error messages, or numbers and names the user will check: the second hop
-  paraphrases by design.
+  error messages, or numbers and names the user will check: every hop
+  paraphrases by design. The fact guard lists what went missing; it does not
+  make such text safe, and it checks names only in Latin-script text and can
+  miss a name that doubles as a common sentence-starting word.
 
 ## Errors
 
@@ -112,13 +142,16 @@ Retry only when `retryable` is `true`.
 | --- | --- |
 | "It's one short sentence, faster to translate myself" | The tool answers in ~300 ms and the user gets a provider they can audit. |
 | "I'll paraphrase to remove the AI tone" | Deleting filler *before* translating is editing; inventing the translation is not. Do the first, never the second. |
-| "Roundtrip will remove the AI opener" | It rewrites wording and keeps sentences. Delete the opener or report that it is still there. |
+| "Roundtrip will remove the AI opener" | Machine-translation presets keep the sentences. Use `--preset llm`, or delete the opener and report that you did. |
+| "`missingFacts` is empty, so the text is safe" | It is a heuristic. For numbers and names the user will check, do not round-trip. |
+| "The text now passes AI detectors" | Nothing here measures or promises that. Say the text reads more like a person wrote it, and stop there. |
 | "The user didn't ask for a command" | They asked for a translation. The command is how this workspace produces one. |
 
 ## Red flags
 
 - You are about to type the translated sentence yourself.
-- You are claiming `roundtrip` removed a sentence it cannot remove.
+- You are claiming a machine-translation `roundtrip` removed a sentence it cannot remove.
+- You are ignoring `missingFacts` or `warnings` in a round-trip result.
 - You are deleting clauses and presenting the result as a straight translation.
 - You are sending code, paths or identifiers without `--preserve`.
 - You are retrying an error whose `retryable` is `false`.

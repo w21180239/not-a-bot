@@ -48,6 +48,11 @@ pub struct Settings {
     pub race_width: Option<usize>,
     /// Default pivot for `roundtrip` when the request says `auto`.
     pub roundtrip_pivot: Option<String>,
+    /// Default `roundtrip` preset when the request names no chain, preset,
+    /// depth or pivot (`mt`, `mt-deep`, `llm`, `lynote`).
+    pub roundtrip_preset: Option<String>,
+    /// Engine behind the LLM hops of the `llm` and `lynote` presets.
+    pub roundtrip_llm: Option<String>,
     pub log: Option<String>,
     /// provider -> extra knobs (base_url, model, instance, ...).
     pub provider: BTreeMap<String, ProviderSettings>,
@@ -61,6 +66,8 @@ pub struct ProviderSettings {
     pub region: Option<String>,
     pub instance: Option<String>,
     pub tier: Option<String>,
+    /// Executable path for CLI-backed providers (`claude-cli`, `opencode-cli`).
+    pub bin: Option<String>,
 }
 
 impl Settings {
@@ -100,6 +107,12 @@ impl Settings {
         if let Ok(v) = std::env::var("TRANSLATEX_ROUNDTRIP_PIVOT") {
             self.roundtrip_pivot = Some(v);
         }
+        if let Ok(v) = std::env::var("TRANSLATEX_ROUNDTRIP_PRESET") {
+            self.roundtrip_preset = Some(v);
+        }
+        if let Ok(v) = std::env::var("TRANSLATEX_ROUNDTRIP_LLM") {
+            self.roundtrip_llm = Some(v);
+        }
         self
     }
 
@@ -131,6 +144,24 @@ impl Settings {
             .as_deref()
             .map(|p| p.trim().to_lowercase())
             .filter(|p| !p.is_empty() && p != "auto")
+    }
+
+    /// Preset used when a roundtrip request asks for nothing specific.
+    pub fn roundtrip_preset(&self) -> String {
+        self.roundtrip_preset
+            .as_deref()
+            .map(|p| p.trim().to_lowercase())
+            .filter(|p| !p.is_empty())
+            .unwrap_or_else(|| "mt".to_string())
+    }
+
+    /// Engine for preset LLM hops.
+    pub fn roundtrip_llm(&self) -> String {
+        self.roundtrip_llm
+            .as_deref()
+            .map(|p| p.trim().to_lowercase())
+            .filter(|p| !p.is_empty())
+            .unwrap_or_else(|| "opencode-cli".to_string())
     }
 
     pub fn provider(&self, name: &str) -> ProviderSettings {
@@ -171,10 +202,19 @@ pub const CONFIG_TEMPLATE: &str = r#"# translatex config
 # retries = 2
 # race_width = 3   # provider attempts in flight; 1 is strictly sequential
 # roundtrip_pivot = "zh"   # "auto" picks zh for non-Chinese text, en for Chinese
+# roundtrip_preset = "mt"  # mt (2 MT hops) | mt-deep (3) | llm | lynote | lynote-fix
+# roundtrip_llm = "opencode-cli"   # engine for preset LLM hops: opencode-cli | claude-cli
 # log = "warn"
 
 # [provider.googlecloud]
 # region = "global"
+
+# [provider.claude-cli]
+# model = "haiku"
+# bin = "C:/Users/me/.local/bin/claude.exe"   # default: resolved on PATH
+
+# [provider.opencode-cli]
+# model = "opencode-go/deepseek-v4.1-flash"
 
 # [provider.llm]
 # base_url = "https://api.openai.com/v1"

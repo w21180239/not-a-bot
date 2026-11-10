@@ -2,17 +2,17 @@
 
 # translatex
 
-**Free translation for your agent — one command, no API key, no signup, no config.**
+**Humanize AI-sounding text from the command line. Translation for your agent too: one binary, no API key.**
 
-A single 6 MB binary with 26 translation engines, raced in parallel. JSON out, typed errors in, and one skill file that 24 coding agents can install with a copy.
+Rewrite AI-generated text so it reads like a person wrote it, using your own Claude or OpenCode subscription. Names, numbers and code stay intact, and translatex tells you if anything went missing. The same 6 MB binary translates through 28 engines, 14 of them free web endpoints that need no key, and ships one skill file that 24 coding agents can install with a copy.
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
-[![Tests](https://img.shields.io/badge/tests-245-brightgreen.svg)](#development)
-[![Providers](https://img.shields.io/badge/providers-26-blueviolet.svg)](#provider-matrix)
+[![Tests](https://img.shields.io/badge/tests-302-brightgreen.svg)](#development)
+[![Providers](https://img.shields.io/badge/providers-28-blueviolet.svg)](#provider-matrix)
 [![Binary](https://img.shields.io/badge/binary-6%20MB-lightgrey.svg)](#install)
 [![Agent-native](https://img.shields.io/badge/agent--native-JSON-purple.svg)](#supported-harnesses)
 
-`translatex translate "Hello world" -t zh`
+`translatex roundtrip "<AI-sounding text>" --from en --preset llm`
 
 [English](./README.md) · [简体中文](./README.zh-cn.md) · [Русский](./README.ru.md) · [Docs](./docs/README.md)
 
@@ -22,12 +22,16 @@ A single 6 MB binary with 26 translation engines, raced in parallel. JSON out, t
 
 ## Contents
 
+- [What you get](#what-you-get)
+- [Before and after](#before-and-after)
+- [Which preset?](#which-preset)
+- [Measured results](#measured-results)
 - [Why translatex](#why-translatex)
 - [Features](#features)
 - [Install](#install)
 - [Quick start](#quick-start)
 - [Supported harnesses](#supported-harnesses)
-- [Round trip: de-AI prose](#round-trip-de-ai-prose)
+- [Round trip: how it works](#round-trip-how-it-works)
 - [Provider matrix](#provider-matrix)
 - [Live channel status](#live-channel-status)
 - [Configuration](#configuration)
@@ -36,21 +40,117 @@ A single 6 MB binary with 26 translation engines, raced in parallel. JSON out, t
 - [Documentation](#documentation)
 - [Development](#development)
 
+## What you get
+
+A humanizer for AI-generated text and a free translation CLI, in one binary.
+
+- **Humanize AI text.** `translatex roundtrip` rewrites AI-sounding prose (stock openers, "not just X, it's Y", "it's worth noting") so it reads like a person wrote it. It runs on your own Claude Code or OpenCode subscription: no API key and no extra bill. Under the hood it is back-translation done by an LLM, out through another language and back, rewritten on both hops.
+- **A free round trip.** The default preset goes through free web engines and costs nothing. It changes the words and keeps the sentence structure, so it is the quick option and the lighter rewrite.
+- **Facts stay put.** Names, numbers, IDs, URLs and code are checked against the source after every round trip. Anything that went missing is listed in `missingFacts`, with a warning.
+- **A repair pass.** `lynote-fix` adds a last hop in which the LLM proposes small edits. translatex applies only exact, small ones, so the rewrite stays and lost facts come back.
+- **Translation for agents.** `translatex translate` races up to three free engines (Google, Edge, Papago, Sogou and more), answers in JSON and returns typed errors. No signup, no config.
+- **No claim about AI detectors.** The goal is prose that reads like a person wrote it, with the facts intact. No method makes text reliably undetectable, and translatex does not promise it.
+
+If you are looking for an AI humanizer, a de-AI tool, a way to remove AI tone or to rewrite AI-generated text from a script or a coding agent, this is a CLI that Claude Code, Codex, OpenCode, Cursor and 20 more harnesses can call, with DeepSeek, Haiku or whichever model your subscription offers doing the rewriting.
+
+## Before and after
+
+Input, an AI-flavoured paragraph with a name and a number:
+
+```
+In today's fast-paced landscape, Aroha's team isn't just shipping a feature, they're fundamentally transforming how 4,200 customers manage their invoices. It's worth noting that this comprehensive solution leverages cutting-edge automation to empower finance teams and unlock their full potential.
+```
+
+```bash
+translatex roundtrip "<the paragraph above>" --from en --preset llm --format json
+```
+
+Output of `--preset llm` (OpenCode CLI with DeepSeek, 31 s for the two hops), one run on 2026-11-11, trimmed to the main fields:
+
+```json
+{
+  "text": "Aroha's team is doing more than shipping one feature: they're changing how 4,200 customers manage their invoices. Automation takes the manual work off finance teams, so their time goes to work that's worth more.",
+  "chain": ["zh", "en"],
+  "hops": [
+    {"from": "en", "to": "zh", "provider": "opencode-cli", "text": "Aroha 的团队正在做的，是让 4,200 家客户换一种方式管理发票，这次不只是上线一个功能。方案用自动化替财务团队省下手工活，让他们的时间用在更有价值的地方。", "latencyMs": 11027},
+    {"from": "zh", "to": "en", "provider": "opencode-cli", "text": "Aroha's team is doing more than shipping one feature: they're changing how 4,200 customers manage their invoices. Automation takes the manual work off finance teams, so their time goes to work that's worth more.", "latencyMs": 20508}
+  ],
+  "missingFacts": [],
+  "latencyMs": 31544
+}
+```
+
+The opener, the hedge and the buzzwords are gone, and Aroha and 4,200 survived. One contrast ("more than shipping one feature") stayed, so the result is a better first draft, and a human edit can still improve it.
+
+The same paragraph through the default `mt` preset (two free machine-translation hops, 1.0 s), one run on 2026-11-11:
+
+```json
+{
+  "text": "In today's fast-paced environment, the Araha team is not just releasing features—they are fundamentally changing how their 4,200 customers manage their invoices. Notably, this integrated solution leverages cutting-edge automation technologies to empower finance teams and maximize their potential.",
+  "chain": ["zh", "ja", "en"],
+  "missingFacts": ["Aroha"],
+  "warnings": ["fact check: missing Aroha"]
+}
+```
+
+Machine translation changed words and kept every sentence. "Not just X" and "in today's" survived, and the name came back as Araha. The fact guard caught it.
+
+## Which preset?
+
+| Preset | What it does | Rewrite strength | Speed | Facts lost (10 texts) | Needs |
+| --- | --- | --- | --- | --- | --- |
+| `mt` (default) | Two machine-translation hops (en to zh to ja to en) | Light: words change, sentences stay | about 1 s | 5 | nothing |
+| `mt-deep` | Three machine-translation hops | A little more, and more drift | about 1 s | 8 | nothing |
+| `llm` | LLM out and back; both hops "translate and rewrite like a person" | Removes the structural tells | 8 to 14 s | 0 | Claude or OpenCode subscription |
+| `lynote` | LLM to zh, LLM to ja, google to fi, edge back | Strongest rewrite | about 20 s | 3 to 5 | subscription |
+| `lynote-fix` | `lynote` plus a repair hop | Strong, with lost facts restored | about 25 s | 1 | subscription |
+
+Pick `llm` to humanise prose, `lynote-fix` for the most rewriting, and `mt` when speed or a zero-cost run matters more. Add `--preserve @code --preserve @url` when the text holds code or links. `lynote` follows the ordering published by [lynote-ai/humanize-text](https://github.com/lynote-ai/humanize-text).
+
+## Measured results
+
+Run on 2026-11-11: 10 texts, one run per configuration (5 AI-flavoured English, 3 fact-heavy workplace English, 2 Chinese). Script and corpus: [`benches/roundtrip-depth/`](./benches/roundtrip-depth/README.md).
+
+| Configuration | Word overlap with source | Tells left (of 10) | Facts missing | Latency |
+| --- | --- | --- | --- | --- |
+| mt, 1 hop (old default) | 0.556 | 7 | 5 | 0.5 s |
+| mt, 2 hops (new default) | 0.520 | 5 | 5 | 0.9 s |
+| mt-deep, 3 hops | 0.480 | 6 | 8 | 1.1 s |
+| llm via opencode-cli (DeepSeek) | 0.446 | 0 | 0 | 14 s |
+| llm via claude-cli (Haiku) | 0.535 | 0 | 0 | 8 s |
+| lynote via claude-cli / opencode-cli | 0.292 / 0.307 | 1 / 0 | 5 / 3 | 19 / 21 s |
+| lynote-fix via claude-cli / opencode-cli | 0.369 / 0.396 | 0 / 1 | 1 / 1 | 24 / 28 s |
+
+Overlap is content-word Jaccard; lower means more rewriting. Tells are structural AI patterns ("not just/only X", "more than just", "it's worth noting", "in today's", "at its core", 不仅, 更是, 值得注意, 当今). Facts missing counts the names, numbers, IDs and code spans the guard reported as absent.
+
+What the data shows:
+
+- Machine translation changes words and keeps sentence structure, so "not just X, it's Y" survives every machine-translation depth.
+- Even one machine-translation hop respells names (Aroha to Aloha, Tom to Tomi) and expands codes (NZD to "New Zealand dollars").
+- A third machine-translation hop costs more facts than it gains in rewriting, so the default is two hops.
+- LLM hops remove the structural tells and kept every fact on this corpus.
+- Machine-translation hops placed after an LLM hop can bring a foil back ("ei ainoastaan ... vaan myös" returned as "not only ... but also"), which is why `lynote` keeps a few.
+- The repair hop cut `lynote`'s fact loss from 3 to 5 down to 1 and kept most of the rewrite.
+- Earlier finding (2026-11-04): German, French and Spanish pivots barely rewrite; Chinese and Japanese rewrite most. See [docs/en/roundtrip/01-pivot-choice.md](./docs/en/roundtrip/01-pivot-choice.md).
+
+Caveats: 10 texts and one run is a small sample; the tell list and the fact guard are heuristics; overlap rewards change, not quality. Nothing here measures AI detectors.
+
 ## Why translatex
 
 | Why it gets picked | What that means |
 | --- | --- |
-| **Free, not a trial** | 14 public endpoints — Google Translate, Bing/Edge, Papago, Reverso, Sogou and more — need no key, no account and no quota sheet. |
+| **Humanizes with your subscription** | `claude-cli` and `opencode-cli` run `claude -p` and `opencode run` on the plan you already pay for. No API key, no new account. |
+| **Facts checked** | Every round trip lists the names, numbers, IDs, URLs and code spans that did not make it back. |
+| **Free, not a trial** | 14 public endpoints (Google Translate, Bing/Edge, Papago, Reverso, Sogou and more) need no key, no account and no quota sheet. |
 | **Zero config** | Install and translate. Config files exist for pinning providers and adding keys, not for getting started. |
 | **Fast by construction** | Up to three providers race; the first good answer wins and the rest are cancelled, so a hung endpoint cannot stall the request. |
 | **Agent-native** | JSON or NDJSON on stdout, logs on stderr, exit codes, typed errors with `retryable` and `suggestedAction`, and a `manifest` that lists every operation. |
 | **No MCP server** | The integration is the CLI plus one skill document: no process, no port, no protocol handshake, nothing to keep in sync. |
-| **De-AI prose** | `roundtrip` sends text out through a pivot language and back, so stock machine phrasing cannot survive the trip. |
 | **Grows with your keys** | Add DeepL, Azure, Google Cloud, Baidu, Tencent and four more when you need an SLA; keys rotate and cool down on their own. |
 | **Nothing to host** | One static binary, 6 MB, no runtime, no Docker, no database. Laptop, CI runner or container. |
-| **Code survives** | Regex spans — code, identifiers, URLs, version strings — are masked before translation and restored after; a corrupted restore fails the hop instead of shipping. |
+| **Code survives** | Regex spans, or the named patterns `@code` and `@url`, are masked before machine translation and restored after; a corrupted restore fails the hop instead of shipping. |
 
-Drop-in for shell scripts, CI pipelines and coding agents. If you were about to sign up for a translation API, start here.
+Drop-in for shell scripts, CI pipelines and coding agents. If you were about to sign up for a translation API, or to paste AI text into a rewriting site, start here.
 
 ### How the chain works
 
@@ -58,6 +158,7 @@ Drop-in for shell scripts, CI pipelines and coding agents. If you were about to 
 request ─▶ priority 1-12  free public endpoints     (no keys, no signup)
         ─▶ priority 20-27 official APIs             (only if credentials exist)
         ─▶ priority 40-42 LLM providers             (last resort, opt-in)
+        ─▶ priority 60-61 claude-cli, opencode-cli  (local agent CLIs, only when named)
 ```
 
 Lower number means tried earlier. Every hop is recorded, so a failure names the engines that were consulted and why each one declined.
@@ -66,12 +167,14 @@ Lower number means tried earlier. Every hop is recorded, so a failure names the 
 
 | Capability | What you get |
 | --- | --- |
-| **26 providers** | 14 free web endpoints, 9 official APIs, 3 LLM providers. LibreTranslate is opt-in via `base_url`. |
+| **Humanize / de-AI** | `roundtrip` goes out through one or more hops and back. Machine-translation hops are free; LLM hops rebuild the sentences. Presets `mt`, `mt-deep`, `llm`, `lynote`, `lynote-fix`, or your own `--chain`. |
+| **Fact guard** | `missingFacts` and a warning after every round trip: names, numbers, IDs, URLs and code that the result lost. |
+| **Repair hop** | `<llm>:fix` asks the LLM for small edits and applies only exact ones. Lost facts always come back; other edits share a budget so the original cannot be copied back. |
+| **28 providers** | 14 free web endpoints, 9 official APIs, 5 LLM providers (OpenAI, Anthropic, DeepSeek, and the local `claude-cli` and `opencode-cli`). LibreTranslate is opt-in via `base_url`. |
 | **Fallback chain** | Ordered by priority; up to three providers in flight at once, so a hung endpoint cannot hide the healthy ones behind it. Explicit `--fallback` order is preserved. |
-| **Round trip** | `roundtrip` translates out through a pivot language and back, which rewrites machine-flavoured prose. Pivot measured, defaults to zh for non-Chinese and en for Chinese. |
 | **Key rotation** | Several credentials per provider, round-robin, with cooldowns shared across processes through `~/.config/translatex/cache/`. |
 | **Structured output** | JSON or NDJSON on stdout, logs on stderr, exit codes an agent can branch on. |
-| **Preserve patterns** | Regex spans (code, variables, URLs) are masked before translation and restored after; a corrupted restore triggers fallback. |
+| **Preserve patterns** | Regex spans or `@code` and `@url` are masked before machine translation and restored after; LLM hops get the spans listed and are checked afterwards. |
 | **24 harnesses** | Claude Code, Codex, Cursor, Zed and 20 more read one skill or instructions block; no server to run. Paths: [integrations/](./integrations/README.md). |
 | **Timeouts that hold** | `timeoutMs` from the request (or `timeout_ms` in config) caps the whole provider call, not just the socket read. |
 | **Honest errors** | `code`, `retryable`, `retryAfterSecs`, `suggestedAction` on every failure. |
@@ -111,9 +214,12 @@ translatex translate "Guten Tag" -s de -t en
 translatex batch --file examples/batch.ndjson --parallel 4
 
 # Keep code spans intact
-translatex translate 'Run `make test` before pushing.' -t zh --preserve '`[^`]*`'
+translatex translate 'Run `make test` before pushing.' -t zh --preserve @code
 
-# Strip the machine cadence: out through Chinese, back to English
+# Humanize AI-sounding text: LLM out through Chinese and back (your Claude or OpenCode subscription)
+translatex roundtrip "In today's fast-paced landscape, it's important to note that …" --from en --preset llm --preserve @code
+
+# Free and fast: two machine-translation hops, then read missingFacts
 translatex roundtrip "In today's fast-paced landscape, it's important to note that …" --from en
 ```
 
@@ -216,43 +322,34 @@ Agents that prefer a command reference over a skill can call the CLI directly:
 | Command | Purpose |
 | --- | --- |
 | `translatex translate "…" -t zh --format json` | One translation |
-| `translatex roundtrip "…" --from en --format json` | Out through a pivot and back |
+| `translatex roundtrip "…" --from en --preset llm --format json` | Humanize: out through one or more hops and back |
 | `translatex providers --format json` | What can serve this machine |
 | `translatex health --format json` | Probe every configured provider |
 
-## Round trip: de-AI prose
+## Round trip: how it works
 
-Translating out through a language with different syntax and back forces the text
-to be rebuilt, so the result loses the stock phrasing that makes model output
-recognisable. It is one command, not a prompt:
+`roundtrip` translates text out through one or more hops and back into the source language. Translating into a language with different syntax forces the text to be rebuilt, so the stock phrasing of generated text does not come back unchanged. Machine-translation hops do that as a side effect; LLM hops are told to translate and rewrite like a person.
 
 ```bash
-translatex roundtrip "Our comprehensive solution leverages cutting-edge technology to empower teams." --from en --format json
+translatex roundtrip "<text>" --from en --preset llm --preserve @code --format json
+translatex roundtrip "<text>" --from en --depth 3                    # zh, ja, fi, back; machine translation only
+translatex roundtrip "<text>" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
+translatex roundtrip --from en --pivot ja < draft.md                 # alias: translatex polish
 ```
 
-```json
-{
-  "text": "Our integrated solutions use cutting-edge technology to give teams more power.",
-  "detectedSource": "en",
-  "pivotLang": "zh",
-  "pivotText": "我们综合的解决方案利用尖端技术来增强团队的能力。",
-  "provider": "google",
-  "providers": ["google", "edge"],
-  "latencyMs": 612,
-  "requestId": "…",
-  "chars": 82
-}
-```
+- **Choosing hops.** First match wins: `--chain "<[engine:]lang,...>"`, `--preset <name>`, `--depth 1-3`, `--pivot <lang>`, then `roundtrip_preset` in the config (default `mt`). A final hop back to the source is appended when a chain lacks one.
+- **LLM providers.** `claude-cli` runs `claude -p` on your Claude subscription (default model haiku); `opencode-cli` runs `opencode run` on your OpenCode quota (default model `opencode-go/deepseek-v4.1-flash`). They need no key, take seconds per hop, and run only when named: `auto` never picks them. `roundtrip_llm` (default `opencode-cli`) chooses the engine for the `llm` and `lynote` presets.
+- **Anchored to the original.** LLM hops also receive the source text and repair meaning that earlier machine-translation hops lost, with the smallest change, before rewriting.
+- **Repair hop.** `<llm>:fix` returns a JSON list of small edits (`from`, `to`, `why`). translatex applies only exact, small ones. Edits that restore a missing fact always apply; other edits share a small budget, so the hop cannot copy the original back. The hop reports each edit under `edits` with `kind` (`fact` or `meaning`), `applied` and `reason`.
+- **Fact guard.** `missingFacts` lists the names, numbers, IDs, code spans and URLs of the source that the result lacks (numbers compared by digits, names as whole words), and a `fact check:` warning is added. A name that doubles as a common sentence-starting word can slip through.
+- **Preferred engines.** A named machine-translation engine is preferred, not pinned. On a retryable error (rate limit, timeout, network, quota) the hop falls back to another engine, avoiding the neighbouring hops' engines, with a warning. LLM hops never fall back.
+- **Placeholders.** Machine-translation hops mask protected spans. LLM hops get the spans as-is, listed in the prompt, and a dropped span adds a warning.
 
-The default pivot is Chinese for non-Chinese text and English for Chinese text.
-That pair was chosen by measurement: German, French and Spanish round-trip
-almost verbatim, Japanese rewrites as strongly as Chinese, and Russian rewrites
-the most but drifts the most. Use `--pivot ja` for technical English that has to
-stay precise, and never round-trip legal text, API docs or anything with numbers
-you cannot verify. Evidence and method: [docs/en/roundtrip/01-pivot-choice.md](./docs/en/roundtrip/01-pivot-choice.md).
+Use `--preserve @code` and `--preserve @url` rather than a regex such as `` `[^`]*` ``: on Windows the npm `.cmd` shim runs through cmd.exe, which strips `^` when Python or Node spawns translatex without a shell.
 
-It rewrites wording and keeps sentences: an AI opener or hedge survives every
-language, so delete those clauses before translating and tell the user you did.
+Response fields: `text`, `detectedSource`, `chain` (languages visited), `hops` (`from`, `to`, `provider`, `text`, `latencyMs`, and `edits` for a repair hop), `provider` (final hop), `missingFacts`, `warnings`, `latencyMs`, `requestId`, `chars`.
+
+Never round-trip legal text, API reference, configuration or numbers the reader will check; every hop paraphrases, and the fact guard is a heuristic. Chains, presets and the edit contract: [docs/en/roundtrip/02-chains-presets-and-llm.md](./docs/en/roundtrip/02-chains-presets-and-llm.md). Measurements and method: [docs/en/roundtrip/01-pivot-choice.md](./docs/en/roundtrip/01-pivot-choice.md).
 
 ## Provider matrix
 
@@ -299,6 +396,10 @@ Priorities are the numbers the chain sorts by. `chars` is the request limit the 
 | 40 | OpenAI | `openai` | `api_key`, optional `base_url`, `model` |
 | 41 | Anthropic | `anthropic` | `api_key`, optional `model` |
 | 42 | DeepSeek | `deepseek` | `api_key`, optional `model` |
+| 60 | Claude Code CLI | `claude-cli` | none; runs `claude -p` on your Claude subscription, optional `model` (default haiku) and `bin` |
+| 61 | OpenCode CLI | `opencode-cli` | none; runs `opencode run` on your OpenCode quota, optional `model` (default `opencode-go/deepseek-v4.1-flash`) and `bin` |
+
+`claude-cli` and `opencode-cli` never join the automatic chain. They run when named: a `roundtrip` hop, a preset, `--provider` or `--fallback`.
 
 ## Live channel status
 
@@ -329,6 +430,8 @@ timeout_ms = 20000
 retries = 1
 race_width = 3
 roundtrip_pivot = "auto"
+roundtrip_preset = "mt"          # mt, mt-deep, llm, lynote, lynote-fix
+roundtrip_llm = "opencode-cli"   # or "claude-cli"; engine for the llm and lynote presets
 log = "warn"
 
 [provider.libretranslate]
@@ -337,6 +440,14 @@ base_url = "http://localhost:5000"
 [provider.openai]
 base_url = "https://api.openai.com/v1"
 model = "gpt-4o-mini"
+
+[provider.claude-cli]
+model = "haiku"
+bin = "claude"
+
+[provider.opencode-cli]
+model = "opencode-go/deepseek-v4.1-flash"
+bin = "opencode"
 ```
 
 `~/.config/translatex/credentials.toml`:
@@ -361,7 +472,7 @@ Resolution: `credentials.toml` labels are tried in file order, a `TRANSLATEX_<PR
 | Command | Purpose |
 | --- | --- |
 | `translate [TEXT]` | One request; reads stdin when text is omitted |
-| `roundtrip [TEXT]` | Out through a pivot language and back; strips machine cadence |
+| `roundtrip [TEXT]` | Out through one or more hops and back; humanizes AI-sounding text (`--chain`, `--preset`, `--depth`, `--pivot`) |
 | `batch` | NDJSON in, NDJSON out, order preserved |
 | `providers` | Capability and configuration state per provider |
 | `languages` | Canonical codes, or one provider's advertised set |
@@ -401,14 +512,15 @@ Full reference: [docs/en/api/OVERVIEW.md](./docs/en/api/OVERVIEW.md).
 | --- | --- |
 | English | [docs/en/OVERVIEW.md](./docs/en/OVERVIEW.md) |
 | 简体中文 | [docs/zh-cn/OVERVIEW.md](./docs/zh-cn/OVERVIEW.md) |
-| Round trip and pivot choice | [docs/en/roundtrip/OVERVIEW.md](./docs/en/roundtrip/OVERVIEW.md) |
+| Round trip: overview, chains and presets, measured results | [docs/en/roundtrip/OVERVIEW.md](./docs/en/roundtrip/OVERVIEW.md) |
+| Bench script and results | [benches/roundtrip-depth/README.md](./benches/roundtrip-depth/README.md) |
 | Harness setup | [integrations/README.md](./integrations/README.md) |
 | Agent integration | [AGENTS.md](./AGENTS.md) |
 
 ## Development
 
 ```bash
-cargo test                # 245 tests
+cargo test                # 302 tests
 cargo build --release     # ~5 min with LTO
 cargo clippy --all-targets
 ```

@@ -1,12 +1,15 @@
+pub mod chain;
 pub mod config;
 pub mod creds;
 pub mod crypto;
 pub mod engine;
 pub mod error;
+pub mod facts;
 pub mod http;
 pub mod keys;
 pub mod lang;
 pub mod preserve;
+pub mod repair;
 pub mod types;
 
 pub use config::{

@@ -44,7 +44,7 @@ ZCode, QwenPaw — with the file path for each is
 | Need | Command |
 | --- | --- |
 | Model translates mid-conversation | `translatex translate "…" -t <lang> --format json` |
-| Model removes machine cadence | `translatex roundtrip "…" --from <lang> --format json` |
+| Model humanises AI-sounding text | `translatex roundtrip "…" --from <lang> --preset llm --preserve @code --format json` |
 | Script, CI, pre-commit | same CLI, parse `text` |
 | Bulk | `translatex batch` (NDJSON in, NDJSON out) |
 | Capability discovery | `translatex providers`, `translatex languages`, `translatex health` |

@@ -1,0 +1,176 @@
+**English** · [简体中文](../../zh-cn/roundtrip/02-chains-presets-and-llm.md)
+
+# Round trip — Chains, presets and LLM hops
+
+[← Domain overview](OVERVIEW.md) · [Documentation index](../README.md)
+
+A round trip is a list of hops. Machine translation changes the words and keeps
+the sentence structure; an LLM hop can rebuild the sentences. A chain mixes the
+two, and presets are chains that were measured and named.
+
+## How a chain works
+
+A hop is `[engine:]lang`. A chain is a comma-separated list of hops, in any
+order of engines and languages:
+
+```bash
+translatex roundtrip "<text>" --from en --chain "opencode-cli:zh,google:ja,edge:en"
+```
+
+- No engine in a hop: the automatic provider chain serves it (up to `race_width` providers race).
+- A named engine: that engine is preferred for the hop (see [preferred engines](#preferred-engines-and-fallback)).
+- The result must end in the source language. When the last hop is not the source, a final hop back to it is appended.
+- `<llm>:fix` is a repair hop. It stays in the current language (see [the repair hop](#the-repair-hop)).
+
+Shortcuts that expand to a chain:
+
+| Flag | Expands to |
+| --- | --- |
+| `--depth 1` | one machine-translation hop out through zh, then back |
+| `--depth 2` | zh, ja, back |
+| `--depth 3` | zh, ja, fi, back |
+| `--pivot ja` | one hop out through ja, then back |
+| `--preset <name>` | a named chain from the table below |
+
+Chinese sources use en instead of zh: depth 3 runs en, ja, fi, then back to Chinese.
+
+Precedence, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, then
+`roundtrip_preset` from the config (default `mt`).
+
+## Presets
+
+| Preset | Hops (English source) | Needs a subscription | Typical latency |
+| --- | --- | --- | --- |
+| `mt` (default) | zh, ja, en: two machine-translation hops out | no | about 1 s |
+| `mt-deep` | zh, ja, fi, en: three hops out | no | about 1 s |
+| `llm` | LLM to zh, LLM back to en; both hops "translate and rewrite like a person" | yes | 8 to 14 s |
+| `lynote` | LLM to zh, LLM to ja (previous step as history), google to fi, edge back to en | yes | about 20 s |
+| `lynote-fix` | `lynote` plus a final repair hop | yes | about 25 s |
+
+`lynote` follows the ordering published by
+[lynote-ai/humanize-text](https://github.com/lynote-ai/humanize-text). That
+project states that no method makes text reliably undetectable, and neither does
+translatex. The aim is prose that reads like a person wrote it, with the facts
+intact.
+
+Set the default in `config.toml`:
+
+```toml
+roundtrip_preset = "llm"       # default: mt
+roundtrip_llm = "claude-cli"   # default: opencode-cli
+```
+
+Environment: `TRANSLATEX_ROUNDTRIP_PRESET`, `TRANSLATEX_ROUNDTRIP_LLM`.
+
+## LLM providers and quota
+
+Two providers run a local agent CLI. They need no API key and use the
+subscription you already pay for:
+
+| Provider | Runs | Quota | Default model |
+| --- | --- | --- | --- |
+| `claude-cli` | `claude -p` | your Claude subscription | haiku |
+| `opencode-cli` | `opencode run` | your OpenCode quota | `opencode-go/deepseek-v4.1-flash` |
+
+```toml
+[provider.claude-cli]
+model = "haiku"
+bin = "claude"
+
+[provider.opencode-cli]
+model = "opencode-go/deepseek-v4.1-flash"
+bin = "opencode"
+```
+
+They are slower than a web endpoint (seconds per hop) and each hop spends a
+little quota. `auto` never picks them: they run only when named, in a chain hop,
+a preset or `--provider`.
+
+## What an LLM hop receives
+
+- The hop instruction: translate, and rewrite the way a person would.
+- In a round trip, the original text as well. The hop first repairs meaning that earlier machine-translation hops lost, with the smallest change that fixes it, then rewrites.
+- For a later LLM hop, the previous LLM hop as history.
+- The protected spans, as-is. An LLM hop gets no placeholders; the prompt lists the spans to keep, and translatex checks the output afterwards. A dropped span adds a `preserve: <provider> dropped <span>` warning. Machine-translation hops still mask spans.
+
+Name patterns instead of writing regexes: `--preserve @code` (inline and fenced
+code) and `--preserve @url`. On Windows the npm `.cmd` shim runs through
+cmd.exe, which strips `^` from a regex such as `` `[^`]*` `` when Python or Node
+spawns translatex without a shell. The named patterns avoid that.
+
+## The repair hop
+
+`<llm>:fix` (for example `opencode-cli:fix`, or the last hop of `lynote-fix`)
+leaves the text in its current language and asks the LLM for a JSON list of
+small edits instead of a new text:
+
+```json
+[{"from": "Aloha's team", "to": "Aroha's team", "why": "name respelled"}]
+```
+
+translatex applies an edit only when it is exact and small:
+
+- `from` must appear exactly once in the current text, must not be empty, and may be at most 40 characters or 25% of the text, whichever is larger.
+- `to` may be at most three times the length of `from` plus 80 characters.
+- Edits that restore a missing fact (a name, number or other token the guard lists) always apply and spend no budget.
+- All other edits (`kind: meaning`) share one budget: content-word overlap with the original may rise by at most 0.10 over the text after the fact edits. Many small edits together cannot copy the original back.
+
+Each hop reports what happened to every edit:
+
+```json
+"edits": [
+  {"from": "Aloha's team", "to": "Aroha's team", "why": "name respelled", "kind": "fact", "applied": true},
+  {"from": "…", "to": "…", "why": "…", "kind": "meaning", "applied": false, "reason": "copies the original back"}
+]
+```
+
+Skip reasons include `from not found`, `from not unique`, `no change`,
+`to too long for from` and `copies the original back`.
+
+The repair hop cut the fact loss of `lynote` from 3 to 5 facts to 1 on the
+corpus below, and kept most of the rewrite.
+
+## Fact guard
+
+Every round trip, whatever the chain, compares the result with the source and
+lists in `missingFacts` the tokens that are absent:
+
+- code spans, URLs, paths, ticket IDs, @mentions and numbers: always. Numbers compare by digits, so `18,900` matches `18900` and `4:50pm` matches `4:50 PM`.
+- capitalised names, when both texts are in Latin script: as whole words, so `Tomi` does not vouch for `Tom`. Mid-sentence names are case-sensitive. A sentence-initial name is checked case-insensitively unless it is a common sentence-starting word or also appears in lowercase in the source, so a name that doubles as such a word can slip through.
+
+A non-empty list also adds a `fact check: missing <list>` warning. The guard
+reports; it does not fix. Read it, then re-run with a repair hop or restore the
+token by hand.
+
+## Preferred engines and fallback
+
+A named machine-translation engine in a chain is preferred, not pinned. On a
+retryable error (`RATE_LIMITED`, `TIMEOUT`, `NETWORK_ERROR`,
+`QUOTA_EXHAUSTED`) the hop falls back to another engine from the automatic chain,
+avoiding the engines of the neighbouring hops, and adds a warning:
+
+```
+hop 2: edge failed (RATE_LIMITED), served by google
+```
+
+LLM hops never fall back: a different model would change the result, so a
+failure there is returned as the error.
+
+## When to use which
+
+| Situation | Choose |
+| --- | --- |
+| Humanise AI-sounding prose and keep the facts | `--preset llm` |
+| Maximum rewriting, and a few facts may need a repair pass | `--preset lynote-fix` |
+| No subscription, or speed matters | `mt` (default) |
+| Machine translation, a little more rewriting | `mt-deep`; fact loss rises faster than rewriting |
+| Text with code or URLs | add `--preserve @code --preserve @url` to any preset |
+| Legal text, contracts, numbers someone will check | do not round-trip |
+
+Read `missingFacts` and `warnings` after every run, and report them.
+
+## Navigation
+
+- ← [Round trip overview](OVERVIEW.md)
+- → [Choosing the pivot and depth](01-pivot-choice.md)
+- ↑ [Documentation index](../README.md)

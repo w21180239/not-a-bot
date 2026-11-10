@@ -11,7 +11,7 @@ stdout 只承载机器可读输出；日志、警告、进度都走 stderr，所
 | 命令 | 作用 | 详情 |
 | --- | --- | --- |
 | `translate` | 单条翻译，参数或 stdin | [01-commands.md](01-commands.md) |
-| `roundtrip` | 经中转语言往返，去掉机器味 | [01-commands.md](01-commands.md) |
+| `roundtrip` | 经多跳机器翻译或 LLM 往返，人性化改写 AI 味文字 | [01-commands.md](01-commands.md) |
 | `batch` | NDJSON 进、NDJSON 出 | [01-commands.md](01-commands.md) |
 | `providers` | 能力与配置状态 | [01-commands.md](01-commands.md) |
 | `languages` | 规范语言码或单个 Provider 的集合 | [01-commands.md](01-commands.md) |

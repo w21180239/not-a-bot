@@ -151,6 +151,36 @@ pub fn alternate_pivot(pivot: &str) -> &'static str {
     }
 }
 
+/// Language implied by the script of `text`, for providers that do not detect:
+/// kana -> ja, Hangul -> ko, Han -> zh, Cyrillic -> ru. `None` for Latin and
+/// anything else. A script counts when it covers at least 30% of the letters;
+/// any kana alongside Han means Japanese.
+pub fn detect_script(text: &str) -> Option<&'static str> {
+    let (mut han, mut kana, mut hangul, mut cyrillic, mut letters) = (0usize, 0, 0, 0, 0);
+    for c in text.chars().filter(|c| c.is_alphabetic()) {
+        letters += 1;
+        match c {
+            '\u{3040}'..='\u{30FF}' => kana += 1,
+            '\u{AC00}'..='\u{D7AF}' | '\u{1100}'..='\u{11FF}' => hangul += 1,
+            '\u{4E00}'..='\u{9FFF}' | '\u{3400}'..='\u{4DBF}' => han += 1,
+            '\u{0400}'..='\u{04FF}' => cyrillic += 1,
+            _ => {}
+        }
+    }
+    let share = |n: usize| letters > 0 && n * 10 >= letters * 3;
+    if kana > 0 && share(han + kana) {
+        Some("ja")
+    } else if share(hangul) {
+        Some("ko")
+    } else if share(han) {
+        Some("zh")
+    } else if share(cyrillic) {
+        Some("ru")
+    } else {
+        None
+    }
+}
+
 /// Per-provider override table builder: `map(&[("zh","zh-CN"), ...])`.
 pub fn map(entries: &[(&'static str, &'static str)]) -> HashMap<&'static str, &'static str> {
     entries.iter().copied().collect()
@@ -240,6 +270,17 @@ pub static BAIDU: std::sync::LazyLock<HashMap<&'static str, &'static str>> =
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn script_detection() {
+        assert_eq!(detect_script("这次更新很重要。"), Some("zh"));
+        assert_eq!(detect_script("今回の更新は重要です。"), Some("ja"));
+        assert_eq!(detect_script("이번 업데이트는 중요합니다."), Some("ko"));
+        assert_eq!(detect_script("Это обновление важно."), Some("ru"));
+        assert_eq!(detect_script("This update matters."), None);
+        assert_eq!(detect_script("12345"), None);
+        assert_eq!(detect_script("Aroha 需要 Tom 的批准"), Some("zh"));
+    }
 
     #[test]
     fn aliases_resolve_to_canonical() {

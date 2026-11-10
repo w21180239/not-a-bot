@@ -2,6 +2,36 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.2.0 — 2026-11-11
+
+### Added
+
+- `roundtrip` runs an N-hop chain. `--chain "<[engine:]lang,...>"` takes any order of engines and languages and appends a final hop back to the source when it is missing; `--depth 1-3` runs a machine-translation-only chain through zh, ja and fi (Chinese sources go en, ja, fi); `--preset <name>` selects `mt`, `mt-deep`, `llm`, `lynote` or `lynote-fix`. Precedence: chain, preset, depth, pivot, then config `roundtrip_preset`.
+- Two providers that run a local agent CLI and need no API key: `claude-cli` (`claude -p`, your Claude subscription, default model haiku) and `opencode-cli` (`opencode run`, your OpenCode quota, default model `opencode-go/deepseek-v4.1-flash`). Configure `model` and `bin` under `[provider.claude-cli]` and `[provider.opencode-cli]`. They run only when named and are never picked by `auto`.
+- Config `roundtrip_preset` (default `mt`), `roundtrip_llm` (default `opencode-cli`; alternative `claude-cli`), and the environment variables `TRANSLATEX_ROUNDTRIP_PRESET` and `TRANSLATEX_ROUNDTRIP_LLM`.
+- LLM hops in a round trip receive the original text and repair meaning that earlier machine-translation hops lost, with the smallest change, before rewriting.
+- Repair hop `<llm>:fix`: the LLM returns a JSON list of small edits and translatex applies only exact, small ones. Edits that restore a missing fact always apply; other edits share a small budget so the hop cannot copy the original back. Each edit is reported in the hop's `edits` with `kind` (`fact` or `meaning`), `applied` and `reason`.
+- Fact guard: every round trip reports `missingFacts` (names, numbers, IDs, code spans and URLs absent from the result; numbers compared by digits, names as whole words) and adds a `fact check:` warning when the list is not empty.
+- Response fields `chain`, `hops`, `missingFacts` and `warnings`.
+- Named preserve patterns `@code` (inline and fenced code) and `@url`. On Windows the npm `.cmd` shim runs through cmd.exe, which strips `^` from a regex such as `` `[^`]*` `` when Python or Node spawns translatex without a shell; the named patterns avoid that.
+- A named machine-translation engine in a chain is preferred, not pinned: on a retryable error the hop falls back to another engine, avoiding the engines of the neighbouring hops, with a warning. LLM hops never fall back.
+- `benches/roundtrip-depth/` with a 10-text corpus and `measure.py`, plus the measured results in the round-trip docs (10 texts, one run, 2026-11-11).
+
+### Changed (breaking)
+
+- `roundtrip` responses drop `pivotLang`, `pivotText` and `providers`. Read `chain`, `hops[].text` and `hops[].provider` instead.
+
+### Changed
+
+- The default round trip is `mt` with two machine-translation hops (for example en to zh to ja to en); it was one hop. On the corpus it left 5 of 10 AI tells instead of 7 at the same fact loss.
+- LLM hops receive protected spans as-is and the prompt lists them; a dropped span adds a `preserve:` warning. Machine-translation hops still mask.
+- Provider count is 28: 14 free web endpoints, 9 official APIs, 5 LLM providers.
+
+### Fixed
+
+- `roundtrip/01-pivot-choice.md` no longer says the measurement script is in the repository history; it points at `benches/roundtrip-depth/measure.py`.
+- The skill said a round trip cannot remove "not just X but Y". That holds for the machine-translation presets only; the LLM presets remove it.
+
 ## 0.1.2 — 2026-11-04
 
 ### Fixed

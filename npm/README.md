@@ -1,10 +1,12 @@
 # translatex
 
-**Free translation for your agent — no API key, no signup, no config.**
+**Humanize AI-sounding text from the command line, and translate for your agent: no API key, no signup, no config.**
 
-`npm install -g translatex` puts a 6 MB static binary on `PATH`. 26 translation
-providers raced in parallel, structured JSON out, one skill file for 24 coding
-agents. The binary ships in a per-platform package (`translatex-windows-x64`,
+`npm install -g translatex` puts a 6 MB static binary on `PATH`. `roundtrip`
+rewrites AI-generated text to read like a person wrote it, on your own Claude or
+OpenCode subscription, and reports any name, number or code that went missing.
+28 translation providers raced in parallel, structured JSON out, one skill file
+for 24 coding agents. The binary ships in a per-platform package (`translatex-windows-x64`,
 `translatex-darwin-arm64`, …) pulled in as an optional dependency, so the
 install runs no scripts at all.
 
@@ -23,7 +25,7 @@ for harnesses that read a project instructions file.
 
 ```bash
 translatex translate "Hello world" -t zh --format json
-translatex roundtrip "In today's landscape, …" --from en --format json
+translatex roundtrip "In today's landscape, …" --from en --preset llm --preserve @code --format json
 ```
 
 Full harness matrix: https://github.com/w21180239/translatex/tree/main/integrations

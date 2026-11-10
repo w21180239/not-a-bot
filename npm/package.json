@@ -1,7 +1,7 @@
 {
   "name": "translatex",
-  "version": "0.1.2",
-  "description": "Free translation CLI for AI agents: no API key, no signup, no config. 26 providers, JSON output, one 6 MB binary.",
+  "version": "0.2.0",
+  "description": "Humanize AI-generated text and translate from the command line: LLM round trips on your Claude or OpenCode subscription with a fact check, plus 28 translation engines (14 free, no API key). JSON output, one binary.",
   "license": "MIT OR Apache-2.0",
   "author": "w21180239",
   "homepage": "https://github.com/w21180239/translatex",
@@ -26,7 +26,14 @@
     "free",
     "no-api-key",
     "humanizer",
+    "ai-humanizer",
+    "humanize-ai-text",
     "deai",
+    "de-ai",
+    "remove-ai-tone",
+    "back-translation",
+    "claude-code",
+    "opencode",
     "mcp-alternative"
   ],
   "bin": {
@@ -37,11 +44,11 @@
     "README.md"
   ],
   "optionalDependencies": {
-    "translatex-darwin-arm64": "0.1.2",
-    "translatex-darwin-x64": "0.1.2",
-    "translatex-linux-arm64": "0.1.2",
-    "translatex-linux-x64": "0.1.2",
-    "translatex-windows-x64": "0.1.2"
+    "translatex-darwin-arm64": "0.2.0",
+    "translatex-darwin-x64": "0.2.0",
+    "translatex-linux-arm64": "0.2.0",
+    "translatex-linux-x64": "0.2.0",
+    "translatex-windows-x64": "0.2.0"
   },
   "engines": {
     "node": ">=18"

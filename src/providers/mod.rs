@@ -60,6 +60,12 @@ pub trait Provider: Send + Sync {
         let _ = source;
         self.supports(target)
     }
+
+    /// Per-call budget when the request sets none. `None` uses the configured
+    /// default; slow providers raise it.
+    fn default_timeout_ms(&self) -> Option<u64> {
+        None
+    }
 }
 
 /// Every provider name this binary can serve, configured or not, including
@@ -98,6 +104,9 @@ pub const KNOWN_PROVIDERS: &[&str] = &[
     "openai",
     "anthropic",
     "deepseek",
+    // Local agent CLIs
+    "claude-cli",
+    "opencode-cli",
 ];
 
 pub fn is_known_provider(name: &str) -> bool {
@@ -111,7 +120,11 @@ pub fn is_known_provider(name: &str) -> bool {
 /// chain buys a failed round trip, so it only runs when the caller names it in
 /// `--provider`, `--fallback` or the configured `chain`. It stays visible in
 /// `translatex providers`.
-pub const DEFAULT_EXCLUDED: &[&str] = &["reverso"];
+///
+/// `claude-cli` and `opencode-cli` run a local agent CLI: tens of seconds per
+/// call and they spend the user's subscription quota, so they too run only
+/// when named.
+pub const DEFAULT_EXCLUDED: &[&str] = &["reverso", "claude-cli", "opencode-cli"];
 
 pub fn is_default_excluded(name: &str) -> bool {
     DEFAULT_EXCLUDED.contains(&name)
@@ -298,6 +311,7 @@ pub mod aliyun;
 pub mod azure;
 pub mod baidu;
 pub mod caiyun;
+pub mod cli_llm;
 pub mod deepl;
 pub mod edge;
 pub mod google;
@@ -544,5 +558,28 @@ mod tests {
             .chain(Some("reverso"), &[], &[], "en", "zh")
             .expect("chain");
         assert_eq!(names(&chain), vec!["reverso"]);
+    }
+
+    #[test]
+    fn auto_never_yields_cli_llm_providers() {
+        use crate::providers::cli_llm::CliLlm;
+        let mut reg = Registry::new();
+        reg.register(Arc::new(CliLlm::claude(&Default::default())));
+        reg.register(Arc::new(CliLlm::opencode(&Default::default())));
+        reg.register(stub("google", 1, &["*"]));
+
+        for source in ["en", "auto"] {
+            let chain = reg.chain(None, &[], &[], source, "zh").expect("chain");
+            assert_eq!(names(&chain), vec!["google"]);
+        }
+        // The default configured chain does not name them either.
+        let defaults = crate::core::config::Settings::default().chain();
+        let chain = reg.chain(None, &[], &defaults, "en", "zh").expect("chain");
+        assert_eq!(names(&chain), vec!["google"]);
+
+        let chain = reg
+            .chain(Some("claude-cli"), &[], &[], "en", "zh")
+            .expect("chain");
+        assert_eq!(names(&chain), vec!["claude-cli"]);
     }
 }
