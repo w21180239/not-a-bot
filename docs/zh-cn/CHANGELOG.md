@@ -2,6 +2,36 @@
 
 文档修订历史。1.0 之前，应用变更也记录在此。
 
+## 0.2.0 — 2026-11-11
+
+### 新增
+
+- `roundtrip` 支持 N 跳链。`--chain "<[engine:]lang,...>"` 接受任意顺序的引擎和语言，末尾没回到原语言时自动补一跳；`--depth 1-3` 只用机器翻译，依次经过 zh、ja、fi（中文原文为 en、ja、fi）；`--preset <name>` 选择 `mt`、`mt-deep`、`llm`、`lynote` 或 `lynote-fix`。优先级：chain、preset、depth、pivot，最后是配置里的 `roundtrip_preset`。
+- 两个调用本机 agent CLI、不需要 API key 的 Provider：`claude-cli`（`claude -p`，用你的 Claude 订阅，默认模型 haiku）和 `opencode-cli`（`opencode run`，用你的 OpenCode 额度，默认模型 `opencode-go/deepseek-v4.1-flash`）。在 `[provider.claude-cli]`、`[provider.opencode-cli]` 下配置 `model` 和 `bin`。它们只在被点名时运行，`auto` 从不选它们。
+- 配置项 `roundtrip_preset`（默认 `mt`）、`roundtrip_llm`（默认 `opencode-cli`，可选 `claude-cli`），以及环境变量 `TRANSLATEX_ROUNDTRIP_PRESET`、`TRANSLATEX_ROUNDTRIP_LLM`。
+- 往返里的 LLM 跳会收到原文，在改写之前先用最小的改动修复前面机器翻译跳丢掉的语义。
+- 修复跳 `<llm>:fix`：LLM 返回 JSON 小编辑列表，translatex 只应用精确且很小的编辑。补回缺失事实的编辑一律应用，其余编辑共用一份小预算，所以这一跳无法把原文抄回来。每条编辑都记录在该跳的 `edits` 里，带 `kind`（`fact` 或 `meaning`）、`applied` 和 `reason`。
+- 事实检查：每次往返都报告 `missingFacts`（结果里缺失的人名、数字、ID、代码片段和 URL；数字按数位比较，人名按整词比较），列表非空时加一条 `fact check:` 警告。
+- 响应字段 `chain`、`hops`、`missingFacts`、`warnings`。
+- 具名保护模式 `@code`（行内和围栏代码）与 `@url`。在 Windows 上，npm 的 `.cmd` 外壳经 cmd.exe 运行；Python 或 Node 不经 shell 启动 translatex 时，cmd.exe 会吞掉 `` `[^`]*` `` 这类正则里的 `^`，具名模式避开这个问题。
+- 链里点名的机器翻译引擎是"优先"而非"钉死"：遇到可重试错误，这一跳改用另一个引擎，并避开相邻两跳的引擎，同时加警告。LLM 跳从不回退。
+- `benches/roundtrip-depth/`：10 段文本的语料和 `measure.py`，实测结果写进往返文档（10 段文本，只跑一次，2026-11-11）。
+
+### 调整（破坏性）
+
+- `roundtrip` 响应移除 `pivotLang`、`pivotText`、`providers`。改读 `chain`、`hops[].text` 和 `hops[].provider`。
+
+### 调整
+
+- 默认往返是两跳机器翻译的 `mt`（例如 en 到 zh 到 ja 再到 en），此前是一跳。在语料上，剩余 AI 腔从 10 段里的 7 段降到 5 段，事实丢失相同。
+- LLM 跳原样接收受保护片段，提示词里列出这些片段；片段丢了会加 `preserve:` 警告。机器翻译跳仍然用占位符遮蔽。
+- Provider 总数为 28：14 个免费网页端点、9 个官方 API、5 个 LLM Provider。
+
+### 修复
+
+- `roundtrip/01-pivot-choice.md` 不再说测量脚本"在仓库历史里"，改为指向 `benches/roundtrip-depth/measure.py`。
+- Skill 里写过往返无法去掉 "not just X but Y"。这只对机器翻译预设成立，LLM 预设可以去掉。
+
 ## 0.1.2 — 2026-11-04
 
 ### 修复
