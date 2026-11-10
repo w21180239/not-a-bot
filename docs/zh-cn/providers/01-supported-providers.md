@@ -52,6 +52,15 @@
 
 LLM 通过对话补全提示翻译。放在最后是因为按 token 计费，且可能改写而不是翻译。
 
+### 本机 agent CLI
+
+| # | Provider | Id | 执行 | 额度 | 默认模型 |
+| --- | --- | --- | --- | --- | --- |
+| 60 | Claude Code CLI | `claude-cli` | `claude -p` | 你的 Claude 订阅 | haiku |
+| 61 | OpenCode CLI | `opencode-cli` | `opencode run` | 你的 OpenCode 额度 | `opencode-go/deepseek-v4.1-flash` |
+
+不需要 API key。在 `[provider.claude-cli]` 或 `[provider.opencode-cli]` 下设置 `model` 和 `bin`。它们从不加入自动链：只在被点名时运行，即 `roundtrip` 的某一跳、预设、`--provider` 或 `--fallback`。见 [../roundtrip/02-chains-presets-and-llm.md](../roundtrip/02-chains-presets-and-llm.md)。
+
 ## 已退役名称
 
 | 名称 | 处理 |

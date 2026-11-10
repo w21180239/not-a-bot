@@ -36,6 +36,8 @@ Semantics worth knowing:
 ```bash
 translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
 translatex roundtrip --from en --pivot ja < draft.md
+translatex roundtrip "…" --from en --preset llm --preserve @code
+translatex roundtrip "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
 ```
 
 | Flag | Default | Meaning |
@@ -43,12 +45,22 @@ translatex roundtrip --from en --pivot ja < draft.md
 | `TEXT` | stdin | Text to round-trip |
 | `-s, --from` | `auto` | Source language |
 | `--pivot` | `auto` | Bridge language |
+| `--chain` | — | Hops `[engine:]lang`, comma-separated; a final hop back to the source is appended when missing; `<llm>:fix` repairs |
+| `--preset` | config `roundtrip_preset` (`mt`) | `mt`, `mt-deep`, `llm`, `lynote`, `lynote-fix` |
+| `--depth` | — | 1-3 machine-translation hops through zh, ja, fi (Chinese sources: en, ja, fi) |
 | `-p, --provider` | `auto` | Pin one provider for both hops |
 | `--fallback` | empty | Providers tried after the pinned one |
-| `--preserve` | empty | Regex spans kept verbatim |
+| `--preserve` | empty | Regex spans kept verbatim, or the named patterns `@code` and `@url`; repeatable |
 | `--timeout-ms` | config | Per-hop budget |
 | `--request-id` | generated | Correlation id |
 | `--json` | — | Full `RoundtripRequest`; replaces the other flags |
+
+Hop selection, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`,
+then `roundtrip_preset` from the config (default `mt`, two machine-translation
+hops). `claude-cli` and `opencode-cli` run only when a hop, a preset or
+`--provider` names them. The response carries `chain`, `hops`, `missingFacts`
+and `warnings`; read `missingFacts` after every run. Chains, presets and the
+repair hop: [roundtrip/02-chains-presets-and-llm.md](../roundtrip/02-chains-presets-and-llm.md).
 
 The result is always in the source language. `pivot: auto` uses Chinese for
 non-Chinese input and English for Chinese input; `--pivot ja` is the documented

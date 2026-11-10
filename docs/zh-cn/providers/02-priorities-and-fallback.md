@@ -38,6 +38,7 @@
 | 9-12 | 尾部网页接口 | Reverso、搜狗、MyMemory、SysTran |
 | 20-27 | 官方 API | 稳定、有 SLA，但需要 Key |
 | 40-42 | LLM | 成本最高、延迟最大、最不可控 |
+| 60-61 | 本机 agent CLI | `claude-cli`、`opencode-cli`；每次调用几秒并消耗订阅额度，所以只在点名时运行 |
 
 数字越小越靠前。区间是约定而非巧合：默认链中网页接口不应排在官方 API 之后，除非它在特定语言对上确实更可靠。
 
@@ -48,6 +49,7 @@
 | Provider | 原因 | 如何启用 |
 | --- | --- | --- |
 | `reverso` | Cloudflare 拒绝本客户端的 TLS 指纹，每次尝试都在握手阶段失败 | `--provider reverso`、`--fallback reverso`，或写进 `chain` |
+| `claude-cli`、`opencode-cli` | 慢，且每次调用消耗订阅额度 | 点名使用：`roundtrip` 的某一跳（`claude-cli:zh`）、预设（`llm`、`lynote`）、`--provider`、`--fallback` 或 `chain` |
 
 跳过列表是 `src/providers/mod.rs` 中的 `DEFAULT_EXCLUDED`。注册表不会按优先级把这类 Provider 追加进链；但只要显式点名（指定、fallback 或配置链），仍会尝试，`translatex providers` 也仍会列出它。
 

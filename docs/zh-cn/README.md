@@ -2,7 +2,7 @@
 
 # translatex — 文档
 
-`translatex` 是面向 Agent 的免费翻译 CLI：不用 API Key、不用注册、不用配置。走 26 个 Provider，自动轮换凭据，输出结构化 JSON。
+`translatex` 是面向 Agent 的免费翻译 CLI：不用 API Key、不用注册、不用配置。走 28 个 Provider，自动轮换凭据，输出结构化 JSON。`roundtrip` 用你自己的 Claude 或 OpenCode 订阅，把 AI 味的文字改写得更像人写的。
 
 ## 从这里开始
 
@@ -23,7 +23,7 @@
 | [install/](install/OVERVIEW.md) | Cargo、预编译包、首次请求、命令补全 |
 | [cli/](cli/OVERVIEW.md) | 命令、参数、退出码、配置与凭据文件 |
 | [providers/](providers/OVERVIEW.md) | Provider 目录、优先级方案、回退语义、新增 Provider |
-| [roundtrip/](roundtrip/OVERVIEW.md) | 经中转语言的去 AI 味改写；中转语言实测选型 |
+| [roundtrip/](roundtrip/OVERVIEW.md) | 人性化改写 AI 味文字：链、预设、LLM 跳、修复跳、事实检查、实测结果 |
 | [integrations/](integrations/OVERVIEW.md) | npm、发布包、各 harness 的 CLI 与 skill 接入 |
 | [api/](api/OVERVIEW.md) | JSON 与 NDJSON 结构、错误分类、Agent 决策规则 |
 | [env/](env/OVERVIEW.md) | 环境变量与优先级 |

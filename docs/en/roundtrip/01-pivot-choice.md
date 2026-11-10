@@ -1,8 +1,13 @@
 **English** · [简体中文](../../zh-cn/roundtrip/01-pivot-choice.md)
 
-# Round trip — Choosing the pivot
+# Round trip — Choosing the pivot and the depth
 
 [← Domain overview](OVERVIEW.md) · [Documentation index](../README.md)
+
+The first half of this page covers the pivot language (2026-11-04). The second
+half covers how many hops, and whether an LLM does them (2026-11-11).
+
+## Choosing the pivot
 
 The pivot has to be far enough from the source language to force a rewrite, and
 well enough supported that both hops succeed. Those pull in opposite directions,
@@ -19,7 +24,7 @@ Five deliberately AI-flavoured English sentences (stock openers, hedge phrases,
 - **Length delta** — mean absolute change in length.
 - **Latency** — wall clock for both hops.
 
-Run it yourself with the script in the repository history, or with one command:
+The 2026-11-04 script was not kept. For a quick check on one text, run:
 
 ```bash
 translatex roundtrip "In today's fast-paced digital landscape, …" --from en --pivot ja --format json
@@ -59,7 +64,8 @@ returns almost the input. They are the wrong tool for this job.
 | Anything non-Chinese | `zh` | Rewrites as much as Japanese, and is served by every provider including the Chinese-anchored ones |
 | Chinese (`zh`, `zh-TW`, `yue`) | `en` | The mirror of the same rule |
 
-`auto` implements exactly that table.
+`auto` implements exactly that table. It is the first hop of the default `mt`
+preset and the only hop of `--pivot`; `--depth` adds ja and fi after it.
 
 **Japanese is the documented alternative.** It rewrites slightly more and keeps
 more grammatical structure, which is an advantage for technical English where
@@ -79,7 +85,7 @@ With `sourceLang: "auto"` the language is unknown when the pivot must be chosen,
 so `auto` guesses Chinese first and inspects `detectedSource` afterwards. If the
 text turns out to be Chinese, the guessed pivot *was* the source language, and
 the first hop is redone into English. That costs one extra call only for Chinese
-input; every other language takes two calls.
+input; every other language takes one call per hop.
 
 ## Configuring it
 
@@ -96,7 +102,53 @@ Every request:
 roundtrip_pivot = "zh"
 ```
 
+## Choosing the depth
+
+Does a second or third machine-translation hop rewrite more? Does an LLM hop
+change the picture? The bench in
+[`benches/roundtrip-depth/`](../../../benches/roundtrip-depth/README.md) answers
+with ten texts per configuration: five AI-flavoured English paragraphs, three
+fact-heavy workplace texts (names, numbers, IDs, code) and two Chinese texts.
+
+Method, per text and configuration:
+
+- **Overlap**: content-word Jaccard with the source. Lower means more rewriting.
+- **Tells left**: structural AI tells still present, out of the 10 texts: "not just/only X", "more than just", "it's worth noting", "in today's", "at its core", 不仅, 更是, 值得注意, 当今.
+- **Facts missing**: names, numbers, IDs and code spans the fact guard reports as absent, summed over the corpus.
+- **Latency**: mean wall clock for the whole chain.
+
+```bash
+python benches/roundtrip-depth/measure.py --bin target/release/translatex.exe --out out --configs mt,llm-opencode
+```
+
+Results (run on 2026-11-11; 10 texts, one run per configuration):
+
+| Configuration | Overlap | Tells left (of 10) | Facts missing | Latency |
+| --- | --- | --- | --- | --- |
+| mt, 1 hop (old default) | 0.556 | 7 | 5 | 0.5 s |
+| mt, 2 hops (new default) | 0.520 | 5 | 5 | 0.9 s |
+| mt-deep, 3 hops | 0.480 | 6 | 8 | 1.1 s |
+| llm via opencode-cli (DeepSeek) | 0.446 | 0 | 0 | 14 s |
+| llm via claude-cli (Haiku) | 0.535 | 0 | 0 | 8 s |
+| lynote via claude-cli / opencode-cli | 0.292 / 0.307 | 1 / 0 | 5 / 3 | 19 / 21 s |
+| lynote-fix via claude-cli / opencode-cli | 0.369 / 0.396 | 0 / 1 | 1 / 1 | 24 / 28 s |
+
+What the numbers say:
+
+- Machine translation changes words and keeps sentence structure, so "not just X, it's Y" survives every depth.
+- Even one machine-translation hop respells names (Aroha became Aloha, Tom became Tomi) and expands codes (NZD became "New Zealand dollars").
+- A third machine-translation hop costs more facts (8 against 5) than it gains in rewriting (overlap 0.480 against 0.520). The default moved from one hop to two; three is opt-in.
+- LLM hops remove the structural tells and kept every fact on this corpus.
+- Machine-translation hops placed after an LLM hop can bring a foil back: Finnish "ei ainoastaan ... vaan myös" returned as "not only ... but also". That is why `lynote` still leaves one tell in some runs.
+- The repair hop cut the fact loss of `lynote` from 3 to 5 facts to 1 and kept most of its rewrite (overlap 0.369 and 0.396 against 0.292 and 0.307).
+
+Caveats: ten texts and one run per configuration is a small sample; the tell
+list and the fact guard are heuristics; overlap rewards change, not quality;
+nothing here measures AI detectors, and no result should be read as
+undetectable text.
+
 ## Navigation
 
 - ← [Round trip overview](OVERVIEW.md)
+- → [Chains, presets and LLM hops](02-chains-presets-and-llm.md)
 - ↑ [Documentation index](../README.md)

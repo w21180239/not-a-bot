@@ -24,7 +24,9 @@ default_target = "zh"
 timeout_ms = 20000     # whole-call budget per provider attempt
 retries = 1            # extra attempts for retryable errors (not timeouts)
 race_width = 3         # providers in flight at once; 1 is strictly sequential
-roundtrip_pivot = "zh" # default bridge language for `translatex roundtrip`
+roundtrip_pivot = "zh" # default bridge language for `translatex roundtrip --pivot auto`
+roundtrip_preset = "mt" # default round trip when no chain, preset, depth or pivot is given
+roundtrip_llm = "opencode-cli" # engine behind the LLM hops of `llm` and `lynote`; or "claude-cli"
 concurrency = 4        # reserved for batch sizing
 log = "warn"
 
@@ -37,6 +39,14 @@ model = "gpt-4o-mini"
 
 [provider.azure]
 region = "eastasia"
+
+[provider.claude-cli]
+model = "haiku"
+bin = "claude"
+
+[provider.opencode-cli]
+model = "opencode-go/deepseek-v4.1-flash"
+bin = "opencode"
 ```
 
 Rules:
@@ -46,7 +56,8 @@ Rules:
 - `timeout_ms` and `retries` set request defaults; `timeoutMs` in a request overrides the timeout.
 - `race_width` sets how many providers may be in flight; `1` restores the strict sequential walk. The `--race` flag overrides it for one invocation.
 - `roundtrip_pivot` is the default bridge for `roundtrip` when the request says `"pivot": "auto"`.
-- `[provider.<name>]` accepts `base_url`, `model`, `region`, `instance`, `tier`. Unknown keys there are rejected too.
+- `roundtrip_preset` picks the round trip when the request names no `chain`, `preset`, `depth` or `pivot`. `roundtrip_llm` names the engine behind the LLM hops of `llm` and `lynote`.
+- `[provider.<name>]` accepts `base_url`, `model`, `region`, `instance`, `tier`, `bin`. Unknown keys there are rejected too.
 
 ## `credentials.toml`
 

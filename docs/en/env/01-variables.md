@@ -22,6 +22,8 @@ Cache and cooldown files live under `<home>/cache/`. Setting `TRANSLATEX_HOME` i
 | `TRANSLATEX_CHAIN` | Replaces the built-in chain. Providers not listed are appended afterwards by priority. | `edge,google,deepl` |
 | `TRANSLATEX_TIMEOUT_MS` | Default per-attempt budget. `timeoutMs` in a request overrides it. | `8000` |
 | `TRANSLATEX_ROUNDTRIP_PIVOT` | Default `roundtrip` pivot when the request says `auto`. `--pivot` wins. | `ja` |
+| `TRANSLATEX_ROUNDTRIP_PRESET` | Default `roundtrip` preset when the request names no chain, preset, depth or pivot. | `llm` |
+| `TRANSLATEX_ROUNDTRIP_LLM` | Engine behind the LLM hops of the `llm` and `lynote` presets. | `claude-cli` |
 | `TRANSLATEX_LOG` | stderr log level | `debug` |
 
 ## Credentials

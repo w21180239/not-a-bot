@@ -22,6 +22,8 @@
 | `TRANSLATEX_CHAIN` | 替换内置链。未列出的 Provider 之后按优先级追加 | `edge,google,deepl` |
 | `TRANSLATEX_TIMEOUT_MS` | 默认单次预算；请求里的 `timeoutMs` 覆盖它 | `8000` |
 | `TRANSLATEX_ROUNDTRIP_PIVOT` | 请求写 `auto` 时 `roundtrip` 的默认中转语言；`--pivot` 优先 | `ja` |
+| `TRANSLATEX_ROUNDTRIP_PRESET` | 请求没给 chain、preset、depth、pivot 时 `roundtrip` 的默认预设 | `llm` |
+| `TRANSLATEX_ROUNDTRIP_LLM` | `llm`、`lynote` 预设里 LLM 跳所用的引擎 | `claude-cli` |
 | `TRANSLATEX_LOG` | stderr 日志级别 | `debug` |
 
 ## 凭据
