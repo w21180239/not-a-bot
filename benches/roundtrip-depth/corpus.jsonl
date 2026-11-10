@@ -1,0 +1,10 @@
+{"id": "ai-1", "lang": "en", "kind": "ai", "text": "In today's fast-paced digital landscape, it's important to note that our comprehensive solution leverages cutting-edge technology to empower teams to unlock their full potential."}
+{"id": "ai-2", "lang": "en", "kind": "ai", "text": "This update is not just a bug fix, it's a fundamental shift in how we approach reliability, ensuring a seamless experience for every user."}
+{"id": "ai-3", "lang": "en", "kind": "ai", "text": "At its core, effective onboarding is about fostering a culture of trust, collaboration, and continuous learning across the organisation."}
+{"id": "ai-4", "lang": "en", "kind": "ai", "text": "Our robust platform serves as a testament to our unwavering commitment to innovation, delivering meaningful outcomes that truly move the needle."}
+{"id": "ai-5", "lang": "en", "kind": "ai", "text": "When it comes to data privacy, it's worth noting that the stakes have never been higher, and organisations must navigate an increasingly complex regulatory environment."}
+{"id": "fact-1", "lang": "en", "kind": "fact", "text": "The staging deploy is blocked: migration `20261014_0931_add_product_site_idx.php` is stuck on stg, so QA cannot validate ACME-1112 until it lands. Mia will ping Ops at 4:50pm."}
+{"id": "fact-2", "lang": "en", "kind": "fact", "text": "The renewal for all 42 seats is due on 14 January 2027 and the quote is NZD 18,900 excluding GST. Aroha needs approval from Tom by Friday."}
+{"id": "fact-3", "lang": "en", "kind": "fact", "text": "The outage hit three services: `appointment-api`, `invoice-worker` and `sms-gateway`. All three share the Redis cluster `redis-prod-2`, which failed over at 03:14 NZDT. Over six months, 88 of 223 escalations (39%) had the same cause."}
+{"id": "zh-1", "lang": "zh", "kind": "ai", "text": "在当今快速发展的数字化时代，值得注意的是，我们的综合解决方案不仅仅是一个工具，更是赋能团队、释放潜能的关键抓手。"}
+{"id": "zh-2", "lang": "zh", "kind": "fact", "text": "预发环境的部署被卡住了：迁移脚本 `20261014_0931_add_product_site_idx.php` 在 stg 上一直没跑完，所以 QA 在它完成之前没法验证 ACME-1112。小李会在下午 4:50 联系运维。"}

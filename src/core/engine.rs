@@ -5,7 +5,9 @@ use crate::core::creds::CredentialStore;
 use crate::core::error::{Error, Result};
 use crate::core::keys::KeyRing;
 use crate::core::preserve::Preserver;
-use crate::core::types::{AttemptRecord, RoundtripRequest, TranslateRequest, TranslateResponse};
+use crate::core::types::{
+    AttemptRecord, Hop, ProviderKind, RoundtripRequest, TranslateRequest, TranslateResponse,
+};
 use crate::providers::{Provider, Registry};
 use crate::retry::backoff;
 use futures::StreamExt;
@@ -53,6 +55,14 @@ struct ProviderRun {
     failures: Vec<String>,
     tried: bool,
     cooling: Option<(String, u64)>,
+}
+
+/// Preserve spans of one request: the masked payload for MT providers and the
+/// verbatim span list for LLM providers.
+struct Preserve {
+    preserver: Preserver,
+    masked: String,
+    spans: Vec<String>,
 }
 
 /// A round trip plus the per-hop trail, so `--verbose` can explain both legs.
@@ -140,12 +150,19 @@ impl Engine {
         inner.target_lang = target.clone();
         inner.source_lang = source.clone();
 
-        let mut preserver = Preserver::new(&req.preserve).map_err(ChainFailure::new)?;
-        let payload = match &mut preserver {
-            Some(p) => p.mask(&inner.text),
-            None => inner.text.clone(),
-        };
-        inner.text = payload;
+        // MT providers get placeholders; LLM providers get the real text plus
+        // the span list, because they mangle placeholders but keep real code.
+        let preserve = Preserver::new(&req.preserve)
+            .map_err(ChainFailure::new)?
+            .map(|mut preserver| {
+                let masked = preserver.mask(&inner.text);
+                let spans = preserver.spans(&inner.text);
+                Preserve {
+                    preserver,
+                    masked,
+                    spans,
+                }
+            });
 
         let chain = self
             .registry
@@ -158,12 +175,16 @@ impl Engine {
             )
             .map_err(ChainFailure::new)?;
         let pinned = req.provider.is_some();
-        // Per-request timeout wins over the configured default.
-        let budget_ms = req
-            .timeout_ms
-            .or(self.settings.timeout_ms)
-            .unwrap_or(20_000);
-        let budget = Duration::from_millis(budget_ms);
+        // Per-request timeout wins; otherwise the configured default, raised
+        // to the provider's own floor for slow ones (local agent CLIs).
+        let base_ms = self.settings.timeout_ms.unwrap_or(20_000);
+        let budget_for = |provider: &Arc<dyn Provider>| {
+            req.timeout_ms.unwrap_or_else(|| {
+                provider
+                    .default_timeout_ms()
+                    .map_or(base_ms, |floor| floor.max(base_ms))
+            })
+        };
         // Pinning means "this one first": racing its fallback against it could
         // return the fallback while the pinned provider was about to answer.
         let width = if pinned {
@@ -183,7 +204,14 @@ impl Engine {
         // chain; more cut tail latency because a hung provider no longer blocks
         // the ones behind it. The first success wins and the rest are cancelled.
         let runs = futures::stream::iter(chain.into_iter().map(|provider| {
-            self.run_provider(provider, &inner, preserver.as_ref(), budget, budget_ms)
+            let budget_ms = budget_for(&provider);
+            self.run_provider(
+                provider,
+                &inner,
+                preserve.as_ref(),
+                Duration::from_millis(budget_ms),
+                budget_ms,
+            )
         }))
         .buffer_unordered(width);
 
@@ -259,13 +287,17 @@ impl Engine {
         Err(ChainFailure { error, attempts })
     }
 
-    /// Round trip: source -> pivot -> source.
+    /// Round trip: source -> hop -> ... -> source.
     ///
-    /// The second hop does the work. Sending the text through a language with a
-    /// different syntax forces a rewrite; translating back cannot reuse the
-    /// original phrasing, so the result loses the stock cadence that makes
-    /// model-written text recognisable.
+    /// Each hop forces the text through a different syntax, so translating
+    /// back cannot reuse the original phrasing. Machine hops rewrite words but
+    /// keep sentence shapes; LLM hops (humanize style) rewrite the shapes too,
+    /// and a later LLM hop sees the previous one as history so it does not
+    /// undo it. The output is checked for facts the input had and lost.
     pub async fn roundtrip(&self, req: &RoundtripRequest) -> Result<RoundtripOutcome> {
+        use crate::core::chain::{plan, resolve_source, Target};
+        use crate::providers::cli_llm::{HISTORY_KEY, ORIGINAL_KEY, ORIGINAL_LANG_KEY, STYLE_KEY};
+
         let started = Instant::now();
         let request_id = req
             .idempotency_key
@@ -275,91 +307,199 @@ impl Engine {
         if req.text.trim().is_empty() {
             return Err(Error::InvalidInput("text is empty".into()));
         }
-
-        // `auto` keeps the measured defaults; a configured pivot replaces the
-        // guess without touching an explicit `--pivot`.
-        let requested_pivot = match crate::core::lang::normalize(&req.pivot) {
-            p if p == "auto" => self
-                .settings
-                .pivot_override()
-                .unwrap_or_else(|| "auto".to_string()),
-            p => p,
-        };
         let source = crate::core::lang::normalize(&req.source_lang);
-        let mut pivot = if requested_pivot == "auto" {
-            crate::core::lang::default_pivot(&source).to_string()
-        } else {
-            requested_pivot.clone()
+        let is_llm = |name: &str| {
+            self.registry
+                .get(name)
+                .is_some_and(|p| p.info().kind == ProviderKind::Llm)
         };
-        if !crate::core::lang::is_known(&pivot) || pivot == "auto" {
-            return Err(Error::InvalidInput(format!(
-                "unknown pivot language {}",
-                requested_pivot
-            )));
+        let mut plan = plan(req, &self.settings, &source, &is_llm)?;
+
+        let mut hops: Vec<Hop> = Vec::new();
+        // Languages visited; a repair pass shows as `fix`.
+        let mut chain: Vec<String> = Vec::new();
+        let mut attempts = Vec::new();
+        let mut warnings = Vec::new();
+        let mut text = req.text.clone();
+        let mut from = source.clone();
+        // Known source language; `auto` until the first hop detects it.
+        let mut detected = source.clone();
+        // Input and output of the previous hop when it was an LLM hop.
+        let mut llm_history: Option<(String, String)> = None;
+        let mut i = 0;
+        while i < plan.hops.len() {
+            let spec = plan.hops[i].clone();
+            let first_lang = plan
+                .hops
+                .iter()
+                .find_map(|h| match &h.to {
+                    Target::Lang(l) => Some(l.clone()),
+                    _ => None,
+                })
+                .unwrap_or_else(|| source.clone());
+            let fix = spec.to == Target::Fix;
+            let to = match &spec.to {
+                Target::Lang(l) => l.clone(),
+                Target::Fix => {
+                    if from == "auto" {
+                        return Err(Error::InvalidInput(
+                            "a fix hop needs a known language; pass sourceLang".into(),
+                        ));
+                    }
+                    from.clone()
+                }
+                Target::Source => {
+                    if plan.appended_back && i > 1 && from == detected {
+                        // An explicit chain that already ended in the source.
+                        break;
+                    }
+                    resolve_source(&detected, &first_lang, &from)
+                }
+            };
+            let llm_hop = spec.engine.as_deref().is_some_and(is_llm);
+            let mut metadata = req.metadata.clone();
+            if llm_hop {
+                metadata.insert(
+                    STYLE_KEY.into(),
+                    if fix { "fix" } else { "humanize" }.into(),
+                );
+                // The first hop's input is the original already.
+                if !hops.is_empty() {
+                    metadata.insert(ORIGINAL_KEY.into(), req.text.clone().into());
+                    metadata.insert(ORIGINAL_LANG_KEY.into(), detected.clone().into());
+                }
+                if let (false, Some((input, output))) = (fix, &llm_history) {
+                    metadata.insert(
+                        HISTORY_KEY.into(),
+                        serde_json::json!({ "input": input, "output": output }),
+                    );
+                }
+            }
+            let hop_req = TranslateRequest {
+                text: text.clone(),
+                // A repair stays in one language; the engine rejects equal
+                // source and target, and the prompt only needs the target.
+                source_lang: if fix { "auto".into() } else { from.clone() },
+                target_lang: to.clone(),
+                provider: spec.engine.clone().or_else(|| req.provider.clone()),
+                fallback_chain: req.fallback_chain.clone(),
+                preserve: req.preserve.clone(),
+                timeout_ms: req.timeout_ms,
+                idempotency_key: Some(request_id.clone()),
+                metadata,
+            };
+            let hop_started = Instant::now();
+            // A named MT engine is preferred, not pinned: a retryable failure
+            // hands the hop to the auto chain. LLM hops stay strict.
+            let mut fallback_note = None;
+            let out = match self.translate_with_attempts(&hop_req).await {
+                (Ok(out), _) => out,
+                (Err(err), failed)
+                    if !llm_hop
+                        && spec.engine.is_some()
+                        && (err.retryable() || matches!(err, Error::QuotaExhausted { .. })) =>
+                {
+                    let engine = spec.engine.clone().unwrap_or_default();
+                    let prev = hops.last().map(|h| h.provider.as_str());
+                    let next = plan.hops.get(i + 1).and_then(|h| h.engine.as_deref());
+                    let names = self.hop_fallback(&hop_req, &engine, prev, next);
+                    let Some((first, rest)) = names.split_first() else {
+                        return Err(err);
+                    };
+                    let mut retry = hop_req.clone();
+                    retry.provider = Some(first.clone());
+                    retry.fallback_chain = rest.to_vec();
+                    let out = self.translate(&retry).await?;
+                    attempts.extend(failed);
+                    fallback_note = Some(format!(
+                        "hop {}: {engine} failed ({}), served by {}",
+                        i + 1,
+                        err.code(),
+                        out.response.provider
+                    ));
+                    out
+                }
+                (Err(err), _) => return Err(err),
+            };
+            let latency_ms = hop_started.elapsed().as_millis() as u64;
+
+            if i == 0 && source == "auto" {
+                let mut found = crate::core::lang::normalize(&out.response.detected_source);
+                // LLM CLIs echo `auto`; the script of the input is enough to
+                // pick the return language and spot a Chinese source.
+                if found == "auto" {
+                    found = crate::core::lang::detect_script(&text)
+                        .unwrap_or("auto")
+                        .to_string();
+                }
+                // The plan guessed a non-Chinese source and went out through
+                // the source itself: rebuild for the detected language and redo.
+                if plan.guessed && found == to {
+                    plan = crate::core::chain::plan(req, &self.settings, &found, &is_llm)?;
+                    plan.guessed = false;
+                    detected = found;
+                    attempts.extend(out.attempts);
+                    continue;
+                }
+                detected = found;
+            }
+
+            attempts.extend(out.attempts);
+            warnings.extend(fallback_note);
+            warnings.extend(out.response.warnings.clone());
+            // A fix hop answers with span edits; only vetted ones touch the
+            // text, and unusable output leaves it as it was.
+            let (hop_text, edits) = if fix {
+                match crate::core::repair::parse_edits(&out.response.text) {
+                    Ok(proposed) => {
+                        let (fixed, edits) =
+                            crate::core::repair::apply_edits(&text, &req.text, proposed);
+                        for e in edits.iter().filter(|e| !e.applied) {
+                            warnings.push(format!(
+                                "fix: skipped edit {:?} -> {:?}: {}",
+                                e.from,
+                                e.to,
+                                e.reason.as_deref().unwrap_or("rejected")
+                            ));
+                        }
+                        (fixed, Some(edits))
+                    }
+                    Err(reason) => {
+                        warnings.push(format!("fix: no edits applied: {reason}"));
+                        (text.clone(), Some(Vec::new()))
+                    }
+                }
+            } else {
+                (out.response.text.clone(), None)
+            };
+            llm_history = (llm_hop && !fix).then(|| (text.clone(), hop_text.clone()));
+            chain.push(if fix { "fix".into() } else { to.clone() });
+            hops.push(Hop {
+                from: from.clone(),
+                to: to.clone(),
+                provider: out.response.provider.clone(),
+                text: hop_text.clone(),
+                latency_ms,
+                edits,
+            });
+            text = hop_text;
+            from = to;
+            i += 1;
         }
-        // Sending text to its own language is not a round trip.
-        if pivot == source {
-            pivot = crate::core::lang::alternate_pivot(&pivot).to_string();
+
+        let missing_facts = crate::core::facts::missing_facts(&req.text, &text);
+        if !missing_facts.is_empty() {
+            warnings.push(format!("fact check: missing {}", missing_facts.join(", ")));
         }
-
-        let hop = |text: String, from: String, to: String| TranslateRequest {
-            text,
-            source_lang: from,
-            target_lang: to,
-            provider: req.provider.clone(),
-            fallback_chain: req.fallback_chain.clone(),
-            preserve: req.preserve.clone(),
-            timeout_ms: req.timeout_ms,
-            idempotency_key: Some(request_id.clone()),
-            metadata: req.metadata.clone(),
-        };
-
-        let mut first = self
-            .translate(&hop(req.text.clone(), source.clone(), pivot.clone()))
-            .await?;
-        let mut detected = crate::core::lang::normalize(&first.response.detected_source);
-
-        // `auto` guessed Chinese because the source was unknown. If the text is
-        // Chinese the guess was the source itself, so redo into English.
-        if requested_pivot == "auto" && detected == pivot {
-            pivot = crate::core::lang::alternate_pivot(&pivot).to_string();
-            first = self
-                .translate(&hop(req.text.clone(), source.clone(), pivot.clone()))
-                .await?;
-            detected = crate::core::lang::normalize(&first.response.detected_source);
-        }
-
-        let mut back = if detected == "auto" || !crate::core::lang::is_known(&detected) {
-            crate::core::lang::default_pivot(&pivot).to_string()
-        } else {
-            detected.clone()
-        };
-        if back == pivot {
-            back = crate::core::lang::alternate_pivot(&pivot).to_string();
-        }
-
-        let second = self
-            .translate(&hop(first.response.text.clone(), pivot.clone(), back))
-            .await?;
-
-        let mut warnings = first.response.warnings.clone();
-        warnings.extend(second.response.warnings.clone());
-        let mut attempts = first.attempts;
-        attempts.extend(second.attempts);
-
-        let pivot_text = first.response.text;
-        let first_provider = first.response.provider;
-        let final_text = second.response.text;
-        let final_provider = second.response.provider;
-
+        let provider = hops.last().map(|h| h.provider.clone()).unwrap_or_default();
         Ok(RoundtripOutcome {
             response: crate::core::types::RoundtripResponse {
-                text: final_text,
-                detected_source: detected,
-                pivot_lang: pivot,
-                pivot_text,
-                provider: final_provider.clone(),
-                providers: vec![first_provider, final_provider],
+                text,
+                detected_source: from,
+                chain,
+                hops,
+                provider,
+                missing_facts,
                 latency_ms: started.elapsed().as_millis() as u64,
                 request_id,
                 chars: Some(req.text.chars().count()),
@@ -369,6 +509,47 @@ impl Engine {
         })
     }
 
+    /// Auto chain for a hop whose named engine failed: no LLM providers, not
+    /// the failed engine, and not the previous hop's provider unless nothing
+    /// else can serve the pair.
+    fn hop_fallback(
+        &self,
+        req: &TranslateRequest,
+        failed: &str,
+        prev: Option<&str>,
+        next: Option<&str>,
+    ) -> Vec<String> {
+        let failed = self
+            .registry
+            .get(failed)
+            .map_or_else(|| failed.to_string(), |p| p.info().name);
+        let Ok(auto) = self.registry.chain(
+            None,
+            &req.fallback_chain,
+            &self.chain,
+            &req.source_lang,
+            &req.target_lang,
+        ) else {
+            return Vec::new();
+        };
+        let names: Vec<String> = auto
+            .iter()
+            .map(|p| p.info())
+            .filter(|info| info.kind != ProviderKind::Llm && info.name != failed)
+            .map(|info| info.name)
+            .collect();
+        let fresh: Vec<String> = names
+            .iter()
+            .filter(|n| Some(n.as_str()) != prev && Some(n.as_str()) != next)
+            .cloned()
+            .collect();
+        if fresh.is_empty() {
+            names
+        } else {
+            fresh
+        }
+    }
+
     /// One provider, every key, every retry: the body of the fallback chain,
     /// callable concurrently. Owns its cooldown bookkeeping so the driver only
     /// merges results.
@@ -376,11 +557,34 @@ impl Engine {
         &self,
         provider: Arc<dyn Provider>,
         req: &TranslateRequest,
-        preserver: Option<&Preserver>,
+        preserve: Option<&Preserve>,
         budget: Duration,
         budget_ms: u64,
     ) -> ProviderRun {
+        use crate::providers::cli_llm::{PRESERVE_KEY, STYLE_KEY};
+        use std::borrow::Cow;
+
         let info = provider.info();
+        let llm = info.kind == ProviderKind::Llm;
+        // A fix hop answers with edits, not the text, so spans cannot be checked.
+        let fix = req.metadata.get(STYLE_KEY).and_then(|v| v.as_str()) == Some("fix");
+        let (req, spans): (Cow<TranslateRequest>, &[String]) = match preserve {
+            None => (Cow::Borrowed(req), &[]),
+            Some(_) if llm && fix => (Cow::Borrowed(req), &[]),
+            Some(p) if llm => {
+                let mut r = req.clone();
+                r.metadata
+                    .insert(PRESERVE_KEY.into(), serde_json::json!(p.spans));
+                (Cow::Owned(r), &p.spans)
+            }
+            Some(p) => {
+                let mut r = req.clone();
+                r.text = p.masked.clone();
+                (Cow::Owned(r), &[])
+            }
+        };
+        let req = req.as_ref();
+        let preserver = preserve.filter(|_| !llm).map(|p| &p.preserver);
         let mut run = ProviderRun {
             name: info.name.clone(),
             result: None,
@@ -461,6 +665,10 @@ impl Engine {
                                     break;
                                 }
                             };
+                        }
+                        for span in spans.iter().filter(|s| !resp.text.contains(s.as_str())) {
+                            resp.warnings
+                                .push(format!("preserve: {} dropped {span}", info.name));
                         }
                         ring.record_success(&label);
                         run.attempts.push(AttemptRecord {
@@ -1184,11 +1392,21 @@ mod tests {
         )
     }
 
+    fn single_hop(source: &str) -> crate::core::types::RoundtripRequest {
+        crate::core::types::RoundtripRequest {
+            depth: Some(1),
+            ..roundtrip_req(source, "auto")
+        }
+    }
+
     fn roundtrip_req(source: &str, pivot: &str) -> crate::core::types::RoundtripRequest {
         crate::core::types::RoundtripRequest {
             text: "hello".into(),
             source_lang: source.into(),
             pivot: pivot.into(),
+            chain: Vec::new(),
+            depth: None,
+            preset: None,
             provider: None,
             fallback_chain: Vec::new(),
             preserve: Vec::new(),
@@ -1217,19 +1435,28 @@ mod tests {
             .expect("roundtrip");
 
         let calls = calls.lock().unwrap().clone();
-        assert_eq!(calls.len(), 2, "one hop out, one hop back");
+        assert_eq!(calls.len(), 3, "two hops out, one hop back");
         assert_eq!(calls[0].0, "en");
         assert_eq!(calls[0].1, "zh", "English goes out through Chinese");
         assert_eq!(calls[1].0, "zh");
-        assert_eq!(calls[1].1, "en");
+        assert_eq!(calls[1].1, "ja");
+        assert_eq!(calls[2].0, "ja");
+        assert_eq!(calls[2].1, "en");
 
-        assert_eq!(out.response.pivot_lang, "zh");
+        assert_eq!(out.response.chain, vec!["zh", "ja", "en"]);
         assert_eq!(out.response.detected_source, "en");
-        assert_eq!(out.response.pivot_text, "hello(zh)");
-        assert_eq!(out.response.text, "hello(zh)(en)");
-        assert_eq!(out.response.providers, vec!["recorder", "recorder"]);
+        assert_eq!(out.response.hops[0].text, "hello(zh)");
+        assert_eq!(out.response.text, "hello(zh)(ja)(en)");
+        let providers: Vec<_> = out
+            .response
+            .hops
+            .iter()
+            .map(|h| h.provider.as_str())
+            .collect();
+        assert_eq!(providers, vec!["recorder"; 3]);
+        assert!(out.response.missing_facts.is_empty());
         assert_eq!(out.response.request_id, "rt-1");
-        assert_eq!(out.attempts.len(), 2);
+        assert_eq!(out.attempts.len(), 3);
     }
 
     #[tokio::test]
@@ -1250,7 +1477,7 @@ mod tests {
         );
 
         engine
-            .roundtrip(&roundtrip_req("en", "auto"))
+            .roundtrip(&single_hop("en"))
             .await
             .expect("roundtrip");
 
@@ -1278,10 +1505,11 @@ mod tests {
             .expect("roundtrip");
 
         let calls = calls.lock().unwrap().clone();
-        assert_eq!(calls.len(), 2);
+        assert_eq!(calls.len(), 3);
         assert_eq!(calls[0].1, "en", "Chinese goes out through English");
-        assert_eq!(calls[1].1, "zh");
-        assert_eq!(out.response.pivot_lang, "en");
+        assert_eq!(calls[1].1, "ja");
+        assert_eq!(calls[2].1, "zh");
+        assert_eq!(out.response.chain, vec!["en", "ja", "zh"]);
     }
 
     #[tokio::test]
@@ -1305,11 +1533,12 @@ mod tests {
             .expect("roundtrip");
 
         let calls = calls.lock().unwrap().clone();
-        assert_eq!(calls.len(), 3, "zh guess, redo into en, then back");
+        assert_eq!(calls.len(), 4, "zh guess, redo into en, ja, then back");
         assert_eq!(calls[0].1, "zh");
         assert_eq!(calls[1].1, "en");
-        assert_eq!(calls[2].1, "zh");
-        assert_eq!(out.response.pivot_lang, "en");
+        assert_eq!(calls[2].1, "ja");
+        assert_eq!(calls[3].1, "zh");
+        assert_eq!(out.response.chain, vec!["en", "ja", "zh"]);
         assert_eq!(out.response.detected_source, "zh");
     }
 
@@ -1353,5 +1582,397 @@ mod tests {
             .await
             .expect_err("unknown pivot");
         assert_eq!(err.code(), "INVALID_INPUT");
+    }
+
+    type MetaCalls = Arc<std::sync::Mutex<Vec<(String, BTreeMap<String, serde_json::Value>)>>>;
+
+    /// Records target language and metadata per call; `kind` decides whether
+    /// the roundtrip treats it as an LLM hop.
+    struct MetaRecorder {
+        name: &'static str,
+        kind: ProviderKind,
+        calls: MetaCalls,
+    }
+
+    #[async_trait]
+    impl Provider for MetaRecorder {
+        fn info(&self) -> ProviderInfo {
+            ProviderInfo {
+                name: self.name.into(),
+                display_name: self.name.into(),
+                kind: self.kind,
+                priority: 1,
+                needs_key: false,
+                max_chars: 5000,
+                auto_detect: true,
+                languages: vec!["*".into()],
+                free_tier: None,
+                configured: true,
+            }
+        }
+        async fn translate_once(&self, req: &TR, _cred: &Credential) -> R<TranslateResponse> {
+            self.calls
+                .lock()
+                .unwrap()
+                .push((req.target_lang.clone(), req.metadata.clone()));
+            let fix = req
+                .metadata
+                .get("translatex.style")
+                .is_some_and(|s| s == "fix");
+            Ok(TranslateResponse {
+                text: if fix {
+                    r#"```json
+[{"from": "hello", "to": "hullo", "why": "spelling"}, {"from": "zz", "to": "y"}]
+```"#
+                        .into()
+                } else {
+                    format!("{}>{}", req.text, req.target_lang)
+                },
+                detected_source: req.source_lang.clone(),
+                target_lang: req.target_lang.clone(),
+                provider: self.name.into(),
+                engine: self.name.into(),
+                latency_ms: 0,
+                request_id: String::new(),
+                chars: None,
+                warnings: Vec::new(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn chain_roundtrip_marks_llm_hops_and_carries_history() {
+        let home = dir();
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut reg = Registry::new();
+        reg.register(Arc::new(MetaRecorder {
+            name: "llm-a",
+            kind: ProviderKind::Llm,
+            calls: calls.clone(),
+        }));
+        reg.register(Arc::new(MetaRecorder {
+            name: "mt-a",
+            kind: ProviderKind::Web,
+            calls: calls.clone(),
+        }));
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(home.path().to_path_buf()),
+            test_settings(),
+        );
+        let mut req = roundtrip_req("en", "auto");
+        req.text = "Ask Aroha".into();
+        req.chain = vec![
+            "llm-a:zh".into(),
+            "llm-a:ja".into(),
+            "mt-a:fi".into(),
+            "mt-a:en".into(),
+        ];
+
+        let out = engine.roundtrip(&req).await.expect("roundtrip");
+
+        let calls = calls.lock().unwrap().clone();
+        let targets: Vec<_> = calls.iter().map(|c| c.0.as_str()).collect();
+        assert_eq!(targets, vec!["zh", "ja", "fi", "en"]);
+        assert_eq!(calls[0].1["translatex.style"], "humanize");
+        assert!(!calls[0].1.contains_key("translatex.history"));
+        assert!(
+            !calls[0].1.contains_key("translatex.original"),
+            "the first hop reads the original itself"
+        );
+        assert_eq!(calls[1].1["translatex.original"], "Ask Aroha");
+        assert_eq!(calls[1].1["translatex.original_lang"], "en");
+        assert_eq!(
+            calls[1].1["translatex.history"],
+            serde_json::json!({"input": "Ask Aroha", "output": "Ask Aroha>zh"})
+        );
+        assert!(calls[2].1.is_empty(), "MT hops get no style");
+        assert_eq!(out.response.chain, vec!["zh", "ja", "fi", "en"]);
+        let providers: Vec<_> = out
+            .response
+            .hops
+            .iter()
+            .map(|h| h.provider.as_str())
+            .collect();
+        assert_eq!(providers, vec!["llm-a", "llm-a", "mt-a", "mt-a"]);
+        assert_eq!(out.response.hops[1].from, "zh");
+        assert_eq!(out.response.text, "Ask Aroha>zh>ja>fi>en");
+        assert!(out.response.missing_facts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn trailing_fix_repairs_in_place_without_a_return_hop() {
+        let home = dir();
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut reg = Registry::new();
+        reg.register(Arc::new(MetaRecorder {
+            name: "llm-a",
+            kind: ProviderKind::Llm,
+            calls: calls.clone(),
+        }));
+        reg.register(Arc::new(MetaRecorder {
+            name: "mt-a",
+            kind: ProviderKind::Web,
+            calls: calls.clone(),
+        }));
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(home.path().to_path_buf()),
+            test_settings(),
+        );
+        let mut req = roundtrip_req("en", "auto");
+        req.chain = vec!["mt-a:zh".into(), "mt-a:en".into(), "llm-a:fix".into()];
+
+        let out = engine.roundtrip(&req).await.expect("roundtrip");
+
+        let calls = calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), 3, "no hop after the fix");
+        assert!(
+            calls[0].1.is_empty() && calls[1].1.is_empty(),
+            "MT hops get no metadata"
+        );
+        assert_eq!(calls[2].0, "en");
+        assert_eq!(calls[2].1["translatex.style"], "fix");
+        assert_eq!(
+            out.response.text, "hullo>zh>en",
+            "only the vetted edit applies"
+        );
+        let edits = out.response.hops[2].edits.as_ref().expect("fix hop edits");
+        assert!(edits[0].applied);
+        assert_eq!(edits[1].reason.as_deref(), Some("from not found"));
+        assert!(out.response.hops[0].edits.is_none());
+        assert!(out
+            .response
+            .warnings
+            .iter()
+            .any(|w| w.starts_with("fix: skipped edit \"zz\"")));
+        assert_eq!(calls[2].1["translatex.original"], "hello");
+        assert_eq!(out.response.chain, vec!["zh", "en", "fix"]);
+        assert_eq!(out.response.hops[2].from, "en");
+        assert_eq!(out.response.hops[2].to, "en");
+        assert_eq!(out.response.detected_source, "en");
+
+        let mut bad = roundtrip_req("en", "auto");
+        bad.chain = vec!["zh".into(), "mt-a:fix".into()];
+        let err = engine.roundtrip(&bad).await.expect_err("MT cannot fix");
+        assert_eq!(err.code(), "INVALID_INPUT");
+    }
+
+    #[tokio::test]
+    async fn depth_three_visits_three_languages_and_flags_lost_facts() {
+        let home = dir();
+        let (rec, calls) = recorder("en");
+        let mut reg = Registry::new();
+        reg.register(rec);
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(home.path().to_path_buf()),
+            test_settings(),
+        );
+        let mut req = roundtrip_req("en", "auto");
+        req.text = "Pay NZD 18,900".into();
+        req.depth = Some(3);
+
+        let out = engine.roundtrip(&req).await.expect("roundtrip");
+
+        let calls = calls.lock().unwrap().clone();
+        let targets: Vec<_> = calls.iter().map(|c| c.1.as_str()).collect();
+        assert_eq!(targets, vec!["zh", "ja", "fi", "en"]);
+        assert_eq!(out.response.chain, vec!["zh", "ja", "fi", "en"]);
+        // The recorder keeps the text, so nothing is lost.
+        assert!(out.response.missing_facts.is_empty());
+        assert!(out.response.warnings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn explicit_chain_ending_in_the_source_adds_no_hop() {
+        let home = dir();
+        let (rec, calls) = recorder("en");
+        let mut reg = Registry::new();
+        reg.register(rec);
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(home.path().to_path_buf()),
+            test_settings(),
+        );
+        let mut req = roundtrip_req("auto", "auto");
+        req.chain = vec!["zh".into(), "recorder:en".into()];
+
+        let out = engine.roundtrip(&req).await.expect("roundtrip");
+        assert_eq!(calls.lock().unwrap().len(), 2);
+        assert_eq!(out.response.chain, vec!["zh", "en"]);
+        assert_eq!(out.response.detected_source, "en");
+    }
+
+    type Seen = Arc<std::sync::Mutex<Vec<TR>>>;
+    type Reply = fn(&TR) -> R<String>;
+
+    /// Records every request and answers with `reply`.
+    struct Spy {
+        name: &'static str,
+        kind: ProviderKind,
+        seen: Seen,
+        reply: Reply,
+    }
+
+    #[async_trait]
+    impl Provider for Spy {
+        fn info(&self) -> ProviderInfo {
+            ProviderInfo {
+                name: self.name.into(),
+                display_name: self.name.into(),
+                kind: self.kind,
+                priority: 1,
+                needs_key: false,
+                max_chars: 5000,
+                auto_detect: true,
+                languages: vec!["*".into()],
+                free_tier: None,
+                configured: true,
+            }
+        }
+        async fn translate_once(&self, req: &TR, _cred: &Credential) -> R<TranslateResponse> {
+            self.seen.lock().unwrap().push(req.clone());
+            Ok(TranslateResponse {
+                text: (self.reply)(req)?,
+                detected_source: req.source_lang.clone(),
+                target_lang: req.target_lang.clone(),
+                provider: self.name.into(),
+                engine: self.name.into(),
+                latency_ms: 0,
+                request_id: String::new(),
+                chars: None,
+                warnings: Vec::new(),
+            })
+        }
+    }
+
+    fn echo(req: &TR) -> R<String> {
+        Ok(req.text.clone())
+    }
+
+    fn spy_engine(spies: Vec<(&'static str, ProviderKind, Reply)>) -> (Engine, Seen) {
+        let seen: Seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut reg = Registry::new();
+        for (name, kind, reply) in spies {
+            reg.register(Arc::new(Spy {
+                name,
+                kind,
+                seen: seen.clone(),
+                reply,
+            }));
+        }
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(dir().keep()),
+            test_settings(),
+        );
+        (engine, seen)
+    }
+
+    const CODE_TEXT: &str = "Run `make test` before `git push`.";
+
+    #[tokio::test]
+    async fn llm_provider_gets_unmasked_text_and_the_span_list() {
+        let (engine, seen) = spy_engine(vec![("llm-a", ProviderKind::Llm, echo)]);
+        let mut req = request(Some("llm-a"));
+        req.text = CODE_TEXT.into();
+        req.preserve = vec!["@code".into()];
+
+        let out = engine.translate(&req).await.unwrap();
+
+        let sent = seen.lock().unwrap()[0].clone();
+        assert_eq!(sent.text, CODE_TEXT);
+        assert_eq!(
+            sent.metadata["translatex.preserve"],
+            serde_json::json!(["`make test`", "`git push`"])
+        );
+        assert_eq!(out.response.text, CODE_TEXT);
+        assert!(out.response.warnings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn llm_dropping_a_span_warns_without_failing() {
+        let drop_push: Reply = |req| Ok(req.text.replace("`git push`", "git push"));
+        let (engine, _) = spy_engine(vec![("llm-a", ProviderKind::Llm, drop_push)]);
+        let mut req = request(Some("llm-a"));
+        req.text = CODE_TEXT.into();
+        req.preserve = vec!["@code".into()];
+
+        let out = engine.translate(&req).await.unwrap();
+
+        assert_eq!(
+            out.response.warnings,
+            vec!["preserve: llm-a dropped `git push`"]
+        );
+    }
+
+    #[tokio::test]
+    async fn mt_provider_still_gets_masked_text() {
+        let (engine, seen) = spy_engine(vec![("mt-a", ProviderKind::Web, echo)]);
+        let mut req = request(Some("mt-a"));
+        req.text = CODE_TEXT.into();
+        req.preserve = vec!["@code".into()];
+
+        let out = engine.translate(&req).await.unwrap();
+
+        let sent = seen.lock().unwrap()[0].clone();
+        assert!(!sent.text.contains('`'), "masked: {}", sent.text);
+        assert!(!sent.metadata.contains_key("translatex.preserve"));
+        assert_eq!(out.response.text, CODE_TEXT);
+    }
+
+    fn rate_limited(_: &TR) -> R<String> {
+        Err(Error::RateLimited {
+            provider: "stub".into(),
+            retry_after_secs: None,
+        })
+    }
+
+    #[tokio::test]
+    async fn named_mt_hop_falls_back_on_a_retryable_error() {
+        let (engine, seen) = spy_engine(vec![
+            ("mt-a", ProviderKind::Web, echo),
+            ("mt-b", ProviderKind::Web, rate_limited),
+            ("llm-a", ProviderKind::Llm, echo),
+            ("mt-c", ProviderKind::Web, echo),
+        ]);
+        let mut req = roundtrip_req("en", "auto");
+        req.chain = vec!["mt-a:zh".into(), "mt-b:fi".into(), "mt-a:en".into()];
+
+        let out = engine.roundtrip(&req).await.expect("roundtrip");
+
+        let providers: Vec<_> = out
+            .response
+            .hops
+            .iter()
+            .map(|h| h.provider.as_str())
+            .collect();
+        assert_eq!(providers, vec!["mt-a", "mt-c", "mt-a"]);
+        assert!(out
+            .response
+            .warnings
+            .contains(&"hop 2: mt-b failed (RATE_LIMITED), served by mt-c".to_string()));
+        assert_eq!(seen.lock().unwrap().len(), 4, "mt-a, mt-b, mt-c, mt-a");
+    }
+
+    #[tokio::test]
+    async fn named_llm_hop_does_not_fall_back() {
+        let (engine, seen) = spy_engine(vec![
+            ("llm-a", ProviderKind::Llm, rate_limited),
+            ("mt-a", ProviderKind::Web, echo),
+        ]);
+        let mut req = roundtrip_req("en", "auto");
+        req.chain = vec!["llm-a:zh".into(), "mt-a:en".into()];
+
+        let err = engine.roundtrip(&req).await.unwrap_err();
+
+        assert_eq!(err.code(), "RATE_LIMITED");
+        assert_eq!(seen.lock().unwrap().len(), 1);
     }
 }

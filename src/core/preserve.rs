@@ -21,7 +21,8 @@ impl Preserver {
         }
         let mut compiled = Vec::with_capacity(patterns.len());
         for p in patterns {
-            compiled.push(Regex::new(p).map_err(|e| Error::BadPattern(format!("{p}: {e}")))?);
+            let pattern = builtin(p).unwrap_or(p.as_str());
+            compiled.push(Regex::new(pattern).map_err(|e| Error::BadPattern(format!("{p}: {e}")))?);
         }
         Ok(Some(Self {
             patterns: compiled,
@@ -29,37 +30,47 @@ impl Preserver {
         }))
     }
 
-    /// Replace every match with a token. Patterns apply in order; later
-    /// patterns cannot re-match text already tokenised.
-    pub fn mask(&mut self, text: &str) -> String {
-        self.tokens.clear();
-        // Collect all matches from all patterns on the original text.
-        // For each character, record which token index (if any) covers it.
-        let mut matches: Vec<Option<usize>> = vec![None; text.len()];
-        // Map from "proposed token index" -> "actual token index in self.tokens"
-        // Only matches that contribute new characters get an actual token.
-        let mut idx_map: Vec<Option<usize>> = Vec::new();
+    /// Every distinct protected span in `text`, in match order, without
+    /// masking: for providers that keep real spans better than placeholders.
+    pub fn spans(&self, text: &str) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for span in self.cover(text).1 {
+            if !out.contains(&span) {
+                out.push(span);
+            }
+        }
+        out
+    }
 
+    /// Per-byte token index plus the matched text of each token. Patterns
+    /// apply in order; a match that adds no uncovered byte gets no token.
+    fn cover(&self, text: &str) -> (Vec<Option<usize>>, Vec<String>) {
+        let mut matches: Vec<Option<usize>> = vec![None; text.len()];
+        let mut tokens: Vec<String> = Vec::new();
         for re in self.patterns.iter() {
             for m in re.find_iter(text) {
-                let proposed_idx = idx_map.len();
-                idx_map.push(None);
-                // Check if this match contributes any new characters.
                 let contributes = matches[m.start()..m.end()]
                     .iter()
                     .any(|slot| slot.is_none());
                 if contributes {
-                    let actual_idx = self.tokens.len();
-                    idx_map[proposed_idx] = Some(actual_idx);
-                    self.tokens.push(text[m.start()..m.end()].to_string());
+                    let idx = tokens.len();
+                    tokens.push(text[m.start()..m.end()].to_string());
                     for slot in &mut matches[m.start()..m.end()] {
                         if slot.is_none() {
-                            *slot = Some(actual_idx);
+                            *slot = Some(idx);
                         }
                     }
                 }
             }
         }
+        (matches, tokens)
+    }
+
+    /// Replace every match with a token. Patterns apply in order; later
+    /// patterns cannot re-match text already tokenised.
+    pub fn mask(&mut self, text: &str) -> String {
+        let (matches, tokens) = self.cover(text);
+        self.tokens = tokens;
         // Build the masked string.
         let mut out = String::with_capacity(text.len());
         let mut i = 0;
@@ -137,9 +148,40 @@ fn find_stray_token(text: &str) -> Option<String> {
     re.find(text).map(|m| m.as_str().to_string())
 }
 
+/// Named patterns, so callers need no regex metacharacters: a Windows npm
+/// `.cmd` shim runs through cmd.exe, which strips `^` from `[^`]*`.
+fn builtin(name: &str) -> Option<&'static str> {
+    match name {
+        "@code" => Some(r"(?s)```.*?```|`[^`\n]+`"),
+        "@url" => Some(r#"https?://[^\s<>"'`)\]]+"#),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn builtin_code_and_url_patterns() {
+        let mut p = Preserver::new(&["@code".into(), "@url".into()])
+            .unwrap()
+            .unwrap();
+        let src = "Run `make test`, see https://example.com/a?b=1 and\n```\nfn x() {}\n```";
+        let masked = p.mask(src);
+        assert!(!masked.contains("make test"));
+        assert!(!masked.contains("example.com"));
+        assert!(!masked.contains("fn x()"));
+        assert_eq!(p.restore(&masked).unwrap(), src);
+    }
+
+    #[test]
+    fn spans_lists_matches_without_masking() {
+        let p = Preserver::new(&["@code".into()]).unwrap().unwrap();
+        let src = "Run `make test`, then `make test` and `ls`.";
+        assert_eq!(p.spans(src), vec!["`make test`", "`ls`"]);
+        assert!(p.tokens.is_empty(), "spans must not mask");
+    }
 
     #[test]
     fn no_patterns_is_noop() {

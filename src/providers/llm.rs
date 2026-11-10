@@ -36,16 +36,22 @@ struct Choice {
 }
 
 /// Build the translation prompt. Kept free so tests need no HTTP.
-fn build_prompt(source: &str, target: &str) -> String {
-    let src = if source == "auto" {
+fn build_prompt(req: &TranslateRequest) -> String {
+    let src = if req.source_lang == "auto" {
         "the detected source language"
     } else {
-        source
+        req.source_lang.as_str()
     };
-    format!(
+    let target = &req.target_lang;
+    let mut prompt = format!(
         "Translate the user's text from {src} to {target}. Output ONLY the translated text. \
          No explanations, no notes. Preserve formatting, code blocks and placeholders exactly."
-    )
+    );
+    if let Some(clause) = crate::providers::cli_llm::preserve_clause(req) {
+        prompt.push('\n');
+        prompt.push_str(&clause);
+    }
+    prompt
 }
 
 pub struct Llm {
@@ -148,7 +154,7 @@ impl Provider for Llm {
             messages: vec![
                 Message {
                     role: "system".into(),
-                    content: build_prompt(&req.source_lang, &req.target_lang),
+                    content: build_prompt(req),
                 },
                 Message {
                     role: "user".into(),
@@ -212,15 +218,40 @@ impl Provider for Llm {
 mod tests {
     use super::*;
 
+    fn req(source: &str, target: &str) -> TranslateRequest {
+        TranslateRequest {
+            text: "hi".into(),
+            source_lang: source.into(),
+            target_lang: target.into(),
+            provider: None,
+            fallback_chain: Vec::new(),
+            preserve: Vec::new(),
+            timeout_ms: None,
+            idempotency_key: None,
+            metadata: BTreeMap::new(),
+        }
+    }
+
     #[test]
     fn prompt_names_both_languages() {
-        let p = build_prompt("en", "zh");
+        let p = build_prompt(&req("en", "zh"));
         assert!(p.contains("en") && p.contains("zh") && p.contains("ONLY"));
+        assert!(!p.contains("These spans"));
     }
 
     #[test]
     fn prompt_handles_auto_source() {
-        assert!(build_prompt("auto", "ja").contains("detected source language"));
+        assert!(build_prompt(&req("auto", "ja")).contains("detected source language"));
+    }
+
+    #[test]
+    fn prompt_lists_preserve_spans() {
+        let mut r = req("en", "zh");
+        r.metadata.insert(
+            crate::providers::cli_llm::PRESERVE_KEY.into(),
+            serde_json::json!(["`a.php`"]),
+        );
+        assert!(build_prompt(&r).ends_with("character for character:\n`a.php`"));
     }
 
     #[tokio::test]

@@ -110,7 +110,7 @@ pub enum Command {
         json: Option<String>,
     },
 
-    /// Translate out through a pivot language and back, to strip machine-flavoured phrasing.
+    /// Translate out through one or more hops and back, to strip machine-flavoured phrasing.
     #[command(alias = "polish")]
     Roundtrip {
         /// Text to round-trip. Omit to read stdin.
@@ -123,6 +123,18 @@ pub enum Command {
         /// Bridge language, or auto for the recommended pair.
         #[arg(long, default_value = "auto")]
         pivot: String,
+
+        /// Hop list `[engine:]lang` or `llm-engine:fix`, e.g. claude-cli:zh,google:fi,edge:en.
+        #[arg(long, value_delimiter = ',')]
+        chain: Vec<String>,
+
+        /// Machine-translation hops before returning (1-3).
+        #[arg(long, value_parser = clap::value_parser!(u8).range(1..=3))]
+        depth: Option<u8>,
+
+        /// Built-in chain: mt (2 MT hops), mt-deep (3), llm, lynote, lynote-fix.
+        #[arg(long)]
+        preset: Option<String>,
 
         /// Provider name, or auto to walk the fallback chain.
         #[arg(short, long, default_value = "auto")]
@@ -345,6 +357,13 @@ pub fn build_registry(creds: &CredentialStore, settings: &Settings) -> Registry 
     // fanyi.xfyun.cn now needs a logged-in account, so the old `iflytek` web
     // endpoints are gone; iflyrec is iFlytek's open one. Same move as the fork.
     reg.alias("iflytek", "iflyrec");
+    // Keyless but never automatic: they run only when named.
+    reg.register(Arc::new(cli_llm::CliLlm::claude(
+        &settings.provider(cli_llm::CLAUDE_CLI),
+    )));
+    reg.register(Arc::new(cli_llm::CliLlm::opencode(
+        &settings.provider(cli_llm::OPENCODE_CLI),
+    )));
     build_keyed(&mut reg, creds, settings);
     reg
 }
@@ -502,6 +521,9 @@ async fn cmd_roundtrip(cli: &Cli, ctx: &Ctx) -> Result<()> {
         text,
         from,
         pivot,
+        chain,
+        depth,
+        preset,
         provider,
         fallback,
         preserve,
@@ -521,6 +543,9 @@ async fn cmd_roundtrip(cli: &Cli, ctx: &Ctx) -> Result<()> {
             text: text.clone().map(Ok).unwrap_or_else(read_stdin_text)?,
             source_lang: from.clone(),
             pivot: pivot.clone(),
+            chain: chain.clone(),
+            depth: *depth,
+            preset: preset.clone(),
             provider: normalize_provider(provider),
             fallback_chain: fallback.clone(),
             preserve: preserve.clone(),
@@ -910,7 +935,7 @@ pub fn manifest_document() -> Result<serde_json::Value> {
             {
                 "name": "roundtrip",
                 "command": "translatex roundtrip --json '{request}' --format json",
-                "description": "Translate through a pivot language and back into the source language, which rewrites the phrasing and strips machine-flavoured cadence.",
+                "description": "Translate through a chain of languages (machine translation or a local LLM CLI) and back into the source language, which rewrites the phrasing and strips machine-flavoured cadence. Reports missingFacts for names, numbers and IDs the output lost.",
                 "inputSchema": roundtrip_schema
             },
             {

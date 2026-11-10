@@ -31,25 +31,41 @@ fn default_auto() -> String {
     "auto".into()
 }
 
-/// Round trip through a pivot language: source -> pivot -> source. The second
-/// hop is what strips machine-flavoured phrasing, because the pivot forces the
-/// text through a different syntax instead of paraphrasing in place.
+/// Round trip through one or more hops and back to the source language. Each
+/// hop forces the text through a different syntax; LLM hops also rewrite the
+/// sentence shapes that machine translation keeps.
+///
+/// Hop selection, first match wins: `chain`, `preset`, `depth`, a non-auto
+/// `pivot`, then the configured `roundtrip_preset`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RoundtripRequest {
     pub text: String,
     #[serde(default = "default_auto")]
     pub source_lang: String,
-    /// Bridge language. `auto` uses the recommended pair for the source
+    /// Single bridge language. `auto` uses the recommended pair for the source
     /// (English for Chinese, Chinese for everything else).
     #[serde(default = "default_auto")]
     pub pivot: String,
+    /// Hop specs `[engine:]lang`, e.g. `["claude-cli:zh", "google:fi", "edge:en"]`.
+    /// No engine (or `auto`) uses the fallback race. A hop back to the source
+    /// is appended when the last hop is not the source language.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chain: Vec<String>,
+    /// Machine-translation hops before returning: 1-3 (zh, ja, fi; en, ja, fi for Chinese).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depth: Option<u8>,
+    /// Built-in chain: `mt`, `mt-deep`, `llm`, `lynote`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preset: Option<String>,
+    /// Provider for hops without an engine.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fallback_chain: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub preserve: Vec<String>,
+    /// Per-hop timeout.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -58,19 +74,63 @@ pub struct RoundtripRequest {
     pub metadata: BTreeMap<String, serde_json::Value>,
 }
 
+/// One translation step of a round trip.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Hop {
+    pub from: String,
+    pub to: String,
+    pub provider: String,
+    /// Output of this hop, kept so a caller can audit it.
+    pub text: String,
+    pub latency_ms: u64,
+    /// Repairs proposed by a `fix` hop and whether each was applied.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edits: Option<Vec<HopEdit>>,
+}
+
+/// What a `fix` hop edit repairs. Fact edits skip the copy-back budget.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum EditKind {
+    Fact,
+    #[default]
+    Meaning,
+}
+
+/// One meaning repair from a `fix` hop: replace `from` (a span of the hop
+/// input) with `to`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct HopEdit {
+    pub from: String,
+    pub to: String,
+    #[serde(default)]
+    pub why: String,
+    /// `fact` when applying it restored a fact the rewrite had lost.
+    #[serde(default)]
+    pub kind: EditKind,
+    #[serde(default)]
+    pub applied: bool,
+    /// Why the edit was skipped.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RoundtripResponse {
     /// Final text, back in the detected source language.
     pub text: String,
     pub detected_source: String,
-    pub pivot_lang: String,
-    /// The intermediate translation, kept so a caller can audit the hop.
-    pub pivot_text: String,
+    /// Languages visited after the source, in order; ends with the source.
+    pub chain: Vec<String>,
+    pub hops: Vec<Hop>,
     /// Provider that served the final hop.
     pub provider: String,
-    /// One entry per hop, in order.
-    pub providers: Vec<String>,
+    /// Names, numbers, IDs, URLs and code spans from the input that the
+    /// output lost. Empty when every checked token survived.
+    pub missing_facts: Vec<String>,
     pub latency_ms: u64,
     pub request_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
