@@ -48,6 +48,21 @@ happened. A round trip also returns `chain`, `hops`, `missingFacts` and
 `roundtrip` returns text in the language it started from, so it can only humanise
 the target language once the text is already in it.
 
+## With a humanizer skill
+
+If a `humanizer` skill is installed, it owns humanising prose. Use `roundtrip`
+for that only when the user names translatex or asks for a round trip, and then:
+
+1. Run the humanizer skill first. It restructures the text and audits every fact
+   against the source.
+2. Round-trip its output with a preset from the table below (`--preset llm` by
+   default).
+3. Hand the result back to the humanizer audit: compare it with the original
+   source (its `lint.py --source` where available) and look for structural tells
+   a machine-translation hop brought back.
+
+Without a humanizer skill, use the round trip on its own as described here.
+
 ## Choosing the preset
 
 | Goal | Preset | Cost |
