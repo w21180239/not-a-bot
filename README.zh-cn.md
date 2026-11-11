@@ -7,7 +7,7 @@
 用你自己的 Claude 或 OpenCode 订阅，对 AI 生成的文字做人性化改写和润色。人名、数字、代码原样保留，丢了什么会明确告诉你。同一个 6 MB 二进制还能通过 28 个翻译引擎翻译，其中 14 个是免费网页接口、不需要 Key，并带一份 skill，24 家编码 Agent 复制即用。
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#许可)
-[![Tests](https://img.shields.io/badge/tests-302-brightgreen.svg)](#开发)
+[![Tests](https://img.shields.io/badge/tests-319-brightgreen.svg)](#开发)
 [![Providers](https://img.shields.io/badge/providers-28-blueviolet.svg)](#provider-一览)
 [![Binary](https://img.shields.io/badge/binary-6%20MB-lightgrey.svg)](#安装)
 [![Agent-native](https://img.shields.io/badge/agent--native-JSON-purple.svg)](#支持的-harness)
@@ -514,7 +514,7 @@ api_key = "..."
 ## 开发
 
 ```bash
-cargo test                # 302 个测试
+cargo test                # 319 个测试
 cargo build --release     # 开 LTO 约 5 分钟
 cargo clippy --all-targets
 ```

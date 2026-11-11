@@ -7,7 +7,7 @@
 Перепишите сгенерированный текст на своей подписке Claude или OpenCode. Имена, числа и код остаются на месте, а если что-то потерялось, translatex скажет об этом. Тот же бинарник на 6 МБ переводит через 28 движков (14 из них бесплатные веб-эндпоинты без ключа) и поставляется с одним skill-файлом, который подключают 24 coding-агента.
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#документация-и-лицензия)
-[![Tests](https://img.shields.io/badge/tests-302-brightgreen.svg)](https://github.com/w21180239/translatex)
+[![Tests](https://img.shields.io/badge/tests-319-brightgreen.svg)](https://github.com/w21180239/translatex)
 [![Providers](https://img.shields.io/badge/providers-28-blueviolet.svg)](#провайдеры)
 [![Binary](https://img.shields.io/badge/binary-6%20MB-lightgrey.svg)](#установка)
 [![Agent-native](https://img.shields.io/badge/agent--native-JSON-purple.svg)](#поддерживаемые-harness)

@@ -7,7 +7,7 @@
 Rewrite AI-generated text so it reads like a person wrote it, using your own Claude or OpenCode subscription. Names, numbers and code stay intact, and translatex tells you if anything went missing. The same 6 MB binary translates through 28 engines, 14 of them free web endpoints that need no key, and ships one skill file that 24 coding agents can install with a copy.
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
-[![Tests](https://img.shields.io/badge/tests-302-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/tests-319-brightgreen.svg)](#development)
 [![Providers](https://img.shields.io/badge/providers-28-blueviolet.svg)](#provider-matrix)
 [![Binary](https://img.shields.io/badge/binary-6%20MB-lightgrey.svg)](#install)
 [![Agent-native](https://img.shields.io/badge/agent--native-JSON-purple.svg)](#supported-harnesses)
@@ -523,7 +523,7 @@ Full reference: [docs/en/api/OVERVIEW.md](./docs/en/api/OVERVIEW.md).
 ## Development
 
 ```bash
-cargo test                # 302 tests
+cargo test                # 319 tests
 cargo build --release     # ~5 min with LTO
 cargo clippy --all-targets
 ```
