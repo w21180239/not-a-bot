@@ -12,7 +12,7 @@ An agent should never parse human-oriented output or guess a retry strategy. Rea
 
 ```bash
 translatex translate "Hello world" -t zh --format json
-translatex roundtrip "In today's fast-paced landscape, …" --from en --preset llm --preserve @code --format json
+translatex roundtrip "In today's fast-paced landscape, …" --from en --preset standard --preserve @code --format json
 translatex batch --file jobs.ndjson --parallel 4
 translatex providers --format json
 translatex languages --provider google --format json
@@ -162,15 +162,15 @@ hop), `provider` (final hop), `missingFacts`, `warnings`, `latencyMs`,
 more than one run happened, `candidates` (`presetOrChain`, `score`,
 `missingFacts` count).
 
-- Hop selection, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, configured `roundtrip_preset` (default `mt`).
+- Hop selection, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, configured `roundtrip_preset` (default `light`).
 - `--chain "claude-cli:zh,google:fi,edge:en"`: hops `[engine:]lang`; no engine races the fallback chain; a named MT engine is preferred, and a retryable failure (`RATE_LIMITED`, `TIMEOUT`, `NETWORK_ERROR`, `QUOTA_EXHAUSTED`) hands the hop to the automatic chain, avoiding the previous hop's provider, with a `hop <n>: <engine> failed (<code>), served by <other>` warning; named LLM engines never fall back; a hop back to the source is appended when needed. `engine:fix` (LLM engines only) stays in the current language and repairs meaning against the original.
 - `fix` hop edits carry `kind`: `fact` edits restore a lost name, number or other fact and always apply; `meaning` edits share one budget, so together they cannot copy the original back.
-- `--depth 1-3`: machine translation only, zh -> ja -> fi (en -> ja -> fi for Chinese). The default preset `mt` is depth 2.
-- Presets: `mt` (default, two machine hops), `mt-deep` (three), `llm` (out and back through `roundtrip_llm`, default `opencode-cli`, alternative `claude-cli`), `lynote` (LLM zh, LLM ja, google fi, edge back), `lynote-fix` (`lynote` plus a final repair hop). Config `roundtrip_preset` (default `mt`), env `TRANSLATEX_ROUNDTRIP_PRESET`, `TRANSLATEX_ROUNDTRIP_LLM`.
+- `--depth 1-3`: machine translation only, zh -> ja -> fi (en -> ja -> fi for Chinese). The default preset `light` is depth 2.
+- Presets: `light` (default, two machine hops), `standard` (LLM out and back through `roundtrip_llm`, default `opencode-cli`, alternative `claude-cli`), `strong` (LLM zh, LLM ja, google fi, edge back, then a repair hop). Any other name fails with `INVALID_INPUT` listing `light, standard, strong`. Config `roundtrip_preset` (default `light`), env `TRANSLATEX_ROUNDTRIP_PRESET`, `TRANSLATEX_ROUNDTRIP_LLM`.
 - LLM hops rewrite in humanize style; later LLM hops also get the previous LLM hop as history and the original text.
 - Machine hops change words but keep sentence shapes ("not just X, it's Y" survives) and respell names (Aroha -> Aloha). Read `missingFacts` (also a `fact check:` warning) and `warnings`, and report them; names are checked as whole words in Latin-script text, and a name that doubles as a common sentence-starting word can slip through.
-- LLM presets rebuild the sentences and remove the structural tells; `lynote-fix` rewrites most. Use `--preserve @code` and `--preserve @url` for code and links. No preset is a claim about AI detectors.
-- `--scorer "<command>"` (config `roundtrip_scorer`), for benchmarks and tuning rather than live requests: a detector reads each result on stdin and prints a 0-1 score (higher = more AI-like) on its last stdout line; no shell; a failure adds a `scorer: ... unscored` warning. `--best-of 1-5` keeps the run with no missing facts (else the fewest), then the lowest score. `--target-score 0-1` then climbs `roundtrip_ladder` (default `llm,lynote-fix`) and warns `target score not met` when no rung reaches it. Both need a scorer, else `INVALID_INPUT`. A score is one detector's measurement; report it per detector.
+- LLM presets rebuild the sentences and remove the structural tells; `strong` rewrites most. Use `--preserve @code` and `--preserve @url` for code and links. No preset is a claim about AI detectors.
+- `--scorer "<command>"` (config `roundtrip_scorer`), for benchmarks and tuning rather than live requests: a detector reads each result on stdin and prints a 0-1 score (higher = more AI-like) on its last stdout line; no shell; a failure adds a `scorer: ... unscored` warning. `--best-of 1-5` keeps the run with no missing facts (else the fewest), then the lowest score. `--target-score 0-1` then climbs `roundtrip_ladder` (default `standard,strong`) and warns `target score not met` when no rung reaches it. Both need a scorer, else `INVALID_INPUT`. A score is one detector's measurement; report it per detector.
 - `--pivot ja` rewrites as strongly and keeps more grammar; use it for technical English.
 - Never round-trip legal text, API reference, configuration or numbers the reader will check; the fact guard is a heuristic.
 

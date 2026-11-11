@@ -12,7 +12,7 @@
 [![Binary](https://img.shields.io/badge/binary-6%20MB-lightgrey.svg)](#安装)
 [![Agent-native](https://img.shields.io/badge/agent--native-JSON-purple.svg)](#支持的-harness)
 
-`translatex roundtrip "<AI 味的文字>" --from en --preset llm`
+`translatex roundtrip "<AI 味的文字>" --from en --preset standard`
 
 [English](./README.md) · [简体中文](./README.zh-cn.md) · [Русский](./README.ru.md) · [文档](./docs/README.md)
 
@@ -47,7 +47,7 @@
 - **AI 文字人性化改写。** `translatex roundtrip` 改写带 AI 味的文字（套话开头、"不仅……更是……"、"值得注意的是"），让它读起来像人写的。它用你自己的 Claude Code 或 OpenCode 订阅，不用 API Key，也没有额外账单。原理是由 LLM 来做的回译：翻到另一种语言再翻回来，两跳都在改写。
 - **免费的往返。** 默认预设走免费网页引擎，零成本。它改用词、保留句子结构，速度快，改写力度较轻。
 - **事实不丢。** 每次往返后都拿原文核对人名、数字、ID、URL 和代码。丢了什么，会列在 `missingFacts` 里并给出警告。
-- **修复一跳。** `lynote-fix` 在最后加一跳，让 LLM 提出小编辑。translatex 只应用精确且很小的编辑，所以改写结果保留，丢掉的事实补回来。
+- **修复一跳。** `strong` 在最后加一跳，让 LLM 提出小编辑。translatex 只应用精确且很小的编辑，所以改写结果保留，丢掉的事实补回来。
 - **给 Agent 的翻译。** `translatex translate` 最多让三个免费引擎（Google、Edge、Papago、搜狗等）竞速，输出 JSON，错误带类型。不用注册，不用配置。
 - **不承诺骗过 AI 检测器。** 目标是读起来像人写的文字，同时事实不丢。没有任何方法能让文本稳定地检测不出，translatex 也不做这个承诺。
 
@@ -62,10 +62,10 @@ In today's fast-paced landscape, Aroha's team isn't just shipping a feature, the
 ```
 
 ```bash
-translatex roundtrip "<上面这段>" --from en --preset llm --format json
+translatex roundtrip "<上面这段>" --from en --preset standard --format json
 ```
 
-`--preset llm`（OpenCode CLI，DeepSeek，两跳共 31 秒）的输出，2026-11-11 跑一次，只保留主要字段：
+`--preset standard`（OpenCode CLI，DeepSeek，两跳共 31 秒）的输出，2026-11-11 跑一次，只保留主要字段：
 
 ```json
 {
@@ -82,7 +82,7 @@ translatex roundtrip "<上面这段>" --from en --preset llm --format json
 
 开头套话、模糊限定和大词都没了，Aroha 和 4,200 都在。有一处对比句式（"more than shipping one feature"）留了下来，所以结果更适合当作改得不错的初稿，人工再润色一遍还能更好。
 
-同一段文字走默认的 `mt` 预设（两跳免费机器翻译，1.0 秒），2026-11-11 跑一次：
+同一段文字走默认的 `light` 预设（两跳免费机器翻译，1.0 秒），2026-11-11 跑一次：
 
 ```json
 {
@@ -99,13 +99,11 @@ translatex roundtrip "<上面这段>" --from en --preset llm --format json
 
 | 预设 | 做什么 | 改写力度 | 速度 | 丢失事实（10 段文本） | 需要 |
 | --- | --- | --- | --- | --- | --- |
-| `mt`（默认） | 两跳机器翻译（en 到 zh 到 ja 再到 en） | 轻：用词变，句子不变 | 约 1 秒 | 5 | 无 |
-| `mt-deep` | 三跳机器翻译 | 稍多一点，漂移也更多 | 约 1 秒 | 8 | 无 |
-| `llm` | LLM 出去再回来，两跳都"像人一样翻译并改写" | 去掉结构性 AI 腔 | 8 到 14 秒 | 0 | Claude 或 OpenCode 订阅 |
-| `lynote` | LLM 到 zh，LLM 到 ja，google 到 fi，edge 回来 | 改写最强 | 约 20 秒 | 3 到 5 | 订阅 |
-| `lynote-fix` | `lynote` 加一跳修复 | 强，且补回丢掉的事实 | 约 25 秒 | 1 | 订阅 |
+| `light`（默认） | 两跳机器翻译（en 到 zh 到 ja 再到 en） | 轻：用词变，句子不变 | 约 1 秒 | 5 | 无 |
+| `standard` | LLM 出去再回来，两跳都"像人一样翻译并改写" | 去掉结构性 AI 腔 | 8 到 14 秒 | 0 | Claude 或 OpenCode 订阅 |
+| `strong` | LLM 跳到 zh 和 ja，机器翻译跳经 fi 回来，最后一跳修复 | 改写最强，且补回丢掉的事实 | 约 25 秒 | 1 | 订阅 |
 
-润色正文选 `llm`，要改写得最多选 `lynote-fix`，更看重速度或要零成本时选 `mt`。文本里有代码或链接时加 `--preserve @code --preserve @url`。`lynote` 沿用 [lynote-ai/humanize-text](https://github.com/lynote-ai/humanize-text) 公开的顺序。
+润色英文正文选 `standard`，要改写得最多选 `strong`，更看重速度或要零成本时选 `light`。文本里有代码或链接时加 `--preserve @code --preserve @url`。`--depth 1-3` 和 `--chain` 可以手动搭出其他机器翻译链或混合链。
 
 ## 实测结果
 
@@ -113,13 +111,12 @@ translatex roundtrip "<上面这段>" --from en --preset llm --format json
 
 | 配置 | 与原文的词重合度 | 剩余 AI 腔（共 10） | 丢失事实 | 延迟 |
 | --- | --- | --- | --- | --- |
-| mt，1 跳（旧默认） | 0.556 | 7 | 5 | 0.5 s |
-| mt，2 跳（新默认） | 0.520 | 5 | 5 | 0.9 s |
-| mt-deep，3 跳 | 0.480 | 6 | 8 | 1.1 s |
-| llm，经 opencode-cli（DeepSeek） | 0.446 | 0 | 0 | 14 s |
-| llm，经 claude-cli（Haiku） | 0.535 | 0 | 0 | 8 s |
-| lynote，claude-cli / opencode-cli | 0.292 / 0.307 | 1 / 0 | 5 / 3 | 19 / 21 s |
-| lynote-fix，claude-cli / opencode-cli | 0.369 / 0.396 | 0 / 1 | 1 / 1 | 24 / 28 s |
+| light，1 跳（`--depth 1`，0.1.x 默认） | 0.556 | 7 | 5 | 0.5 s |
+| light，2 跳（0.3 默认） | 0.520 | 5 | 5 | 0.9 s |
+| 3 跳机器翻译（`--depth 3`） | 0.480 | 6 | 8 | 1.1 s |
+| standard，经 opencode-cli（DeepSeek） | 0.446 | 0 | 0 | 14 s |
+| standard，经 claude-cli（Haiku） | 0.535 | 0 | 0 | 8 s |
+| strong，claude-cli / opencode-cli | 0.369 / 0.396 | 0 / 1 | 1 / 1 | 24 / 28 s |
 
 重合度是实词 Jaccard，越低说明改写越多。AI 腔指结构性套路（"not just/only X"、"more than just"、"it's worth noting"、"in today's"、"at its core"、不仅、更是、值得注意、当今）。丢失事实是事实检查报告缺失的人名、数字、ID 和代码片段数。
 
@@ -129,8 +126,8 @@ translatex roundtrip "<上面这段>" --from en --preset llm --format json
 - 哪怕只有一跳机器翻译，也会改拼人名（Aroha 变 Aloha，Tom 变 Tomi）、展开缩写（NZD 变 "New Zealand dollars"）。
 - 第三跳机器翻译丢的事实比多改写的部分更多，所以默认是两跳。
 - LLM 跳去掉了结构性 AI 腔，在这批语料上事实全部保留。
-- 放在 LLM 跳之后的机器翻译跳可能把对比句式带回来（"ei ainoastaan ... vaan myös" 回成 "not only ... but also"），这就是 `lynote` 仍留几处的原因。
-- 修复跳把 `lynote` 的事实丢失从 3 到 5 个降到 1 个，并保留了大部分改写。
+- 放在 LLM 跳之后的机器翻译跳可能把对比句式带回来（"ei ainoastaan ... vaan myös" 回成 "not only ... but also"），所以没有修复跳的同一条链仍留几处。
+- 修复跳把这条链的事实丢失从 3 到 5 个降到 1 个，并保留了大部分改写，这就是 `strong`。
 - 早先的结论（2026-11-04）：德语、法语、西班牙语中转几乎不改写，中文和日文改写最多。见 [docs/zh-cn/roundtrip/01-pivot-choice.md](./docs/zh-cn/roundtrip/01-pivot-choice.md)。
 
 局限：10 段文本、只跑一次，样本很小；AI 腔清单和事实检查都是启发式；重合度奖励的是"改得多"，不是"改得好"。这里没有测任何 AI 检测器。
@@ -167,7 +164,7 @@ translatex roundtrip "<上面这段>" --from en --preset llm --format json
 
 | 能力 | 说明 |
 | --- | --- |
-| **人性化改写 / 去 AI 腔** | `roundtrip` 经一跳或多跳翻出再翻回。机器翻译跳免费；LLM 跳会重建句子。预设 `mt`、`mt-deep`、`llm`、`lynote`、`lynote-fix`，或自己写 `--chain`。 |
+| **人性化改写 / 去 AI 腔** | `roundtrip` 经一跳或多跳翻出再翻回。机器翻译跳免费；LLM 跳会重建句子。预设 `light`、`standard`、`strong`，或自己写 `--chain`。 |
 | **事实检查** | 每次往返后给出 `missingFacts` 和警告：结果里丢掉的人名、数字、ID、URL 和代码。 |
 | **修复跳** | `<llm>:fix` 让 LLM 提出小编辑，只应用精确的；丢失的事实一定补回，其余编辑共用一份预算，所以抄不回原文。 |
 | **28 个 Provider** | 14 个免费网页接口、9 个官方 API、5 个 LLM（OpenAI、Anthropic、DeepSeek，以及本机的 `claude-cli` 和 `opencode-cli`）。LibreTranslate 通过 `base_url` 按需启用。 |
@@ -217,7 +214,7 @@ translatex batch --file examples/batch.ndjson --parallel 4
 translatex translate 'Run `make test` before pushing.' -t zh --preserve @code
 
 # 人性化改写 AI 味文字：LLM 经中文翻出再翻回（用你的 Claude 或 OpenCode 订阅）
-translatex roundtrip "In today's fast-paced landscape, it's important to note that …" --from en --preset llm --preserve @code
+translatex roundtrip "In today's fast-paced landscape, it's important to note that …" --from en --preset standard --preserve @code
 
 # 免费且快：两跳机器翻译，之后读 missingFacts
 translatex roundtrip "In today's fast-paced landscape, it's important to note that …" --from en
@@ -320,7 +317,7 @@ cat integrations/guidance/AGENTS.md >> AGENTS.md
 | 命令 | 用途 |
 | --- | --- |
 | `translatex translate "…" -t zh --format json` | 单条翻译 |
-| `translatex roundtrip "…" --from en --preset llm --format json` | 人性化改写：经一跳或多跳翻出再翻回 |
+| `translatex roundtrip "…" --from en --preset standard --format json` | 人性化改写：经一跳或多跳翻出再翻回 |
 | `translatex providers --format json` | 本机能用哪些 Provider |
 | `translatex health --format json` | 探测所有已配置 Provider |
 
@@ -329,14 +326,14 @@ cat integrations/guidance/AGENTS.md >> AGENTS.md
 `roundtrip` 把文本经一跳或多跳翻译出去，再翻回原语言。翻到语法结构不同的语言，文本必须被重建，生成式文字的套话也就不会原样回来。机器翻译跳是顺带做到这一点；LLM 跳则被明确要求"像人一样翻译并改写"。
 
 ```bash
-translatex roundtrip "<text>" --from en --preset llm --preserve @code --format json
+translatex roundtrip "<text>" --from en --preset standard --preserve @code --format json
 translatex roundtrip "<text>" --from en --depth 3                    # zh、ja、fi 再回来，只用机器翻译
 translatex roundtrip "<text>" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
 translatex roundtrip --from en --pivot ja < draft.md                 # 别名：translatex polish
 ```
 
-- **选跳。** 先匹配者生效：`--chain "<[engine:]lang,...>"`、`--preset <name>`、`--depth 1-3`、`--pivot <lang>`，最后是配置里的 `roundtrip_preset`（默认 `mt`）。链末尾没回到源语言时，自动补一跳。
-- **LLM Provider。** `claude-cli` 在你的 Claude 订阅上运行 `claude -p`（默认模型 haiku）；`opencode-cli` 在你的 OpenCode 额度上运行 `opencode run`（默认模型 `opencode-go/deepseek-v4.1-flash`）。它们不需要 Key，每跳几秒，只在被点名时运行：`auto` 从不选它们。`roundtrip_llm`（默认 `opencode-cli`）决定 `llm` 和 `lynote` 预设用哪个引擎。
+- **选跳。** 先匹配者生效：`--chain "<[engine:]lang,...>"`、`--preset <name>`、`--depth 1-3`、`--pivot <lang>`，最后是配置里的 `roundtrip_preset`（默认 `light`）。链末尾没回到源语言时，自动补一跳。
+- **LLM Provider。** `claude-cli` 在你的 Claude 订阅上运行 `claude -p`（默认模型 haiku）；`opencode-cli` 在你的 OpenCode 额度上运行 `opencode run`（默认模型 `opencode-go/deepseek-v4.1-flash`）。它们不需要 Key，每跳几秒，只在被点名时运行：`auto` 从不选它们。`roundtrip_llm`（默认 `opencode-cli`）决定 `standard` 和 `strong` 预设用哪个引擎。
 - **以原文为锚。** LLM 跳也会收到源文本，在改写之前先用最小的改动修复前面机器翻译跳丢掉的语义。
 - **修复跳。** `<llm>:fix` 返回 JSON 小编辑列表（`from`、`to`、`why`）。translatex 只应用精确且很小的编辑。补回缺失事实的编辑一律应用；其余编辑共用一份小预算，所以这一跳抄不回原文。每条编辑记录在 `edits` 里，带 `kind`（`fact` 或 `meaning`）、`applied` 和 `reason`。
 - **事实检查。** `missingFacts` 列出源文本里有、结果里没有的人名、数字、ID、代码片段和 URL（数字按数位比较，人名按整词比较），并加一条 `fact check:` 警告。与常见句首词同形的人名可能漏检。
@@ -427,8 +424,8 @@ timeout_ms = 20000
 retries = 1
 race_width = 3
 roundtrip_pivot = "auto"
-roundtrip_preset = "mt"          # mt、mt-deep、llm、lynote、lynote-fix
-roundtrip_llm = "opencode-cli"   # 或 "claude-cli"；llm 和 lynote 预设所用的引擎
+roundtrip_preset = "light"          # light、standard、strong
+roundtrip_llm = "opencode-cli"   # 或 "claude-cli"；standard 和 strong 预设所用的引擎
 log = "warn"
 
 [provider.libretranslate]

@@ -141,7 +141,7 @@ under `$HOME` where marked.
 | Need | Command |
 | --- | --- |
 | The agent translates while answering | `translatex translate "…" -t <lang> --format json` |
-| Humanise AI-sounding prose | `translatex roundtrip "…" --from <lang> --preset llm --preserve @code --format json` |
+| Humanise AI-sounding prose | `translatex roundtrip "…" --from <lang> --preset standard --preserve @code --format json` |
 | A script or CI job needs a translation | same CLI, parse `text` |
 | Bulk work | `translatex batch --file jobs.ndjson` |
 | Capability discovery | `translatex providers`, `translatex languages`, `translatex health` |

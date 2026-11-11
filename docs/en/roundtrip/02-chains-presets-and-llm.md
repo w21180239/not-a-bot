@@ -35,28 +35,27 @@ Shortcuts that expand to a chain:
 Chinese sources use en instead of zh: depth 3 runs en, ja, fi, then back to Chinese.
 
 Precedence, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, then
-`roundtrip_preset` from the config (default `mt`).
+`roundtrip_preset` from the config (default `light`).
 
 ## Presets
 
 | Preset | Hops (English source) | Needs a subscription | Typical latency |
 | --- | --- | --- | --- |
-| `mt` (default) | zh, ja, en: two machine-translation hops out | no | about 1 s |
-| `mt-deep` | zh, ja, fi, en: three hops out | no | about 1 s |
-| `llm` | LLM to zh, LLM back to en; both hops "translate and rewrite like a person" | yes | 8 to 14 s |
-| `lynote` | LLM to zh, LLM to ja (previous step as history), google to fi, edge back to en | yes | about 20 s |
-| `lynote-fix` | `lynote` plus a final repair hop | yes | about 25 s |
+| `light` (default) | zh, ja, en: two machine-translation hops out | no | about 1 s |
+| `standard` | LLM to zh, LLM back to en; both hops "translate and rewrite like a person" | yes | 8 to 14 s |
+| `strong` | LLM to zh, LLM to ja (previous step as history), google to fi, edge back to en, then a repair hop | yes | about 25 s |
 
-`lynote` follows the ordering published by
-[lynote-ai/humanize-text](https://github.com/lynote-ai/humanize-text). That
-project states that no method makes text reliably undetectable, and neither does
-translatex. The aim is prose that reads like a person wrote it, with the facts
-intact.
+`strong` pushes the text through distant languages with LLM hops, adds
+machine-translation hops, and ends with the repair hop that restores facts the
+rewrite dropped. No method makes text reliably undetectable, and translatex does
+not promise it. The aim is prose that reads like a person wrote it, with the
+facts intact. `--depth 1-3` and `--chain` build other chains by hand. Any other
+preset name fails with `INVALID_INPUT`, listing `light, standard, strong`.
 
 Set the default in `config.toml`:
 
 ```toml
-roundtrip_preset = "llm"       # default: mt
+roundtrip_preset = "standard"  # default: light
 roundtrip_llm = "claude-cli"   # default: opencode-cli
 ```
 
@@ -100,7 +99,7 @@ spawns translatex without a shell. The named patterns avoid that.
 
 ## The repair hop
 
-`<llm>:fix` (for example `opencode-cli:fix`, or the last hop of `lynote-fix`)
+`<llm>:fix` (for example `opencode-cli:fix`, or the last hop of `strong`)
 leaves the text in its current language and asks the LLM for a JSON list of
 small edits instead of a new text:
 
@@ -127,7 +126,7 @@ Each hop reports what happened to every edit:
 Skip reasons include `from not found`, `from not unique`, `no change`,
 `to too long for from` and `copies the original back`.
 
-The repair hop cut the fact loss of `lynote` from 3 to 5 facts to 1 on the
+The repair hop cut the fact loss of the same chain without it from 3 to 5 facts to 1 on the
 corpus below, and kept most of the rewrite.
 
 ## Fact guard
@@ -163,14 +162,14 @@ translatex pick between runs by a detector's score, under a hard rule: a run tha
 keeps every fact always beats one that lost a fact, whatever the scores. Use it to benchmark and tune presets; a local detector loads a model on every call, which is too slow and heavy for live requests.
 
 ```bash
-translatex roundtrip "<text>" --from en --preset llm --best-of 3 --scorer "python score.py" --format json
+translatex roundtrip "<text>" --from en --preset standard --best-of 3 --scorer "python score.py" --format json
 translatex roundtrip "<text>" --from en --target-score 0.4 --scorer "python score.py" --format json
 ```
 
 - `--scorer "<command>"` (config `roundtrip_scorer`): translatex writes each result to the command's stdin and reads a score from 0 to 1 (higher = more AI-like) from the last non-empty line of stdout. The command is split into words (quotes group, backslashes stay literal) and run without a shell; programs on `PATH` resolve the same way as the CLI providers, `.cmd` shims included. Each call has the `--timeout-ms` budget, but never less than 120 s, since local detectors load a model per call.
 - A scorer that fails, times out or prints something other than a number in [0, 1] adds a `scorer: run <n> (<preset>) unscored: <reason>` warning, and that run is unscored. When no run gets a score, the result is the same as without a scorer.
 - `--best-of N` (1-5, default 1) runs the planned chain N times. Selection: no missing facts first (else the fewest), then the lowest score, with unscored runs after scored ones. Above 1 it needs a scorer and fails with `INVALID_INPUT` otherwise.
-- `--target-score X` (0-1, needs a scorer) tries the requested chain first, with `--best-of`, then each preset of `roundtrip_ladder` (default `["llm", "lynote-fix"]`) not yet tried. It stops at the first rung where the best run so far scores at or below X; otherwise it returns the best run overall with a `target score not met` warning.
+- `--target-score X` (0-1, needs a scorer) tries the requested chain first, with `--best-of`, then each preset of `roundtrip_ladder` (default `["standard", "strong"]`) not yet tried. It stops at the first rung where the best run so far scores at or below X; otherwise it returns the best run overall with a `target score not met` warning.
 
 The response adds `score` (the selected run's score, `null` without a usable
 scorer), `scorer` (program name, no arguments) and, when more than one run
@@ -179,7 +178,7 @@ happened, `candidates`: one `{presetOrChain, score, missingFacts}` per run,
 
 ```toml
 roundtrip_scorer = "python score.py"
-roundtrip_ladder = ["llm", "lynote-fix"]
+roundtrip_ladder = ["standard", "strong"]
 ```
 
 A score is a measurement from one detector on one text. Report it with the
@@ -190,10 +189,10 @@ the text is undetectable.
 
 | Situation | Choose |
 | --- | --- |
-| Humanise AI-sounding prose and keep the facts | `--preset llm` |
-| Maximum rewriting, and a few facts may need a repair pass | `--preset lynote-fix` |
-| No subscription, or speed matters | `mt` (default) |
-| Machine translation, a little more rewriting | `mt-deep`; fact loss rises faster than rewriting |
+| Humanise AI-sounding prose and keep the facts | `--preset standard` |
+| Maximum rewriting, and a few facts may need a repair pass | `--preset strong` |
+| No subscription, or speed matters | `--preset light` (default) |
+| Machine translation, a little more rewriting | `--depth 3`; fact loss rises faster than rewriting |
 | Text with code or URLs | add `--preserve @code --preserve @url` to any preset |
 | Legal text, contracts, numbers someone will check | do not round-trip |
 

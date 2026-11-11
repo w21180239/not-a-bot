@@ -25,7 +25,7 @@ for harnesses that read a project instructions file.
 
 ```bash
 translatex translate "Hello world" -t zh --format json
-translatex roundtrip "In today's landscape, …" --from en --preset llm --preserve @code --format json
+translatex roundtrip "In today's landscape, …" --from en --preset standard --preserve @code --format json
 ```
 
 Full harness matrix: https://github.com/w21180239/translatex/tree/main/integrations

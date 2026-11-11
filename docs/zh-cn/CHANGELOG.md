@@ -2,15 +2,28 @@
 
 文档修订历史。1.0 之前，应用变更也记录在此。
 
-## 未发布
+## 0.3.0 — 2026-11-11
 
 ### 新增
 
 - `roundtrip --scorer "<command>"`（配置项 `roundtrip_scorer`）：外部检测器从 stdin 读取每个结果，在 stdout 最后一行输出 0 到 1 的分数（越高越像 AI）。不经过 shell，受 `--timeout-ms` 限制；打分器失败时加一条警告，该次运行记为未打分。
 - `roundtrip --best-of 1-5`：把链跑 N 次，先选没有丢事实的（都丢了就选丢得最少的），再选分数最低的。N 大于 1 时需要打分器。
-- `roundtrip --target-score 0-1`：先跑请求的链，再依次尝试 `roundtrip_ladder`（默认 `llm,lynote-fix`）里的预设，直到最好的运行分数不高于目标；否则返回最好的运行，并加一条 `target score not met` 警告。
+- `roundtrip --target-score 0-1`：先跑请求的链，再依次尝试 `roundtrip_ladder`（默认 `standard,strong`）里的预设，直到最好的运行分数不高于目标；否则返回最好的运行，并加一条 `target score not met` 警告。
 - 响应字段 `score`、`scorer`（只有程序名）和 `candidates`（每次运行一条：`presetOrChain`、`score`、`missingFacts` 个数）。请求字段 `scorer`、`bestOf`、`targetScore`。
-- `benches/roundtrip-depth/measure.py --scorer CMD` 增加 "detector src" 和 "detector out" 两列，以及 `llm-best3`、`llm-target` 两个配置。
+- `benches/roundtrip-depth/measure.py --scorer CMD` 增加 "detector src" 和 "detector out" 两列，以及 `standard-best3`、`standard-target` 两个配置。
+
+### 调整（破坏性）
+
+- 往返预设按强度重新命名：`mt` 改为 `light`（两跳机器翻译，默认），`llm` 改为 `standard`（LLM 出去再回来），以修复跳收尾的那个预设改为 `strong`（LLM 跳到 zh 和 ja，再经机器翻译跳过 fi 回来，最后一跳修复）。旧名字会被拒绝，返回 `INVALID_INPUT` 并列出 `light, standard, strong`，不保留别名。
+- 配置项 `roundtrip_preset` 默认 `light`，`roundtrip_ladder` 默认 `["standard", "strong"]`。配置文件或 `TRANSLATEX_ROUNDTRIP_PRESET` 里写着旧名字的要改掉。
+
+### 移除
+
+- 三跳机器翻译预设 `mt-deep`，以及不带修复跳、直接运行 strong 链的预设。基准里第三跳机器翻译比两跳丢更多事实，没有修复跳的链丢 3 到 5 条事实，加修复跳后只丢 1 条。`--depth 1-3` 和 `--chain` 仍可手动搭出这类链。
+
+### 调整
+
+- `benches/roundtrip-depth/measure.py` 的配置名改用新预设名（`light-d1`、`light`、`standard-claude`、`standard-opencode`、`strong-claude`、`strong-opencode`），并新增 `--langs`（默认 `en`）按语言过滤语料行。`results.jsonl` 里用旧名字写下的行仍可读取，不做迁移。
 
 ## 0.2.0 — 2026-11-11
 
