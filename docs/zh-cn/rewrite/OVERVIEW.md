@@ -16,11 +16,11 @@
 
 | 跳 | 改变 | 保留 | 成本 |
 | --- | --- | --- | --- |
-| 机器翻译（`light`） | 用词 | 句子结构，"not just X, it's Y" 之类句式会留下 | 免费，约 1 秒 |
-| LLM（`standard`、`strong`） | 用词和句子结构，去掉结构性的 AI 腔 | 事实，由事实检查核对 | 用你自己的 Claude 或 OpenCode 订阅，每跳几秒 |
-| 修复（`<llm>:fix`，`standard` 的最后一跳） | 少量精确编辑，补回丢掉的硬事实（名字、数字、日期、ID、代码、否定）；不恢复被删的感受和承诺句 | 改写结果 | 多一次 LLM 调用 |
+| 机器翻译（`light` 的第一跳） | 用词 | 句子结构，"not just X, it's Y" 之类句式会留下 | 免费 |
+| LLM（`light` 的返回跳、`standard`） | 用词和句子结构，去掉结构性的 AI 腔 | 事实，由事实检查核对 | 用你自己的 Claude 或 OpenCode 订阅，每跳几秒 |
+| 修复（`<llm>:fix`，每个预设的最后一跳） | 少量精确编辑，补回丢掉的含义（名字、数字、日期、ID、代码、否定、确定程度、行为主体、原因、被丢掉或凭空添加的论断）；不恢复被删的感受和承诺句 | 改写结果 | 多一次 LLM 调用 |
 
-实测 10 段文本、各跑一次：`light` 还剩 5 段带 AI 腔句式、丢了 5 个事实；`standard` 剩 0 段、丢 0 个事实。完整表格见 [01-pivot-choice.md](01-pivot-choice.md#选择跳数)。
+实测 10 段文本、各跑一次：两跳机器翻译链还剩 5 段带 AI 腔句式、丢了 5 个事实；`standard` 剩 0 段、丢 0 个事实。完整表格见 [01-pivot-choice.md](01-pivot-choice.md#选择跳数)。
 
 目标是让文字读起来像人写的，同时事实不丢。not-a-bot 对 AI 检测器不做任何承诺，也不保证文本"检测不出"。
 
@@ -52,8 +52,8 @@ not-a-bot rewrite "<中文文本>" --from zh --format json   # 再对中文做�
 
 ```bash
 not-a-bot rewrite "In today's fast-paced landscape, …" --from en --format json
-not-a-bot rewrite "…" --from en --preset standard              # LLM 出去再回来，再做事实修复（需要 claude-cli 或 opencode-cli）
-not-a-bot rewrite "…" --from en --preset strong       # LLM 出去再回来，不修复：改写最远，可能丢事实
+not-a-bot rewrite "…" --from en --preset standard              # LLM 出去，LLM 自由回来，再做语义修复（需要 claude-cli 或 opencode-cli）
+not-a-bot rewrite "…" --from en --preset light         # Google 出去，修复，LLM 回来，修复：改写最轻，保真度最高
 not-a-bot rewrite "…" --from en --depth 3                 # zh -> ja -> fi -> en，只用机器翻译
 not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
 not-a-bot rewrite --from en --pivot ja < draft.md         # 别名：not-a-bot polish
@@ -65,7 +65,7 @@ not-a-bot rewrite "Run \`make test\`" --from en --preset standard --preserve @co
 | 参数 | 含义 |
 | --- | --- |
 | `--chain "<[engine:]lang,...>"` | 显式指定每一跳；末尾没回到原语言时自动补一跳 |
-| `--preset <name>` | `light`、`standard`、`strong` |
+| `--preset <name>` | `light`、`standard` |
 | `--depth 1-3` | 只用机器翻译，依次经过 zh、ja、fi（中文原文为 en、ja、fi） |
 | `--pivot <lang>` | 单个中转语言，或 `auto` |
 | `--preserve <pattern>` | 正则，或具名模式 `@code`、`@url` |

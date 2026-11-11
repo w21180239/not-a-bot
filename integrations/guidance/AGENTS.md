@@ -15,8 +15,8 @@ not-a-bot providers --format json
 - Read `text` from the JSON. `detectedSource` and `provider` come from the tool.
 - Protect code, paths, identifiers and URLs with `--preserve @code` and `--preserve @url`, or a regex.
 - `--preset standard` (your Claude or OpenCode subscription, no API key) rebuilds the
-  sentences; `strong` rewrites most. The `light` preset is free and fast but keeps
-  sentences: delete an AI opener or hedge yourself first and say what you removed.
+  sentences and scores lowest on the detector. `--preset light` rewrites least and keeps
+  the most meaning. Both end with a meaning-repair hop; report what the result lost.
 - Read `missingFacts` and `warnings` after a round trip and report them. Never
   round-trip legal text or numbers the user will check.
 - Retry only when the error says `retryable: true`. Full skill:

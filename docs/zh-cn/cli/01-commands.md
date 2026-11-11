@@ -44,8 +44,8 @@ not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:
 | `TEXT` | stdin | 待往返的文本 |
 | `-s, --from` | `auto` | 源语言 |
 | `--pivot` | `auto` | 中转语言 |
-| `--chain` | — | 逗号分隔的跳 `[engine:]lang`；末尾没回到源语言时自动补一跳；`<llm>:fix` 为只修事实的修复跳 |
-| `--preset` | 配置 `rewrite_preset`（`standard`） | `light`（两跳机器翻译）、`standard`（LLM 出去再回来，再做事实修复）、`strong`（LLM 出去再回来，不修复，可能丢事实）；后两者要求 `rewrite_llm` 是 LLM 引擎，否则 `INVALID_INPUT` |
+| `--chain` | — | 逗号分隔的跳 `[engine:]lang`；末尾没回到源语言时自动补一跳；`<llm>:fix` 为对照原文、以小片段编辑修复语义的修复跳 |
+| `--preset` | 配置 `rewrite_preset`（`standard`） | `light`（Google 出去，修复，一次 LLM 改写回来，修复）、`standard`（LLM 出去，LLM 自由回来，修复）；每个预设都以修复跳收尾，并要求 `rewrite_llm` 是 LLM 引擎，否则 `INVALID_INPUT` |
 | `--depth` | — | 1-3 跳机器翻译，依次经 zh、ja、fi（中文原文为 en、ja、fi） |
 | `-p, --provider` | `auto` | 两跳都用指定 Provider |
 | `--fallback` | 空 | 指定 Provider 之后尝试的列表 |
@@ -54,7 +54,7 @@ not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:
 | `--request-id` | 自动生成 | 关联 id |
 | `--json` | — | 完整 `RewriteRequest`，覆盖其它参数 |
 
-选跳规则，先匹配者生效：`--chain`、`--preset`、`--depth`、`--pivot`，最后是配置里的 `rewrite_preset`（默认 `standard`；`light` 是两跳机器翻译）。`claude-cli` 和 `opencode-cli` 只在某一跳、预设或 `--provider` 点名时运行。响应带 `chain`、`hops`、`missingFacts` 和 `warnings`；每次运行后都要读 `missingFacts`。链、预设与修复跳见 [rewrite/02-chains-presets-and-llm.md](../rewrite/02-chains-presets-and-llm.md)。
+选跳规则，先匹配者生效：`--chain`、`--preset`、`--depth`、`--pivot`，最后是配置里的 `rewrite_preset`（默认 `standard`）。`claude-cli` 和 `opencode-cli` 只在某一跳、预设或 `--provider` 点名时运行。响应带 `chain`、`hops`、`missingFacts` 和 `warnings`；每次运行后都要读 `missingFacts`。链、预设与修复跳见 [rewrite/02-chains-presets-and-llm.md](../rewrite/02-chains-presets-and-llm.md)。
 
 结果永远回到源语言。`pivot: auto` 对非中文用中文、对中文用英文；技术类英文的官方备选是 `--pivot ja`，见 [rewrite/01-pivot-choice.md](../rewrite/01-pivot-choice.md)。
 

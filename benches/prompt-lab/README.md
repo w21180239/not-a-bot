@@ -17,16 +17,37 @@ Experiments on the LLM humanize brief (`build_prompt` in `src/providers/cli_llm.
 - The model matters more than any wording change tried: the same brief scores 0.736 on sonnet and 0.530 on deepseek-v4.1-flash.
 - High-scoring outputs keep the source's content-free sentences (thanks, excitement, pledges, generic lessons). Listing human-writing features, a ja pivot, a literal first hop or a haiku final hop all scored worse than the baseline.
 - Deleting feeling and pledge sentences (v10, now in `build_prompt`) lowers the score; a broader cut (v6) lowers it the same but drops place names that sat inside the cut sentences.
-- Checked with the real binary on `benches/rewrite-depth` (8 English texts, desklib): `standard` 0.657 to 0.611, `strong` 0.711 to 0.697, no missing facts before or after.
 
-## Rounds 4-6 (30 texts, 2-3 samples each, real binary)
+## Chains (30 texts x 2 samples, real binary)
 
-| variant | mean p_ai | texts with a lost fact token |
-|---|---|---|
-| earlier brief | 0.579 | 2.3 |
-| `standard` (LLM out, LLM back, fact-only fix hop) | 0.387 | 1.3 |
-| `strong` (LLM out, LLM back) | 0.367 | 2.0 |
+Detector desklib/ai-text-detector-v1.01, mean P(AI); source texts score 0.999. Fact loss is the number of texts (of 30) missing at least one exact fact token. Meaning is judged per text by Claude Sonnet: the share of texts with no MAJOR meaning error.
 
-- Sampling noise is large: the same text and variant move several points between samples, so compare pooled means over 2-3 samples (`--rep`, real-binary `tx-*` variants), not single runs.
-- The first fix hop repaired meaning against the original and restored the feeling and pledge sentences the humanize hops had deleted, which raised the score back toward the baseline.
-- A fact-only repair that also receives the fact check's list of missing tokens restores the facts and leaves the cut sentences deleted. This is the `standard` preset; `strong` skips the repair hop and may drop a fact, always reported in `missingFacts`.
+| chain | mean P(AI) | fact loss | no major meaning error |
+|---|---|---|---|
+| `standard` (LLM out, free LLM back, fix) | 0.364 | 0.5 | 98% |
+| 3 LLM hops zh->ja->en + fix | 0.380 | 1.5 | 98% |
+| LLM out, LLM back given the original, fix (earlier draft) | 0.393 | 0.5 | 98% |
+| `light` (Google out, fix, LLM back, fix) | 0.489 | 0 | 97% |
+| old mixed chain (LLM zh, LLM ja, Google fi, Edge en) with a fix after each machine hop | 0.494 | 7.0 | 93% |
+| same old mixed chain with one final fix | 0.383 | 7.5 | 54% |
+| Google out, LLM back, one final fix (no fix after the machine hop) | 0.515 | 0 | 87% |
+| LLM out, Google back, fix | 0.642 | 5.5 | 87% |
+| 2 machine-translation hops + final fix | 0.930 | 5.0 | 80% |
+| 0.1.x standard (LLM out/back, fact-only fix) | 0.387 | 1.3 | 96% (3 samples) |
+
+- Machine translation changes words but keeps sentence structure, so machine-only chains stay near the source score even with repairs. The score drop comes from the LLM rewrite hop.
+- A fix right after a machine hop is needed when no LLM hop with the original follows soon: for the Google-out chain it lifts the meaning gate from 87% to 97%.
+- Mixed chains whose last hops are machine translation fail the meaning gate.
+- No chain that costs more than `standard` scored lower, so there are two presets, `light` and `standard`.
+- Sampling noise is large: the same text and variant move several points between samples, so compare pooled means over 2 or more samples, not single runs.
+- A fix hop that sees the original and is not limited to facts can restore the feeling and pledge sentences the humanize hops deleted, which raises the score. The shipped fix hop restores meaning only, never cut pleasantries, and caps non-fact edits with one copy-back budget.
+
+## Meaning gate
+
+`python lab.py meaning` judges every output for meaning errors (Claude Sonnet, per text). Environment switches:
+
+- `LAB_WORKERS`: number of parallel judge calls.
+- `LAB_HAIKU_JUDGE=0`: skip the 1-5 haiku judge (`same_meaning`, `reads_human`, `added_facts`); the meaning gate still runs.
+- `LAB_MEANING=0`: defer the meaning gate (Claude quota) from a run to a later `python lab.py meaning`.
+
+Screening round: run new variants with `--limit 12 --results results-screen` first, then run the survivors on all 30 texts.

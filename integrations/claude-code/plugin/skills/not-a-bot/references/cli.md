@@ -31,19 +31,18 @@ A round trip through another language that rewrites the sentences on the way. Th
 
 | Goal | Preset | Cost |
 | --- | --- | --- |
-| Humanise AI-sounding prose (default) | `--preset standard` | One LLM hop out, one back, then a fact-only repair hop on the user's Claude or OpenCode subscription, about 70 s on opencode |
-| Maximum rewriting | `--preset strong` | LLM out and back, no repair hop; lowest detector score, may drop a fact (listed in `missingFacts`), about 30 s |
-| Speed, or no subscription | `--preset light` | Free, about 1 s; changes words, keeps sentence structure |
+| Humanise AI-sounding prose (default) | `--preset standard` | LLM out, free LLM back, then a meaning-repair hop, on the user's Claude or OpenCode subscription; several LLM calls, tens of seconds; lowest detector score |
+| Lightest rewrite, highest fidelity | `--preset light` | Google out, repair, one LLM rewrite back, repair; several LLM calls, tens of seconds |
 
-`claude-cli` and `opencode-cli` run the local CLI, need no API key and never join the automatic chain; `rewrite_llm` (default `opencode-cli`) picks the engine for `standard` and `strong`. Measured on 10 texts, one run: `light` left 5 of 10 structural tells and lost 5 facts; `standard` left 0 and lost 0; `strong` left 0 or 1 and lost 1. Humanize hops delete sentences that only express feelings, pledges or pleasantries; the repair hop restores hard facts only (names, numbers, dates, IDs, code, negations) and never those sentences. `standard` and `strong` need an LLM `rewrite_llm`, else `INVALID_INPUT`. No preset makes text undetectable by AI detectors; do not promise that.
+Both presets need an LLM `rewrite_llm` (default `opencode-cli`, alternative `claude-cli`), else `INVALID_INPUT`; `claude-cli` and `opencode-cli` run the local CLI, need no API key and never join the automatic chain. Every preset ends with a fix hop: an LLM that sees the original and returns small span edits restoring lost or changed meaning (names, numbers, dates, amounts, IDs, code, negations, qualifiers, actor, cause, dropped or invented claims) and never restores deliberately cut feeling, pledge or pleasantry sentences. Measured on 30 texts x 2 samples (desklib, source 0.999): `standard` mean P(AI) 0.364, `light` 0.489; both lose almost no fact tokens (0.5 and 0 texts of 30) and 98% and 97% of texts have no major meaning error. Machine translation keeps sentence structure, so machine-only chains stay near the source score. `strong` is removed and fails with `INVALID_INPUT`. No preset makes text undetectable by AI detectors; do not promise that.
 
-Other options: `--depth 1-3` (machine translation only; a third hop loses more facts than it gains), `--chain "<[engine:]lang,...>"`, `--pivot <lang>` (default: Chinese for non-Chinese text, English for Chinese text; `--pivot ja` keeps more grammar, better for precise technical English). First match wins in the order preset, depth, chain, pivot.
+Other options: `--depth 1-3` (machine translation only, no repair hop; a third hop loses more facts than it gains), `--chain "<[engine:]lang,...>"`, `--pivot <lang>` (default: Chinese for non-Chinese text, English for Chinese text; `--pivot ja` keeps more grammar, better for precise technical English). First match wins in the order preset, depth, chain, pivot.
 
 Scoring is for tuning presets, not live requests, because a local detector loads a model on every call. Pass `--scorer "<command>"` (text on stdin, a 0-1 score on the last stdout line, higher = more AI-like), `--best-of 1-5` or `--target-score 0-1` only when the user asks for a scored run, and report the score with the detector's name. `benches/detector/` has one.
 
 ### After a round trip
 
-1. Report every `missingFacts` and `warnings` entry (`fact check:`, `preserve:`, engine fallback) to the user. If `missingFacts` is not empty, restore the token by hand (`strong` has no repair hop and drops more facts than `standard`).
+1. Report every `missingFacts` and `warnings` entry (`fact check:`, `preserve:`, engine fallback) to the user. If `missingFacts` is not empty, restore the token by hand (a fact the fix hop could not restore is reported, never silently fixed).
 2. Re-run `nab lint --source` against the original source and check the structural tells in `patterns.md` again; machine-translation hops can bring staged contrasts back.
 3. Never round-trip legal text, contracts, API reference, configuration, error messages, or numbers and names the reader will check line by line. The fact guard lists what went missing; it does not make such text safe, and it checks names only in Latin-script text.
 

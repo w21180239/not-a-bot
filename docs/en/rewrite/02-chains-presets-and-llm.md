@@ -39,30 +39,46 @@ Precedence, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, then
 
 ## Presets
 
-| Preset | Hops (English source) | Needs a subscription | Typical latency |
+| Preset | Hops (English source) | Chain shown in output | Typical latency |
 | --- | --- | --- | --- |
-| `light` | zh, ja, en: two machine-translation hops out | no | about 1 s |
-| `standard` | LLM to zh, LLM back to en, then a fact-only repair hop (`<llm>:fix`); the first two hops "translate and rewrite like a person" | yes | about 70 s on opencode (three LLM calls) |
-| `strong` | LLM to zh, LLM back to en; no repair hop | yes | about 30 s on opencode |
+| `light` | Google machine translation to zh, a repair hop (`<llm>:fix`) that repairs the translation in zh, one LLM rewrite back to en that also repairs meaning against the original inline, then the final repair hop | `["zh","fix","en","fix"]` | several LLM calls, tens of seconds |
+| `standard` | LLM to zh, LLM back to en rewriting freely (this hop is not given the original), then the final repair hop; the first two hops "translate and rewrite like a person" | `["zh","en","fix"]` | several LLM calls, tens of seconds |
 
+For a Chinese source the outward language is en. `light` is the lightest
+rewrite with the highest fidelity: it makes three `rewrite_llm` calls, but only
+one is a full rewrite; the two repair hops return short edit lists. `standard`
+is the default and scored lowest with the detector.
+
+Every preset ends with an LLM minimal meaning-repair hop (`<llm>:fix`). It sees
+the original and returns small JSON span edits that restore meaning lost or
+changed by earlier hops: missing or altered names, numbers, dates, amounts, IDs
+and code spans; flipped negations; changed qualifiers or certainty; changed
+actor, cause or order; dropped or invented claims. It also receives the fact
+check's list of missing tokens. Fact edits always apply; other edits share one
+copy-back budget. It never restores a deliberately cut feeling, pledge or
+pleasantry sentence and never moves wording or structure back toward the
+original. A fix between hops works too, for example
+`--chain "google:zh,opencode-cli:fix,opencode-cli:en,opencode-cli:fix"`.
+
+Both presets need an LLM engine (`rewrite_llm`, default `opencode-cli`,
+alternative `claude-cli`): any other `rewrite_llm` fails with `INVALID_INPUT`.
 The humanize hops delete sentences that only express feelings, pledges or
-pleasantries. `standard` then repairs hard facts only: names, places, products,
-numbers, dates, amounts, currencies, IDs, versions, paths, code spans, negations
-and qualifiers. The repair hop is told which tokens the fact check found missing
-and never restores a cut feeling or pledge sentence. `strong` skips the repair
-hop: it rewrites furthest and scored lowest with the detector, but may drop a
-fact, which `missingFacts` always reports. `standard` and `strong` need an LLM
-engine: a `rewrite_llm` that is not one fails with `INVALID_INPUT`.
+pleasantries.
 
 No method makes text reliably undetectable, and not-a-bot does not promise it.
 The aim is prose that reads like a person wrote it, with the facts intact.
-`--depth 1-3` and `--chain` build other chains by hand. Any other preset name
-fails with `INVALID_INPUT`, listing `light, standard, strong`.
+`--depth 1-3` and `--chain` build other chains by hand; machine-translation-only
+depth paths have no repair hop unless a chain adds `<llm>:fix`. Any other preset
+name, including the removed `strong`, fails with `INVALID_INPUT`, listing
+`light, standard`.
 
-Measured with the real binary (30 English texts, desklib detector, 2 to 3
-samples each; `benches/prompt-lab`): the earlier brief scored a mean `p_ai` of
-0.579 with 2.3 texts losing a fact token; `standard` 0.387 with 1.3; `strong`
-0.367 with 2.0.
+Measured with the real binary (30 English texts x 2 samples, desklib detector,
+source texts 0.999; `benches/prompt-lab`): `standard` scored a mean `p_ai` of
+0.364 with 0.5 texts (of 30) losing a fact token and 98% of texts free of major
+meaning errors; `light` 0.489, 0, 97%. Machine translation changes words but
+keeps sentence structure, so machine-only chains stay near the source score
+even with repairs; the score drop comes from the LLM rewrite hop. No chain that
+costs more than `standard` scored lower, so there is no `strong`.
 
 Set the default in `config.toml`:
 
@@ -100,7 +116,7 @@ a preset or `--provider`.
 ## What an LLM hop receives
 
 - The hop instruction: translate, and rewrite the way a person would.
-- In a round trip, the original text as well. The hop first restores hard facts that earlier machine-translation hops lost, with the smallest change that fixes them, then rewrites.
+- The original text, for the return hop of `light` and for every `fix` hop. The `light` return hop first repairs meaning that the machine translation changed, with the smallest change that fixes it, then rewrites. The `standard` return hop is not given the original.
 - For a later LLM hop, the previous LLM hop as history.
 - The protected spans, as-is. An LLM hop gets no placeholders; the prompt lists the spans to keep, and not-a-bot checks the output afterwards. A dropped span adds a `preserve: <provider> dropped <span>` warning. Machine-translation hops still mask spans.
 
@@ -111,11 +127,12 @@ spawns not-a-bot without a shell. The named patterns avoid that.
 
 ## The repair hop
 
-`<llm>:fix` (for example `opencode-cli:fix`, or the last hop of `standard`)
+`<llm>:fix` (for example `opencode-cli:fix`, or the last hop of every preset)
 leaves the text in its current language and asks the LLM for a JSON list of
-small edits instead of a new text. It repairs facts against the original: names,
+small edits instead of a new text. It repairs meaning against the original: names,
 places, products, numbers, dates, amounts, currencies, IDs, versions, paths, code
-spans, negations and qualifiers. It receives the fact check's list of missing
+spans, negations, qualifiers and certainty, actor, cause and order, and dropped
+or invented claims. It receives the fact check's list of missing
 tokens, and it never restores a sentence the humanize hops cut for expressing
 only feelings, pledges or pleasantries; a fact from a cut sentence goes into the
 nearest kept sentence.
@@ -185,7 +202,7 @@ not-a-bot rewrite "<text>" --from en --target-score 0.4 --scorer "python score.p
 - `--scorer "<command>"` (config `rewrite_scorer`): not-a-bot writes each result to the command's stdin and reads a score from 0 to 1 (higher = more AI-like) from the last non-empty line of stdout. The command is split into words (quotes group, backslashes stay literal) and run without a shell; programs on `PATH` resolve the same way as the CLI providers, `.cmd` shims included. Each call has the `--timeout-ms` budget, but never less than 120 s, since local detectors load a model per call.
 - A scorer that fails, times out or prints something other than a number in [0, 1] adds a `scorer: run <n> (<preset>) unscored: <reason>` warning, and that run is unscored. When no run gets a score, the result is the same as without a scorer.
 - `--best-of N` (1-5, default 1) runs the planned chain N times. Selection: no missing facts first (else the fewest), then the lowest score, with unscored runs after scored ones. Above 1 it needs a scorer and fails with `INVALID_INPUT` otherwise.
-- `--target-score X` (0-1, needs a scorer) tries the requested chain first, with `--best-of`, then each preset of `rewrite_ladder` (default `["standard", "strong"]`) not yet tried. It stops at the first rung where the best run so far scores at or below X; otherwise it returns the best run overall with a `target score not met` warning.
+- `--target-score X` (0-1, needs a scorer) tries the requested chain first, with `--best-of`, then each preset of `rewrite_ladder` (default `["light", "standard"]`) not yet tried. It stops at the first rung where the best run so far scores at or below X; otherwise it returns the best run overall with a `target score not met` warning.
 
 The response adds `score` (the selected run's score, `null` without a usable
 scorer), `scorer` (program name, no arguments) and, when more than one run
@@ -194,7 +211,7 @@ happened, `candidates`: one `{presetOrChain, score, missingFacts}` per run,
 
 ```toml
 rewrite_scorer = "python score.py"
-rewrite_ladder = ["standard", "strong"]
+rewrite_ladder = ["light", "standard"]
 ```
 
 A score is a measurement from one detector on one text. Report it with the
@@ -205,10 +222,9 @@ the text is undetectable.
 
 | Situation | Choose |
 | --- | --- |
-| Humanise AI-sounding prose and keep the facts | `--preset standard` |
-| Maximum rewriting, and a fact may drop (listed in `missingFacts`) | `--preset strong` |
-| No subscription, or speed matters | `--preset light` (default) |
-| Machine translation, a little more rewriting | `--depth 3`; fact loss rises faster than rewriting |
+| Humanise AI-sounding prose (lowest detector score) | `--preset standard` (default) |
+| Lightest rewrite, highest fidelity | `--preset light` |
+| Machine translation only, no LLM | `--depth 1-3`; the score stays near the source and fact loss rises with depth |
 | Text with code or URLs | add `--preserve @code --preserve @url` to any preset |
 | Legal text, contracts, numbers someone will check | do not round-trip |
 

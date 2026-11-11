@@ -45,8 +45,8 @@ not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:
 | `TEXT` | stdin | Text to round-trip |
 | `-s, --from` | `auto` | Source language |
 | `--pivot` | `auto` | Bridge language |
-| `--chain` | — | Hops `[engine:]lang`, comma-separated; a final hop back to the source is appended when missing; `<llm>:fix` repairs facts only |
-| `--preset` | config `rewrite_preset` (`standard`) | `light` (two machine-translation hops), `standard` (LLM out and back, then a fact repair), `strong` (LLM out and back, no repair, may drop a fact); the last two need an LLM `rewrite_llm`, else `INVALID_INPUT` |
+| `--chain` | — | Hops `[engine:]lang`, comma-separated; a final hop back to the source is appended when missing; `<llm>:fix` repairs meaning against the original with small span edits |
+| `--preset` | config `rewrite_preset` (`standard`) | `light` (Google out, fix, one LLM rewrite back, fix), `standard` (LLM out, free LLM back, fix); every preset ends with a fix hop and needs an LLM `rewrite_llm`, else `INVALID_INPUT` |
 | `--depth` | — | 1-3 machine-translation hops through zh, ja, fi (Chinese sources: en, ja, fi) |
 | `-p, --provider` | `auto` | Pin one provider for both hops |
 | `--fallback` | empty | Providers tried after the pinned one |
@@ -56,8 +56,7 @@ not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:
 | `--json` | — | Full `RewriteRequest`; replaces the other flags |
 
 Hop selection, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`,
-then `rewrite_preset` from the config (default `standard`; `light` is two machine-translation
-hops). `claude-cli` and `opencode-cli` run only when a hop, a preset or
+then `rewrite_preset` from the config (default `standard`). `claude-cli` and `opencode-cli` run only when a hop, a preset or
 `--provider` names them. The response carries `chain`, `hops`, `missingFacts`
 and `warnings`; read `missingFacts` after every run. Chains, presets and the
 repair hop: [rewrite/02-chains-presets-and-llm.md](../rewrite/02-chains-presets-and-llm.md).

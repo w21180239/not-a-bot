@@ -43,8 +43,8 @@ The three stock words are gone, and so is the closing pledge, which says nothing
 
 <table>
 <tr>
-<td align="center" width="25%"><a href="#measured-results"><b>0.999 → 0.39</b><br/><sub>mean detector score, 30 texts</sub></a></td>
-<td align="center" width="25%"><a href="#measured-results"><b>96%</b><br/><sub>of texts keep every fact</sub></a></td>
+<td align="center" width="25%"><a href="#measured-results"><b>0.999 → 0.36</b><br/><sub>mean detector score, 30 texts</sub></a></td>
+<td align="center" width="25%"><a href="#measured-results"><b>98%</b><br/><sub>of texts with no major meaning error</sub></a></td>
 <td align="center" width="25%"><a href="#lint-offline-and-deterministic"><b>0</b><br/><sub>network calls for <code>nab lint</code></sub></a></td>
 <td align="center" width="25%"><a href="#install"><b>1</b><br/><sub>binary, no runtime</sub></a></td>
 </tr>
@@ -82,8 +82,8 @@ Paths for each agent are in [integrations/README.md](./integrations/README.md).
 # Rewrite a draft (default preset: standard)
 nab rewrite --from en --preserve @code < draft.md
 
-# Lowest detector score, may drop a fact (reported in missingFacts)
-nab rewrite --from en --preset strong < draft.md
+# Lightest rewrite, highest fidelity
+nab rewrite --from en --preset light < draft.md
 
 # Check a rewrite against its source; exit 1 on any tell or lost fact
 nab lint rewrite.md --source draft.md --strict
@@ -106,25 +106,28 @@ for f in $(git diff --cached --name-only -- '*.md'); do nab lint "$f" --strict |
 
 | Preset | What runs | Use it for |
 | --- | --- | --- |
-| `standard` (default) | LLM out to another language, LLM back, then a fact-only repair hop that is told which tokens went missing | Most text. Lowest fact loss. |
-| `strong` | LLM out and back, no repair hop | The lowest detector score. May drop a fact, which is reported. |
-| `light` | Two free machine-translation hops | A quick pass with no subscription. Words change, sentence shapes stay. |
+| `standard` (default) | LLM out to another language, LLM back rewriting freely (it does not see the original), then a minimal meaning-repair hop | Most text. Lowest detector score. |
+| `light` | Google machine translation out, a repair hop, one LLM rewrite back, then a final repair hop | The lightest rewrite and the highest fidelity. |
+
+Both presets need an LLM (`rewrite_llm`, default `opencode-cli`, or `claude-cli`) and make several LLM calls, tens of seconds in total. In `light` only one call is a full rewrite; the two repair hops return short edit lists.
 
 Pass `--preserve @code` and `--preserve @url` to keep code spans and links verbatim. Do not round-trip legal text, API reference or numbers a reader will check line by line.
 
 ## How it works
 
-Translating into another language and back forces the sentences to be rebuilt, so the stock phrasing of generated text does not return unchanged. In `standard` and `strong` both hops are LLM calls told to rewrite like a person. They also cut sentences that only express feelings, pledges or pleasantries, which is where much of a draft's AI voice sits.
+Translating into another language and back forces the sentences to be rebuilt, so the stock phrasing of generated text does not return unchanged. In `standard` both hops are LLM calls told to rewrite like a person. They also cut sentences that only express feelings, pledges or pleasantries, which is where much of a draft's AI voice sits.
 
 ```mermaid
 flowchart LR
     A[AI-style draft] --> B[LLM hop: rewrite into zh]
     B --> C[LLM hop: rewrite back into en]
-    C --> D{Fact check against the draft}
-    D -->|tokens missing| E[Fact-only repair hop]
-    D -->|all present| F[Result]
-    E --> F
+    C --> D[Fix hop: minimal meaning repair against the draft]
+    D --> E{Fact check against the draft}
+    E -->|all present| F[Result]
+    E -->|tokens missing| G[Reported in missingFacts]
 ```
+
+Every preset ends with a fix hop: an LLM that sees the original and returns small JSON span edits restoring meaning that earlier hops lost or changed (names, numbers, dates, amounts, IDs, code spans, flipped negations, changed qualifiers or certainty, changed actor, cause or order, dropped or invented claims). Fact edits always apply; other edits share one copy-back budget. It never restores deliberately cut feeling, pledge or pleasantry sentences, and never moves wording back toward the original. It also receives the fact check's list of missing tokens.
 
 The fact check compares names, numbers, versions, paths, IDs and code spans with the source. Whatever is still missing at the end comes back in `missingFacts`, so a lost fact is reported rather than shipped silently.
 
@@ -134,23 +137,23 @@ The fact check compares names, numbers, versions, paths, IDs and code spans with
 
 ## Measured results
 
-`benches/prompt-lab`: 30 synthetic AI-style English workplace texts (customer emails, Slack updates, marketing blurbs, documentation, LinkedIn posts), run through the real binary, 2 to 3 samples per configuration. Each output is scored by `desklib/ai-text-detector-v1.01`; the score is P(AI), higher means more AI-like. Facts are exact, case-sensitive token matches against the source.
+`benches/prompt-lab`: 30 synthetic AI-style English workplace texts (customer emails, Slack updates, marketing blurbs, documentation, LinkedIn posts), run through the real binary, 2 samples per configuration. Each output is scored by `desklib/ai-text-detector-v1.01`; the score is P(AI), higher means more AI-like. Fact loss is the number of texts (of 30) missing at least one exact, case-sensitive fact token. Meaning is judged per text by Claude Sonnet: the share of texts with no major meaning error.
 
-| Configuration | Mean P(AI) | Outputs below 0.5 | Texts with a lost fact token (of 30) | Latency on opencode |
-| --- | --- | --- | --- | --- |
-| Source texts | 0.999 | 0% | n/a | n/a |
-| Earlier prompt | 0.579 | 43% | 2.3 | n/a |
-| `standard` | 0.387 | 63% | 1.3 | about 70 s |
-| `strong` | 0.367 | 68% | 2.0 | about 30 s |
+| Configuration | Mean P(AI) | Fact loss (of 30) | No major meaning error |
+| --- | --- | --- | --- |
+| Source texts | 0.999 | n/a | n/a |
+| `standard` (LLM out, free LLM back, fix) | 0.364 | 0.5 | 98% |
+| `light` (Google out, fix, LLM back, fix) | 0.489 | 0 | 97% |
+| Google out, LLM back, one final fix | 0.515 | 0 | 87% |
+| 2 machine-translation hops and a final fix | 0.930 | 5.0 | 80% |
 
-`standard` keeps about 99.6% of fact tokens. Method, per-variant tables and failed experiments: [benches/prompt-lab](./benches/prompt-lab/README.md). A second bench on 8 texts is in [benches/rewrite-depth](./benches/rewrite-depth/README.md).
+Machine translation changes words but keeps sentence structure, so machine-only chains stay near the source score even with repairs; the score drop comes from the LLM rewrite hop. No chain that costs more than `standard` scored lower. Method, the full table and failed experiments: [benches/prompt-lab](./benches/prompt-lab/README.md). A second bench on 8 texts is in [benches/rewrite-depth](./benches/rewrite-depth/README.md).
 
 What this does not show:
 
 - It is one detector. Detectors disagree with each other and change between versions, and no tool makes text reliably undetectable. A score under 0.5 on this detector says nothing about another.
-- 37% of `standard` outputs still score above 0.5.
-- The corpus is synthetic and in English only. The LLM hops shorten text by about 30% because they cut pleasantries and pledges.
-- Latency depends on your model and plan. The 60-word paragraph above took 39 s.
+- The corpus is synthetic and in English only. The LLM hops shorten text because they cut pleasantries and pledges.
+- Latency depends on your model and plan. Each preset makes several LLM calls, tens of seconds in total.
 
 ## How it compares
 
@@ -194,7 +197,7 @@ For agents, every command takes `--format json`, and every failure carries `code
 `~/.config/not-a-bot/config.toml`, or `NOT_A_BOT_CONFIG`:
 
 ```toml
-rewrite_preset = "standard"     # light, standard, strong
+rewrite_preset = "standard"     # light, standard
 rewrite_llm = "opencode-cli"    # or "claude-cli"
 ```
 
