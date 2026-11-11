@@ -4,6 +4,7 @@ pub mod core;
 pub mod providers;
 
 pub mod cli;
+pub mod process;
 pub mod retry;
 
 pub use core::{config, creds, engine, error, http, keys, lang, preserve, types};
