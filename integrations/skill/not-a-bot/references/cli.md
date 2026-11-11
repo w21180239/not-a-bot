@@ -6,7 +6,7 @@
 
 | The user wants | Run |
 | --- | --- |
-| A draft audited against its source, offline | `nab lint draft.txt --source source.txt` |
+| A draft audited against its source, offline | `nab lint draft.txt --source source.txt --format text` |
 | Text in another language | `nab translate "<text>" -t <lang> --preserve @code --format json` |
 | The same language, rewritten by a round trip | `nab rewrite "<text>" --from <lang> --preset standard --preserve @code --format json` |
 | The same, quickly and with no subscription | `nab rewrite "<text>" --from <lang> --preset light --format json` |
@@ -18,7 +18,7 @@ Translate into language L: `translate -t L`. Translate and humanise: `translate 
 
 ## `nab lint`
 
-`nab lint <DRAFT|-> [--source FILE] [--format text|json] [--strict]`. `-` reads the draft from stdin. No network and no model.
+`nab lint <DRAFT|-> [--source FILE] [--format text|json] [--strict]`. `-` reads the draft from stdin. Output is JSON (`tells`, `missingFromDraft`, `newInDraft`) by default; `--format text` prints one hit per line. No network and no model.
 
 - Without `--source`: lists word, phrase, structure, spelling and punctuation tells with their line numbers.
 - With `--source`: also lists fact tokens (code spans, URLs, paths, ticket IDs, mentions, numbers, names). `missing-from-draft` are tokens the draft lost; `new-in-draft` are tokens it gained. Confirm each by meaning: a number written as a word shows as missing.
