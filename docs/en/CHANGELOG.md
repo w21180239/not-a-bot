@@ -2,6 +2,28 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.1.0 — unreleased
+
+not-a-bot continues translatex 0.3.0 under a new name. Nothing else changed in behaviour except the default preset.
+
+### Changed
+
+- The binary is `not-a-bot`, with `nab` as a short alias that behaves the same. The crate is `not-a-bot` (library `not_a_bot`) and the npm package is `not-a-bot` (platform packages `not-a-bot-<os>-<arch>`); both npm bins run the same launcher.
+- The `roundtrip` subcommand is now `rewrite`, and its default preset is `standard` (LLM out and back); `light` stays available with `--preset light`. The schema types `RoundtripRequest` and `RoundtripResponse` are now `RewriteRequest` and `RewriteResponse`.
+- Config keys `roundtrip_preset`, `roundtrip_pivot`, `roundtrip_llm`, `roundtrip_scorer` and `roundtrip_ladder` are now `rewrite_*`.
+- Environment variables use the `NOT_A_BOT_` prefix instead of `TRANSLATEX_` (for example `NOT_A_BOT_REWRITE_PRESET`, `NOT_A_BOT_CONFIG`, `NOT_A_BOT_HOME`).
+- The config and cache directory is `~/.config/not-a-bot`. Old names, variables and directories are not read.
+- Provider metadata keys use the `not-a-bot.` prefix (`not-a-bot.style`, `not-a-bot.history`, `not-a-bot.original`), and the HTTP User-Agent is `not-a-bot/<version>`.
+- The `translatex` integration skill is now `not-a-bot`.
+
+### Removed
+
+- The Russian README and `docs/ru`.
+
+## translatex history
+
+Entries below predate the rename and describe translatex, including its `roundtrip` command and `TRANSLATEX_*` variables.
+
 ## Unreleased
 
 ### Changed

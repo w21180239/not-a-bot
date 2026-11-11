@@ -1,4 +1,4 @@
-**简体中文** · [English](../../en/roundtrip/01-pivot-choice.md)
+**简体中文** · [English](../../en/rewrite/01-pivot-choice.md)
 
 # 往返翻译 — 中转语言与跳数的选择
 
@@ -21,7 +21,7 @@
 2026-11-04 的脚本没有保留。想在单段文本上快速验证，用一条命令：
 
 ```bash
-translatex roundtrip "In today's fast-paced digital landscape, …" --from en --pivot ja --format json
+not-a-bot rewrite "In today's fast-paced digital landscape, …" --from en --pivot ja --format json
 ```
 
 ## 结果
@@ -57,12 +57,12 @@ de     Our comprehensive solution leverages cutting-edge technology to empower
 | 非中文 | `zh` | 改写强度与日文相当，且所有 Provider 都支持（含只做中文对的） |
 | 中文（`zh`、`zh-TW`、`yue`） | `en` | 同一规则的镜像 |
 
-`auto` 就是这张表。它是默认 `light` 预设的第一跳，也是 `--pivot` 的唯一一跳；`--depth` 在它之后再加 ja 和 fi。
+`auto` 就是这张表。它是 `light` 预设的第一跳，也是 `--pivot` 的唯一一跳；`--depth` 在它之后再加 ja 和 fi。
 
 **日文是文档给出的备选。** 它改写略多、保留的语法结构更多，因此更适合技术类英文——以中文为中转会丢掉冠词和单复数：
 
 ```bash
-translatex roundtrip --from en --pivot ja < api-notes.md
+not-a-bot rewrite --from en --pivot ja < api-notes.md
 ```
 
 **俄文改写最多，但漂移最明显**，所以不是默认：样本里它把 "comprehensive" 换成了 "end-to-end" 并丢了限定词。只有在"改写优先于保真"时才用。
@@ -82,13 +82,13 @@ translatex roundtrip --from en --pivot ja < api-notes.md
 全局：
 
 ```toml
-# ~/.config/translatex/config.toml
-roundtrip_pivot = "zh"
+# ~/.config/not-a-bot/config.toml
+rewrite_pivot = "zh"
 ```
 
 ## 选择跳数
 
-第二跳、第三跳机器翻译还能多改写多少？换成 LLM 跳又会怎样？[`benches/roundtrip-depth/`](../../../benches/roundtrip-depth/README.md) 用每种配置 10 段文本来回答：5 段 AI 味英文、3 段事实密集的职场英文（含人名、数字、ID、代码）、2 段中文。
+第二跳、第三跳机器翻译还能多改写多少？换成 LLM 跳又会怎样？[`benches/rewrite-depth/`](../../../benches/rewrite-depth/README.md) 用每种配置 10 段文本来回答：5 段 AI 味英文、3 段事实密集的职场英文（含人名、数字、ID、代码）、2 段中文。
 
 对每段文本、每种配置的统计方法：
 
@@ -98,15 +98,15 @@ roundtrip_pivot = "zh"
 - **延迟**：整条链的平均耗时。
 
 ```bash
-python benches/roundtrip-depth/measure.py --bin target/release/translatex.exe --out out --configs light,standard-opencode
+python benches/rewrite-depth/measure.py --bin target/release/not-a-bot.exe --out out --configs light,standard-opencode
 ```
 
 结果（2026-11-11 运行；每种配置 10 段文本，只跑一次）：
 
 | 配置 | 重合度 | 剩余 AI 腔（共 10） | 丢失事实 | 延迟 |
 | --- | --- | --- | --- | --- |
-| light，1 跳（`--depth 1`，0.1.x 默认） | 0.556 | 7 | 5 | 0.5 s |
-| light，2 跳（0.3 默认） | 0.520 | 5 | 5 | 0.9 s |
+| light，1 跳（`--depth 1`，最早的默认） | 0.556 | 7 | 5 | 0.5 s |
+| light，2 跳（上一版默认） | 0.520 | 5 | 5 | 0.9 s |
 | 3 跳机器翻译（`--depth 3`） | 0.480 | 6 | 8 | 1.1 s |
 | standard，经 opencode-cli（DeepSeek） | 0.446 | 0 | 0 | 14 s |
 | standard，经 claude-cli（Haiku） | 0.535 | 0 | 0 | 8 s |

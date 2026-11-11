@@ -1,10 +1,10 @@
-**English** · [简体中文](../../zh-cn/roundtrip/OVERVIEW.md)
+**English** · [简体中文](../../zh-cn/rewrite/OVERVIEW.md)
 
 # Round trip — Overview
 
 [← Documentation index](../README.md)
 
-`roundtrip` translates text out through one or more hops and back into the
+`rewrite` translates text out through one or more hops and back into the
 source language:
 
 ```
@@ -24,26 +24,26 @@ measured on it. Chinese text works with the same presets.
 
 | Hop | Changes | Keeps | Cost |
 | --- | --- | --- | --- |
-| Machine translation (default `light`) | Words | Sentence structure, so "not just X, it's Y" survives | Free, about 1 s |
+| Machine translation (`light`) | Words | Sentence structure, so "not just X, it's Y" survives | Free, about 1 s |
 | LLM (`standard`, `strong`) | Words and sentence structure; removes the structural tells | Facts, checked by the fact guard | Your Claude or OpenCode subscription, 8 to 28 s |
 | Repair (`<llm>:fix`) | A few exact edits that restore lost facts or meaning | The rewrite | One more LLM call |
 
-Measured on 10 texts, one run: the default `light` left 5 of 10 tells and lost 5
+Measured on 10 texts, one run: `light` left 5 of 10 tells and lost 5
 facts; `standard` left 0 tells and lost 0 facts. Details and the full table:
 [01-pivot-choice.md](01-pivot-choice.md#choosing-the-depth).
 
 The goal is prose that reads like a person wrote it, with the facts intact.
-translatex makes no claim about AI detectors and does not promise undetectable
+not-a-bot makes no claim about AI detectors and does not promise undetectable
 text.
 
 ## Ordering with translation
 
-`roundtrip` returns text in the language it started from, so translate first when
+`rewrite` returns text in the language it started from, so translate first when
 the target differs:
 
 ```bash
-translatex translate "<text>" -t zh --format json          # into Chinese
-translatex roundtrip "<Chinese text>" --from zh --format json   # humanise the Chinese
+not-a-bot translate "<text>" -t zh --format json          # into Chinese
+not-a-bot rewrite "<Chinese text>" --from zh --format json   # humanise the Chinese
 ```
 
 ## When it hurts
@@ -66,22 +66,22 @@ so the intermediates can be audited.
 ## Interface
 
 ```bash
-translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
-translatex roundtrip "…" --from en --preset standard              # LLM out and back (needs claude-cli or opencode-cli)
-translatex roundtrip "…" --from en --preset strong       # strongest rewrite, plus a repair hop
-translatex roundtrip "…" --from en --depth 3                 # zh -> ja -> fi -> en, machine translation only
-translatex roundtrip "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
-translatex roundtrip --from en --pivot ja < draft.md         # alias: translatex polish
-translatex roundtrip "Run \`make test\`" --from en --preset standard --preserve @code
+not-a-bot rewrite "In today's fast-paced landscape, …" --from en --format json
+not-a-bot rewrite "…" --from en --preset standard              # LLM out and back (needs claude-cli or opencode-cli)
+not-a-bot rewrite "…" --from en --preset strong       # strongest rewrite, plus a repair hop
+not-a-bot rewrite "…" --from en --depth 3                 # zh -> ja -> fi -> en, machine translation only
+not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
+not-a-bot rewrite --from en --pivot ja < draft.md         # alias: not-a-bot polish
+not-a-bot rewrite "Run \`make test\`" --from en --preset standard --preserve @code
 ```
 
 Hop selection, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, then
-the configured `roundtrip_preset` (default `light`).
+the configured `rewrite_preset` (default `standard`).
 
 | Flag | Meaning |
 | --- | --- |
 | `--chain "<[engine:]lang,...>"` | Explicit hops; a final hop back to the source is appended when missing |
-| `--preset <name>` | `light` (default), `standard`, `strong` |
+| `--preset <name>` | `light`, `standard`, `strong` |
 | `--depth 1-3` | Machine translation only, through zh, ja, fi (Chinese sources: en, ja, fi) |
 | `--pivot <lang>` | One bridge language, or `auto` |
 | `--preserve <pattern>` | Regex, or the named patterns `@code` and `@url` |
@@ -118,21 +118,21 @@ described in [02-chains-presets-and-llm.md](02-chains-presets-and-llm.md).
 | `warnings` | Present when non-empty: `fact check:`, `preserve:` and engine fallback notes |
 | `latencyMs`, `requestId`, `chars` | Total wall clock, correlation id, input length |
 
-`translatex polish` is an alias for `roundtrip`.
+`not-a-bot polish` is an alias for `rewrite`.
 
 ## Pivot selection
 
 `pivot: "auto"` uses Chinese for non-Chinese input and English for Chinese
-input, and is the first hop of the default `light` preset.
+input, and is the first hop of the `light` preset.
 [01-pivot-choice.md](01-pivot-choice.md) has the measurements behind that
 choice and the cases where Japanese is better.
 
 Override per request with `--pivot` / `"pivot"`, or for every request with
-`roundtrip_pivot` in `config.toml`.
+`rewrite_pivot` in `config.toml`.
 
 ## Cost
 
-One round trip costs one provider call per hop: three for the default `light`
+One round trip costs one provider call per hop: three for the `light` preset
 (more for Chinese input detected under `auto`, see
 [01-pivot-choice.md](01-pivot-choice.md#the-auto-pivot-retry)). Latency is
 roughly the sum of the hops, not the maximum. LLM hops take seconds each and

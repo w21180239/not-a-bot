@@ -9,7 +9,7 @@
 `CredentialStore::load` 读取三个来源并逐层覆盖：
 
 1. `credentials.toml` —— 节 `[provider.label]`，每组是扁平字段表。
-2. 环境变量 —— `TRANSLATEX_<PROVIDER>_<FIELD>`，生成标签为 `env` 的凭据。
+2. 环境变量 —— `NOT_A_BOT_<PROVIDER>_<FIELD>`，生成标签为 `env` 的凭据。
 3. 钥匙串 —— 值为 `@keyring` 的字段会被替换为服务 `translators` 下账户 `<provider>.<field>` 的密钥。
 
 当某 Provider 至少有一组凭据且所有必填字段齐全时即为 `configured`。`ProviderInfo.configured` 反映这一点，`build_keyed` 只注册满足条件的官方 Provider。
@@ -33,7 +33,7 @@
 | `RATE_LIMITED` | `retryAfterSecs`，否则 60 秒 |
 | `AUTH_FAILED` | 900 秒 |
 
-状态按 Provider 持久化到 `~/.config/translatex/cache/keys-<provider>.json`：
+状态按 Provider 持久化到 `~/.config/not-a-bot/cache/keys-<provider>.json`：
 
 ```json
 {
@@ -42,7 +42,7 @@
 }
 ```
 
-所有进程读写的都是同一个文件，两个并发调用共享同一视图。`translatex keys --reset` 删除这些文件。
+所有进程读写的都是同一个文件，两个并发调用共享同一视图。`not-a-bot keys --reset` 删除这些文件。
 
 ## 无 Key 的 Provider
 

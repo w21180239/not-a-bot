@@ -6,8 +6,8 @@ cross-runtime skills.
 ## Skill
 
 ```bash
-mkdir -p ~/.agents/skills/translatex
-cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/SKILL.md
+mkdir -p ~/.agents/skills/not-a-bot
+cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/SKILL.md
 ```
 
 ## Instructions
@@ -19,7 +19,7 @@ cat integrations/guidance/AGENTS.md >> GEMINI.md
 ## Verify
 
 ```bash
-translatex translate "Hello world" -t zh --format json
+not-a-bot translate "Hello world" -t zh --format json
 gemini -p "translate 'Hello world' to Chinese"
 ```
 

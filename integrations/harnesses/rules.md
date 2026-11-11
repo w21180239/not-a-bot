@@ -7,35 +7,35 @@ project rule file. The content is the same block; only the path changes.
 
 ```bash
 mkdir -p .clinerules
-cat integrations/guidance/AGENTS.md > .clinerules/translatex.md
+cat integrations/guidance/AGENTS.md > .clinerules/not-a-bot.md
 ```
 
 ## Roo Code
 
 ```bash
 mkdir -p .roo/rules
-cat integrations/guidance/AGENTS.md > .roo/rules/translatex.md
+cat integrations/guidance/AGENTS.md > .roo/rules/not-a-bot.md
 ```
 
 ## Kilo Code
 
 ```bash
 mkdir -p .kilocode/rules
-cat integrations/guidance/AGENTS.md > .kilocode/rules/translatex.md
+cat integrations/guidance/AGENTS.md > .kilocode/rules/not-a-bot.md
 ```
 
 ## Continue
 
 ```bash
 mkdir -p .continue/rules
-cat integrations/guidance/AGENTS.md > .continue/rules/translatex.md
+cat integrations/guidance/AGENTS.md > .continue/rules/not-a-bot.md
 ```
 
 ## JetBrains AI
 
 ```bash
 mkdir -p .aiassistant/rules
-cat integrations/guidance/AGENTS.md > .aiassistant/rules/translatex.md
+cat integrations/guidance/AGENTS.md > .aiassistant/rules/not-a-bot.md
 ```
 
 ## Zed

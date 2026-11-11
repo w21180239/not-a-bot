@@ -1,4 +1,4 @@
-"""Prompt lab for translatex roundtrip presets.
+"""Prompt lab for not-a-bot rewrite presets.
 
     python lab.py run [--variants v0-current,v2-human-features] [--limit N] [--results DIR]
     python lab.py summary [--results DIR]
@@ -88,7 +88,7 @@ def hop(model, frm, to, tpl):
 
 
 VARIANTS = {
-    # translatex claude-cli defaults to haiku (cli_llm.rs); sonnet used here as briefed.
+    # not-a-bot claude-cli defaults to haiku (cli_llm.rs); sonnet used here as briefed.
     "v0-current": [hop("sonnet", "en", "zh", T_HUM), hop("sonnet", "zh", "en", T_HUM_FINAL)],
     "v1-direct": [hop("sonnet", "en", "en", T_DIRECT)],
     "v2-human-features": [hop("sonnet", "en", "zh", T_HUM), hop("sonnet", "zh", "en", T_HUM_FINAL_V2)],
@@ -99,7 +99,7 @@ VARIANTS = {
     "v6-cut": [hop("sonnet", "en", "zh", T_HUM_CUT), hop("sonnet", "zh", "en", T_HUM_FINAL_CUT)],
     "v7-direct-cut": [hop("sonnet", "en", "en", T_DIRECT_CUT)],
     "v8-cut-final-only": [hop("sonnet", "en", "zh", T_HUM), hop("sonnet", "zh", "en", T_HUM_FINAL_CUT)],
-    # translatex production default (roundtrip_llm = opencode-cli).
+    # not-a-bot production default (rewrite_llm = opencode-cli).
     "v0-oc": [hop(OC, "en", "zh", T_HUM), hop(OC, "zh", "en", T_HUM_FINAL)],
     "v6-oc": [hop(OC, "en", "zh", T_HUM_CUT), hop(OC, "zh", "en", T_HUM_FINAL_CUT)],
     "v9-oc-fold": [hop(OC, "en", "zh", T_HUM_FOLD), hop(OC, "zh", "en", T_HUM_FINAL_FOLD)],

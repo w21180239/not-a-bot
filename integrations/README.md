@@ -1,18 +1,18 @@
 # Agent integrations
 
-`translatex` integrates as **a CLI plus a skill** — one binary the agent runs,
+`not-a-bot` integrates as **a CLI plus a skill** — one binary the agent runs,
 one document telling it when and how. No server, no protocol handshake: the agent
 calls the command and reads JSON. The same setup works in 24 harnesses; only the
 place the document goes differs.
 
 ```bash
-npm install -g translatex     # or: cargo install translatex
-translatex --version
+npm install -g not-a-bot     # or: cargo install not-a-bot
+not-a-bot --version
 ```
 
-[`skill/translatex/SKILL.md`](skill/translatex/SKILL.md) is the canonical skill,
+[`skill/not-a-bot/SKILL.md`](skill/not-a-bot/SKILL.md) is the canonical skill,
 [`guidance/AGENTS.md`](guidance/AGENTS.md) the short block for harnesses that
-read project instructions, and [`cursor/translatex.mdc`](cursor/translatex.mdc)
+read project instructions, and [`cursor/not-a-bot.mdc`](cursor/not-a-bot.mdc)
 the Cursor rule with frontmatter.
 
 <div align="center">
@@ -78,13 +78,13 @@ Skill harnesses:
 
 ```bash
 # Claude Code, project scope
-mkdir -p .claude/skills/translatex && cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/
+mkdir -p .claude/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md .claude/skills/not-a-bot/
 
 # OpenCode
-mkdir -p ~/.config/opencode/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/
+mkdir -p ~/.config/opencode/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.config/opencode/skills/not-a-bot/
 
 # Codex and Gemini CLI share the cross-runtime location
-mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/
+mkdir -p ~/.agents/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/
 ```
 
 Rule and instructions harnesses read the same block under their own filename:
@@ -92,8 +92,8 @@ Rule and instructions harnesses read the same block under their own filename:
 ```bash
 cat integrations/guidance/AGENTS.md >> AGENTS.md          # Codex, OpenCode, and the AGENTS.md tools
 cat integrations/guidance/AGENTS.md >> GEMINI.md         # Gemini CLI
-mkdir -p .clinerules && cat integrations/guidance/AGENTS.md > .clinerules/translatex.md
-mkdir -p .cursor/rules && cp integrations/cursor/translatex.mdc .cursor/rules/
+mkdir -p .clinerules && cat integrations/guidance/AGENTS.md > .clinerules/not-a-bot.md
+mkdir -p .cursor/rules && cp integrations/cursor/not-a-bot.mdc .cursor/rules/
 ```
 
 PowerShell: `New-Item -ItemType Directory -Force <dir>` then
@@ -106,20 +106,20 @@ under `$HOME` where marked.
 
 | Harness | Channel | Where |
 | --- | --- | --- |
-| Claude Code | Skill | `.claude/skills/translatex/SKILL.md`, or `~/.claude/skills/translatex/SKILL.md` |
-| Claude Code | Plugin | `/plugin marketplace add w21180239/translatex` then `/plugin install translatex@translatex` |
-| Codex CLI | Skill | `~/.agents/skills/translatex/SKILL.md` |
+| Claude Code | Skill | `.claude/skills/not-a-bot/SKILL.md`, or `~/.claude/skills/not-a-bot/SKILL.md` |
+| Claude Code | Plugin | `/plugin marketplace add w21180239/not-a-bot` then `/plugin install not-a-bot@not-a-bot` |
+| Codex CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` |
 | Codex CLI | Instructions | `AGENTS.md`, or `~/.codex/AGENTS.md` |
-| Gemini CLI | Skill | `~/.agents/skills/translatex/SKILL.md` |
+| Gemini CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` |
 | Gemini CLI | Instructions | `GEMINI.md` |
-| OpenCode | Skill | `~/.config/opencode/skills/translatex/SKILL.md` |
+| OpenCode | Skill | `~/.config/opencode/skills/not-a-bot/SKILL.md` |
 | OpenCode | Instructions | `AGENTS.md` |
-| Cursor | Rule | `.cursor/rules/translatex.mdc` |
-| Cline | Rule | `.clinerules/translatex.md` |
-| Roo Code | Rule | `.roo/rules/translatex.md` |
-| Kilo Code | Rule | `.kilocode/rules/translatex.md` |
-| Continue | Rule | `.continue/rules/translatex.md` |
-| JetBrains AI | Rule | `.aiassistant/rules/translatex.md` |
+| Cursor | Rule | `.cursor/rules/not-a-bot.mdc` |
+| Cline | Rule | `.clinerules/not-a-bot.md` |
+| Roo Code | Rule | `.roo/rules/not-a-bot.md` |
+| Kilo Code | Rule | `.kilocode/rules/not-a-bot.md` |
+| Continue | Rule | `.continue/rules/not-a-bot.md` |
+| JetBrains AI | Rule | `.aiassistant/rules/not-a-bot.md` |
 | Zed | Rule | `.rules` |
 | Aider | Instructions | `CONVENTIONS.md`, read with `--read CONVENTIONS.md` |
 | Qwen Code | Instructions | `QWEN.md` |
@@ -134,26 +134,26 @@ under `$HOME` where marked.
 | Reasonix | Instructions | `AGENTS.md` |
 | ZCode | Instructions | `AGENTS.md` |
 | QwenPaw | Instructions | the project instructions file |
-| Anything else | CLI | the agent runs `translatex … --format json` directly |
+| Anything else | CLI | the agent runs `not-a-bot … --format json` directly |
 
 ## Which channel for which job
 
 | Need | Command |
 | --- | --- |
-| The agent translates while answering | `translatex translate "…" -t <lang> --format json` |
-| Humanise AI-sounding prose | `translatex roundtrip "…" --from <lang> --preset standard --preserve @code --format json` |
+| The agent translates while answering | `not-a-bot translate "…" -t <lang> --format json` |
+| Humanise AI-sounding prose | `not-a-bot rewrite "…" --from <lang> --preset standard --preserve @code --format json` |
 | A script or CI job needs a translation | same CLI, parse `text` |
-| Bulk work | `translatex batch --file jobs.ndjson` |
-| Capability discovery | `translatex providers`, `translatex languages`, `translatex health` |
+| Bulk work | `not-a-bot batch --file jobs.ndjson` |
+| Capability discovery | `not-a-bot providers`, `not-a-bot languages`, `not-a-bot health` |
 
-The CLI reads `~/.config/translatex/config.toml` and `credentials.toml`, or
-`TRANSLATEX_*` environment variables. Free web endpoints need neither, so the
+The CLI reads `~/.config/not-a-bot/config.toml` and `credentials.toml`, or
+`NOT_A_BOT_*` environment variables. Free web endpoints need neither, so the
 skill works on a fresh machine with only the binary installed.
 
 ## Verify
 
 ```bash
-translatex translate "Hello world" -t zh --format json
+not-a-bot translate "Hello world" -t zh --format json
 ```
 
 Then ask the harness to translate a sentence. A correct answer contains a

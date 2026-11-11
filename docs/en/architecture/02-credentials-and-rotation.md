@@ -9,7 +9,7 @@
 `CredentialStore::load` reads three sources and layers them:
 
 1. `credentials.toml` — sections `[provider.label]`, each a flat map of fields.
-2. Environment — `TRANSLATEX_<PROVIDER>_<FIELD>` becomes a credential labelled `env`.
+2. Environment — `NOT_A_BOT_<PROVIDER>_<FIELD>` becomes a credential labelled `env`.
 3. Keyring — any field whose value is `@keyring` is replaced with the secret stored under the account `<provider>.<field>` in the `translators` service.
 
 A provider is `configured` when it has at least one credential with every required field present. `ProviderInfo.configured` reflects that, and `build_keyed` registers official providers only when they qualify.
@@ -33,7 +33,7 @@ The engine loads the ring once per provider per request, picks the first non-coo
 | `RATE_LIMITED` | `retryAfterSecs`, else 60 s |
 | `AUTH_FAILED` | 900 s |
 
-State is persisted per provider in `~/.config/translatex/cache/keys-<provider>.json`:
+State is persisted per provider in `~/.config/not-a-bot/cache/keys-<provider>.json`:
 
 ```json
 {
@@ -42,7 +42,7 @@ State is persisted per provider in `~/.config/translatex/cache/keys-<provider>.j
 }
 ```
 
-Every process reads and writes the same file, so two concurrent calls share one view. `translatex keys --reset` deletes the files.
+Every process reads and writes the same file, so two concurrent calls share one view. `not-a-bot keys --reset` deletes the files.
 
 ## Keyless providers
 

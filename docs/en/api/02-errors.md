@@ -39,7 +39,7 @@ Every failure carries enough information for an agent to decide without guessing
 | `INVALID_INPUT` | no | `fix_input` | Empty text, bad code, same source and target |
 | `INVALID_PRESERVE_PATTERN` | no | `fix_preserve_pattern` | Regex did not compile |
 | `CONFIG_ERROR` | no | `fix_config_file` | Malformed TOML or unknown key |
-| `INTERNAL` | no | `report_bug` | Bug in translatex itself |
+| `INTERNAL` | no | `report_bug` | Bug in not-a-bot itself |
 
 ## Decision table
 

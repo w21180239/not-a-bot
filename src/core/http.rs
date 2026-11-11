@@ -4,7 +4,7 @@ use crate::core::error::{Error, Result};
 use reqwest::{Client, RequestBuilder, Response, StatusCode};
 use std::time::Duration;
 
-pub const USER_AGENT: &str = concat!("translatex/", env!("CARGO_PKG_VERSION"));
+pub const USER_AGENT: &str = concat!("not-a-bot/", env!("CARGO_PKG_VERSION"));
 
 pub fn client(timeout: Duration) -> Result<Client> {
     Client::builder()

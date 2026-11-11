@@ -11,7 +11,7 @@ pub use core::{config, creds, engine, error, http, keys, lang, preserve, types};
 pub use error::{Error, Result};
 pub use providers::{Provider, Registry};
 pub use types::{
-    AttemptRecord, HealthRecord, ProviderInfo, ProviderKind, RoundtripRequest, RoundtripResponse,
+    AttemptRecord, HealthRecord, ProviderInfo, ProviderKind, RewriteRequest, RewriteResponse,
     TranslateRequest, TranslateResponse,
 };
 

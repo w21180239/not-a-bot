@@ -16,15 +16,15 @@ Install the binary, run one request, and turn on shell completion.
 
 | Method | Command | Notes |
 | --- | --- | --- |
-| Cargo | `cargo install translatex` | Compiles with LTO; a few minutes |
-| Prebuilt | download from [Releases](https://github.com/w21180239/translatex/releases/latest) | Windows, Linux, macOS |
-| Source | `cargo build --release` | Binary at `target/release/translatex` |
+| Cargo | `cargo install not-a-bot` | Compiles with LTO; a few minutes |
+| Prebuilt | download from [Releases](https://github.com/w21180239/not-a-bot/releases/latest) | Windows, Linux, macOS |
+| Source | `cargo build --release` | Binary at `target/release/not-a-bot` |
 
 ## Verify
 
 ```bash
-translatex --version
-translatex providers --format text
+not-a-bot --version
+not-a-bot providers --format text
 ```
 
 `providers` lists the registered providers after credential gating. Free endpoints always appear; keyed providers appear only when credentials resolve.
@@ -32,29 +32,29 @@ translatex providers --format text
 ## First request
 
 ```bash
-translatex translate "Hello world" -t zh
+not-a-bot translate "Hello world" -t zh
 ```
 
 If no provider answers, the error tells you why:
 
 ```bash
-translatex translate "Hello world" -t zh --verbose
-translatex health --format json
+not-a-bot translate "Hello world" -t zh --verbose
+not-a-bot health --format json
 ```
 
 ## Shell completion
 
 ```bash
-translatex completions bash       > /etc/bash_completion.d/translatex
-translatex completions zsh        > ~/.zfunc/_translatex
-translatex completions fish       > ~/.config/fish/completions/translatex.fish
+not-a-bot completions bash       > /etc/bash_completion.d/not-a-bot
+not-a-bot completions zsh        > ~/.zfunc/_not-a-bot
+not-a-bot completions fish       > ~/.config/fish/completions/not-a-bot.fish
 ```
 
 PowerShell needs the generated script dot-sourced from the profile:
 
 ```powershell
-translatex completions powershell > "$HOME\Documents\PowerShell\translatex-completion.ps1"
-Add-Content $PROFILE '. "$HOME\Documents\PowerShell\translatex-completion.ps1"'
+not-a-bot completions powershell > "$HOME\Documents\PowerShell\not-a-bot-completion.ps1"
+Add-Content $PROFILE '. "$HOME\Documents\PowerShell\not-a-bot-completion.ps1"'
 ```
 
 ## Navigation

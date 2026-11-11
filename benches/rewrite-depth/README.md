@@ -1,6 +1,6 @@
-# roundtrip-depth
+# rewrite-depth
 
-Compares `translatex roundtrip` configurations on three measures: how much the text is rewritten, how many structural AI tells survive, and how many facts go missing.
+Compares `not-a-bot rewrite` configurations on three measures: how much the text is rewritten, how many structural AI tells survive, and how many facts go missing.
 
 ## What it measures
 
@@ -16,15 +16,15 @@ Compares `translatex roundtrip` configurations on three measures: how much the t
 ## Run it
 
 ```bash
-python benches/roundtrip-depth/measure.py --bin target/release/translatex.exe --out out
-python benches/roundtrip-depth/measure.py --bin target/release/translatex.exe --out out --configs light,standard-opencode
+python benches/rewrite-depth/measure.py --bin target/release/not-a-bot.exe --out out
+python benches/rewrite-depth/measure.py --bin target/release/not-a-bot.exe --out out --configs light,standard-opencode
 ```
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
-| `--bin` | `translatex` on `PATH` | Binary to test |
-| `--out` | `benches/roundtrip-depth/out` | Directory for `results.jsonl` (one record per text and configuration) and `summary.md` |
-| `--configs` | all | Comma-separated names from `CONFIGS` in `measure.py`: `light-d1` (`--depth 1`), `light` (the default preset, 2 hops), `standard-claude`, `standard-opencode`, `strong-claude`, `strong-opencode`, the by-hand chains `light-fix-claude` and `light-then-llm-claude` / `light-then-llm-opencode`, and with `--scorer` also `standard-best3` (`--preset standard --best-of 3`) and `standard-target` (`--preset standard --target-score`) |
+| `--bin` | `not-a-bot` on `PATH` | Binary to test |
+| `--out` | `benches/rewrite-depth/out` | Directory for `results.jsonl` (one record per text and configuration) and `summary.md` |
+| `--configs` | all | Comma-separated names from `CONFIGS` in `measure.py`: `light-d1` (`--depth 1`), `light` (2 hops), `standard-claude`, `standard-opencode`, `strong-claude`, `strong-opencode`, the by-hand chains `light-fix-claude` and `light-then-llm-claude` / `light-then-llm-opencode`, and with `--scorer` also `standard-best3` (`--preset standard --best-of 3`) and `standard-target` (`--preset standard --target-score`) |
 | `--langs` | `en` | Comma-separated corpus languages to run (`en`, `zh`). `summary.md` opens with the languages it covers. Rows already in `results.jsonl` for other languages stay in the file and are left out of the summary |
 | `--sleep` | 0.4 | Seconds between calls, to stay polite to the free endpoints |
 | `--timeout` | 600 | Per-call timeout in seconds |
@@ -41,8 +41,8 @@ Run on 2026-11-11. 10 texts, one run per configuration.
 
 | Configuration | Overlap | Tells left (of 10) | Facts missing | Latency |
 | --- | --- | --- | --- | --- |
-| light, 1 hop (`--depth 1`, 0.1.x default) | 0.556 | 7 | 5 | 0.5 s |
-| light, 2 hops (0.3 default) | 0.520 | 5 | 5 | 0.9 s |
+| light, 1 hop (`--depth 1`, earliest default) | 0.556 | 7 | 5 | 0.5 s |
+| light, 2 hops (previous default) | 0.520 | 5 | 5 | 0.9 s |
 | 3 machine-translation hops (`--depth 3`) | 0.480 | 6 | 8 | 1.1 s |
 | standard via opencode-cli (DeepSeek) | 0.446 | 0 | 0 | 14 s |
 | standard via claude-cli (Haiku) | 0.535 | 0 | 0 | 8 s |

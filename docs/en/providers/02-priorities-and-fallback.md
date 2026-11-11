@@ -9,7 +9,7 @@
 `Registry::chain` assembles the attempt list in this order:
 
 1. **Fallback list** — `--fallback` / `fallbackChain`, in the order written.
-2. **Configured chain** — `chain` in `config.toml` or `TRANSLATEX_CHAIN`.
+2. **Configured chain** — `chain` in `config.toml` or `NOT_A_BOT_CHAIN`.
 3. **Everything else** registered, sorted by ascending `priority`.
 
 Duplicates are removed on the resolved provider id, so an alias and its target cannot both appear. When a provider is pinned with `--provider`:
@@ -49,9 +49,9 @@ One provider is registered but never selected automatically:
 | Provider | Why | How to use it |
 | --- | --- | --- |
 | `reverso` | Cloudflare rejects this client's TLS fingerprint, so the attempt fails at the handshake every time | `--provider reverso`, `--fallback reverso`, or listing it in `chain` |
-| `claude-cli`, `opencode-cli` | Slow, and each call spends subscription quota | Name them: a `roundtrip` hop (`claude-cli:zh`), a preset (`standard`, `strong`), `--provider`, `--fallback` or `chain` |
+| `claude-cli`, `opencode-cli` | Slow, and each call spends subscription quota | Name them: a `rewrite` hop (`claude-cli:zh`), a preset (`standard`, `strong`), `--provider`, `--fallback` or `chain` |
 
-`DEFAULT_EXCLUDED` in `src/providers/mod.rs` is the skip list. The registry never appends those providers by priority; naming one anywhere — pinned, fallback or configured chain — still attempts it, and `translatex providers` still lists it.
+`DEFAULT_EXCLUDED` in `src/providers/mod.rs` is the skip list. The registry never appends those providers by priority; naming one anywhere — pinned, fallback or configured chain — still attempts it, and `not-a-bot providers` still lists it.
 
 ## Attempt behaviour
 
@@ -75,7 +75,7 @@ A timeout is deliberately not retried inline: the provider already consumed its 
 
 Cooldowns exist to rotate between credentials, not to disable a provider:
 
-- Keyed providers persist cooldown state to `~/.config/translatex/cache/keys-<provider>.json`, shared by every process.
+- Keyed providers persist cooldown state to `~/.config/not-a-bot/cache/keys-<provider>.json`, shared by every process.
 - Keyless providers use an unmanaged ring. Their single pseudo-credential never cools, because there is no second key to rotate to and a cooldown would silently remove the channel.
 - If every key of every provider is cooling, the error is `RATE_LIMITED` with the longest remaining cooldown, not `NO_PROVIDER`.
 

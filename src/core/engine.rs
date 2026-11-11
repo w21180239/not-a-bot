@@ -6,7 +6,7 @@ use crate::core::error::{Error, Result};
 use crate::core::keys::KeyRing;
 use crate::core::preserve::Preserver;
 use crate::core::types::{
-    AttemptRecord, Hop, ProviderKind, RoundtripRequest, TranslateRequest, TranslateResponse,
+    AttemptRecord, Hop, ProviderKind, RewriteRequest, TranslateRequest, TranslateResponse,
 };
 use crate::providers::{Provider, Registry};
 use crate::retry::backoff;
@@ -70,8 +70,8 @@ struct Preserve {
 
 /// A round trip plus the per-hop trail, so `--verbose` can explain both legs.
 #[derive(Debug, Clone)]
-pub struct RoundtripOutcome {
-    pub response: crate::core::types::RoundtripResponse,
+pub struct RewriteOutcome {
+    pub response: crate::core::types::RewriteResponse,
     pub attempts: Vec<AttemptRecord>,
 }
 
@@ -291,8 +291,8 @@ impl Engine {
     }
 
     /// Round trip with the request's scoring options: the scorer command
-    /// comes from the request, else the configured `roundtrip_scorer`.
-    pub async fn roundtrip(&self, req: &RoundtripRequest) -> Result<RoundtripOutcome> {
+    /// comes from the request, else the configured `rewrite_scorer`.
+    pub async fn rewrite(&self, req: &RewriteRequest) -> Result<RewriteOutcome> {
         use crate::core::scoring::{CommandScorer, Scorer};
         let command = req
             .scorer
@@ -300,7 +300,7 @@ impl Engine {
             .map(str::trim)
             .filter(|s| !s.is_empty())
             .map(str::to_string)
-            .or_else(|| self.settings.roundtrip_scorer());
+            .or_else(|| self.settings.rewrite_scorer());
         // Local detectors load a model per call (10+ s on CPU), so the scorer
         // gets the same kind of floor as the local agent CLIs.
         let timeout_ms = req
@@ -310,19 +310,19 @@ impl Engine {
         let scorer = command
             .map(|c| CommandScorer::parse(&c, timeout_ms))
             .transpose()?;
-        self.roundtrip_scored(req, scorer.as_ref().map(|s| s as &dyn Scorer))
+        self.rewrite_scored(req, scorer.as_ref().map(|s| s as &dyn Scorer))
             .await
     }
 
     /// Round trip scored by `scorer`: `bestOf` runs per rung, facts first,
     /// then lowest score; `targetScore` climbs the configured ladder.
-    pub async fn roundtrip_scored(
+    pub async fn rewrite_scored(
         &self,
-        req: &RoundtripRequest,
+        req: &RewriteRequest,
         scorer: Option<&dyn crate::core::scoring::Scorer>,
-    ) -> Result<RoundtripOutcome> {
+    ) -> Result<RewriteOutcome> {
         crate::core::scoring::search(req, &self.settings, scorer, |r| async move {
-            self.roundtrip_once(&r).await
+            self.rewrite_once(&r).await
         })
         .await
     }
@@ -334,7 +334,7 @@ impl Engine {
     /// keep sentence shapes; LLM hops (humanize style) rewrite the shapes too,
     /// and a later LLM hop sees the previous one as history so it does not
     /// undo it. The output is checked for facts the input had and lost.
-    async fn roundtrip_once(&self, req: &RoundtripRequest) -> Result<RoundtripOutcome> {
+    async fn rewrite_once(&self, req: &RewriteRequest) -> Result<RewriteOutcome> {
         use crate::core::chain::{plan, resolve_source, Target};
         use crate::providers::cli_llm::{HISTORY_KEY, ORIGINAL_KEY, ORIGINAL_LANG_KEY, STYLE_KEY};
 
@@ -532,8 +532,8 @@ impl Engine {
             warnings.push(format!("fact check: missing {}", missing_facts.join(", ")));
         }
         let provider = hops.last().map(|h| h.provider.clone()).unwrap_or_default();
-        Ok(RoundtripOutcome {
-            response: crate::core::types::RoundtripResponse {
+        Ok(RewriteOutcome {
+            response: crate::core::types::RewriteResponse {
                 text,
                 detected_source: from,
                 chain,
@@ -891,6 +891,7 @@ mod tests {
         Settings {
             retries: Some(0),
             race_width: Some(1),
+            rewrite_preset: Some("light".into()),
             ..Default::default()
         }
     }
@@ -1435,15 +1436,15 @@ mod tests {
         )
     }
 
-    fn single_hop(source: &str) -> crate::core::types::RoundtripRequest {
-        crate::core::types::RoundtripRequest {
+    fn single_hop(source: &str) -> crate::core::types::RewriteRequest {
+        crate::core::types::RewriteRequest {
             depth: Some(1),
-            ..roundtrip_req(source, "auto")
+            ..rewrite_req(source, "auto")
         }
     }
 
-    fn roundtrip_req(source: &str, pivot: &str) -> crate::core::types::RoundtripRequest {
-        crate::core::types::RoundtripRequest {
+    fn rewrite_req(source: &str, pivot: &str) -> crate::core::types::RewriteRequest {
+        crate::core::types::RewriteRequest {
             text: "hello".into(),
             source_lang: source.into(),
             pivot: pivot.into(),
@@ -1463,7 +1464,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn roundtrip_goes_out_through_the_pivot_and_back() {
+    async fn rewrite_goes_out_through_the_pivot_and_back() {
         let home = dir();
         let (rec, calls) = recorder("en");
         let mut reg = Registry::new();
@@ -1476,9 +1477,9 @@ mod tests {
         );
 
         let out = engine
-            .roundtrip(&roundtrip_req("en", "auto"))
+            .rewrite(&rewrite_req("en", "auto"))
             .await
-            .expect("roundtrip");
+            .expect("rewrite");
 
         let calls = calls.lock().unwrap().clone();
         assert_eq!(calls.len(), 3, "two hops out, one hop back");
@@ -1506,13 +1507,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn roundtrip_pivot_from_config_replaces_the_guess() {
+    async fn rewrite_pivot_from_config_replaces_the_guess() {
         let home = dir();
         let (rec, calls) = recorder("en");
         let mut reg = Registry::new();
         reg.register(rec);
         let settings = Settings {
-            roundtrip_pivot: Some("ja".into()),
+            rewrite_pivot: Some("ja".into()),
             ..test_settings()
         };
         let engine = Engine::new(
@@ -1522,10 +1523,7 @@ mod tests {
             settings,
         );
 
-        engine
-            .roundtrip(&single_hop("en"))
-            .await
-            .expect("roundtrip");
+        engine.rewrite(&single_hop("en")).await.expect("rewrite");
 
         let calls = calls.lock().unwrap().clone();
         assert_eq!(calls[0].1, "ja", "the configured pivot beats the default");
@@ -1533,7 +1531,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn roundtrip_auto_pivot_uses_english_for_chinese() {
+    async fn rewrite_auto_pivot_uses_english_for_chinese() {
         let home = dir();
         let (rec, calls) = recorder("zh");
         let mut reg = Registry::new();
@@ -1546,9 +1544,9 @@ mod tests {
         );
 
         let out = engine
-            .roundtrip(&roundtrip_req("zh", "auto"))
+            .rewrite(&rewrite_req("zh", "auto"))
             .await
-            .expect("roundtrip");
+            .expect("rewrite");
 
         let calls = calls.lock().unwrap().clone();
         assert_eq!(calls.len(), 3);
@@ -1559,7 +1557,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn roundtrip_retries_through_english_when_auto_guesses_the_source() {
+    async fn rewrite_retries_through_english_when_auto_guesses_the_source() {
         let home = dir();
         // `auto` starts with zh; the provider reports the text is Chinese, so
         // the guessed pivot was the source and the hop is redone into English.
@@ -1574,9 +1572,9 @@ mod tests {
         );
 
         let out = engine
-            .roundtrip(&roundtrip_req("auto", "auto"))
+            .rewrite(&rewrite_req("auto", "auto"))
             .await
-            .expect("roundtrip");
+            .expect("rewrite");
 
         let calls = calls.lock().unwrap().clone();
         assert_eq!(calls.len(), 4, "zh guess, redo into en, ja, then back");
@@ -1589,7 +1587,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn roundtrip_moves_a_pivot_that_equals_the_source() {
+    async fn rewrite_moves_a_pivot_that_equals_the_source() {
         let home = dir();
         let (rec, calls) = recorder("en");
         let mut reg = Registry::new();
@@ -1602,16 +1600,16 @@ mod tests {
         );
 
         engine
-            .roundtrip(&roundtrip_req("en", "en"))
+            .rewrite(&rewrite_req("en", "en"))
             .await
-            .expect("roundtrip");
+            .expect("rewrite");
 
         let calls = calls.lock().unwrap().clone();
         assert_eq!(calls[0].1, "zh", "a source-language pivot is unusable");
     }
 
     #[tokio::test]
-    async fn roundtrip_rejects_an_unknown_pivot() {
+    async fn rewrite_rejects_an_unknown_pivot() {
         let home = dir();
         let (rec, _) = recorder("en");
         let mut reg = Registry::new();
@@ -1624,7 +1622,7 @@ mod tests {
         );
 
         let err = engine
-            .roundtrip(&roundtrip_req("en", "klingon"))
+            .rewrite(&rewrite_req("en", "klingon"))
             .await
             .expect_err("unknown pivot");
         assert_eq!(err.code(), "INVALID_INPUT");
@@ -1633,7 +1631,7 @@ mod tests {
     type MetaCalls = Arc<std::sync::Mutex<Vec<(String, BTreeMap<String, serde_json::Value>)>>>;
 
     /// Records target language and metadata per call; `kind` decides whether
-    /// the roundtrip treats it as an LLM hop.
+    /// the rewrite treats it as an LLM hop.
     struct MetaRecorder {
         name: &'static str,
         kind: ProviderKind,
@@ -1663,7 +1661,7 @@ mod tests {
                 .push((req.target_lang.clone(), req.metadata.clone()));
             let fix = req
                 .metadata
-                .get("translatex.style")
+                .get("not-a-bot.style")
                 .is_some_and(|s| s == "fix");
             Ok(TranslateResponse {
                 text: if fix {
@@ -1687,7 +1685,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn chain_roundtrip_marks_llm_hops_and_carries_history() {
+    async fn chain_rewrite_marks_llm_hops_and_carries_history() {
         let home = dir();
         let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
         let mut reg = Registry::new();
@@ -1707,7 +1705,7 @@ mod tests {
             Some(home.path().to_path_buf()),
             test_settings(),
         );
-        let mut req = roundtrip_req("en", "auto");
+        let mut req = rewrite_req("en", "auto");
         req.text = "Ask Aroha".into();
         req.chain = vec![
             "llm-a:zh".into(),
@@ -1716,21 +1714,21 @@ mod tests {
             "mt-a:en".into(),
         ];
 
-        let out = engine.roundtrip(&req).await.expect("roundtrip");
+        let out = engine.rewrite(&req).await.expect("rewrite");
 
         let calls = calls.lock().unwrap().clone();
         let targets: Vec<_> = calls.iter().map(|c| c.0.as_str()).collect();
         assert_eq!(targets, vec!["zh", "ja", "fi", "en"]);
-        assert_eq!(calls[0].1["translatex.style"], "humanize");
-        assert!(!calls[0].1.contains_key("translatex.history"));
+        assert_eq!(calls[0].1["not-a-bot.style"], "humanize");
+        assert!(!calls[0].1.contains_key("not-a-bot.history"));
         assert!(
-            !calls[0].1.contains_key("translatex.original"),
+            !calls[0].1.contains_key("not-a-bot.original"),
             "the first hop reads the original itself"
         );
-        assert_eq!(calls[1].1["translatex.original"], "Ask Aroha");
-        assert_eq!(calls[1].1["translatex.original_lang"], "en");
+        assert_eq!(calls[1].1["not-a-bot.original"], "Ask Aroha");
+        assert_eq!(calls[1].1["not-a-bot.original_lang"], "en");
         assert_eq!(
-            calls[1].1["translatex.history"],
+            calls[1].1["not-a-bot.history"],
             serde_json::json!({"input": "Ask Aroha", "output": "Ask Aroha>zh"})
         );
         assert!(calls[2].1.is_empty(), "MT hops get no style");
@@ -1768,10 +1766,10 @@ mod tests {
             Some(home.path().to_path_buf()),
             test_settings(),
         );
-        let mut req = roundtrip_req("en", "auto");
+        let mut req = rewrite_req("en", "auto");
         req.chain = vec!["mt-a:zh".into(), "mt-a:en".into(), "llm-a:fix".into()];
 
-        let out = engine.roundtrip(&req).await.expect("roundtrip");
+        let out = engine.rewrite(&req).await.expect("rewrite");
 
         let calls = calls.lock().unwrap().clone();
         assert_eq!(calls.len(), 3, "no hop after the fix");
@@ -1780,7 +1778,7 @@ mod tests {
             "MT hops get no metadata"
         );
         assert_eq!(calls[2].0, "en");
-        assert_eq!(calls[2].1["translatex.style"], "fix");
+        assert_eq!(calls[2].1["not-a-bot.style"], "fix");
         assert_eq!(
             out.response.text, "hullo>zh>en",
             "only the vetted edit applies"
@@ -1794,15 +1792,15 @@ mod tests {
             .warnings
             .iter()
             .any(|w| w.starts_with("fix: skipped edit \"zz\"")));
-        assert_eq!(calls[2].1["translatex.original"], "hello");
+        assert_eq!(calls[2].1["not-a-bot.original"], "hello");
         assert_eq!(out.response.chain, vec!["zh", "en", "fix"]);
         assert_eq!(out.response.hops[2].from, "en");
         assert_eq!(out.response.hops[2].to, "en");
         assert_eq!(out.response.detected_source, "en");
 
-        let mut bad = roundtrip_req("en", "auto");
+        let mut bad = rewrite_req("en", "auto");
         bad.chain = vec!["zh".into(), "mt-a:fix".into()];
-        let err = engine.roundtrip(&bad).await.expect_err("MT cannot fix");
+        let err = engine.rewrite(&bad).await.expect_err("MT cannot fix");
         assert_eq!(err.code(), "INVALID_INPUT");
     }
 
@@ -1818,11 +1816,11 @@ mod tests {
             Some(home.path().to_path_buf()),
             test_settings(),
         );
-        let mut req = roundtrip_req("en", "auto");
+        let mut req = rewrite_req("en", "auto");
         req.text = "Pay NZD 18,900".into();
         req.depth = Some(3);
 
-        let out = engine.roundtrip(&req).await.expect("roundtrip");
+        let out = engine.rewrite(&req).await.expect("rewrite");
 
         let calls = calls.lock().unwrap().clone();
         let targets: Vec<_> = calls.iter().map(|c| c.1.as_str()).collect();
@@ -1845,10 +1843,10 @@ mod tests {
             Some(home.path().to_path_buf()),
             test_settings(),
         );
-        let mut req = roundtrip_req("auto", "auto");
+        let mut req = rewrite_req("auto", "auto");
         req.chain = vec!["zh".into(), "recorder:en".into()];
 
-        let out = engine.roundtrip(&req).await.expect("roundtrip");
+        let out = engine.rewrite(&req).await.expect("rewrite");
         assert_eq!(calls.lock().unwrap().len(), 2);
         assert_eq!(out.response.chain, vec!["zh", "en"]);
         assert_eq!(out.response.detected_source, "en");
@@ -1935,7 +1933,7 @@ mod tests {
         let sent = seen.lock().unwrap()[0].clone();
         assert_eq!(sent.text, CODE_TEXT);
         assert_eq!(
-            sent.metadata["translatex.preserve"],
+            sent.metadata["not-a-bot.preserve"],
             serde_json::json!(["`make test`", "`git push`"])
         );
         assert_eq!(out.response.text, CODE_TEXT);
@@ -1969,7 +1967,7 @@ mod tests {
 
         let sent = seen.lock().unwrap()[0].clone();
         assert!(!sent.text.contains('`'), "masked: {}", sent.text);
-        assert!(!sent.metadata.contains_key("translatex.preserve"));
+        assert!(!sent.metadata.contains_key("not-a-bot.preserve"));
         assert_eq!(out.response.text, CODE_TEXT);
     }
 
@@ -1988,10 +1986,10 @@ mod tests {
             ("llm-a", ProviderKind::Llm, echo),
             ("mt-c", ProviderKind::Web, echo),
         ]);
-        let mut req = roundtrip_req("en", "auto");
+        let mut req = rewrite_req("en", "auto");
         req.chain = vec!["mt-a:zh".into(), "mt-b:fi".into(), "mt-a:en".into()];
 
-        let out = engine.roundtrip(&req).await.expect("roundtrip");
+        let out = engine.rewrite(&req).await.expect("rewrite");
 
         let providers: Vec<_> = out
             .response
@@ -2013,10 +2011,10 @@ mod tests {
             ("llm-a", ProviderKind::Llm, rate_limited),
             ("mt-a", ProviderKind::Web, echo),
         ]);
-        let mut req = roundtrip_req("en", "auto");
+        let mut req = rewrite_req("en", "auto");
         req.chain = vec!["llm-a:zh".into(), "mt-a:en".into()];
 
-        let err = engine.roundtrip(&req).await.unwrap_err();
+        let err = engine.rewrite(&req).await.unwrap_err();
 
         assert_eq!(err.code(), "RATE_LIMITED");
         assert_eq!(seen.lock().unwrap().len(), 1);

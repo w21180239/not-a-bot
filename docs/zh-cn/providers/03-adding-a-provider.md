@@ -112,7 +112,7 @@ mod tests {
 上线前做实测：
 
 ```bash
-translatex translate "Hello world" -t zh --provider example --format json
+not-a-bot translate "Hello world" -t zh --provider example --format json
 ```
 
 返回与源文一致的 Provider 属于静默失败。解析响应体，缺少译文时返回 `Error::BadResponse`。

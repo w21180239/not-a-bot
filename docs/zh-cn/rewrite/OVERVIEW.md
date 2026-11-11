@@ -1,10 +1,10 @@
-**简体中文** · [English](../../en/roundtrip/OVERVIEW.md)
+**简体中文** · [English](../../en/rewrite/OVERVIEW.md)
 
 # 往返翻译 — 概览
 
 [← 文档索引](../README.md)
 
-`roundtrip` 把文本经一跳或多跳翻译出去，再翻回原语言：
+`rewrite` 把文本经一跳或多跳翻译出去，再翻回原语言：
 
 ```
 原文 ──▶ 第 1 跳 ──▶ 第 2 跳 ──▶ … ──▶ 原语言
@@ -16,21 +16,21 @@
 
 | 跳 | 改变 | 保留 | 成本 |
 | --- | --- | --- | --- |
-| 机器翻译（默认 `light`） | 用词 | 句子结构，"not just X, it's Y" 之类句式会留下 | 免费，约 1 秒 |
+| 机器翻译（`light`） | 用词 | 句子结构，"not just X, it's Y" 之类句式会留下 | 免费，约 1 秒 |
 | LLM（`standard`、`strong`） | 用词和句子结构，去掉结构性的 AI 腔 | 事实，由事实检查核对 | 用你自己的 Claude 或 OpenCode 订阅，8 到 28 秒 |
 | 修复（`<llm>:fix`） | 少量精确编辑，补回丢掉的事实或语义 | 改写结果 | 多一次 LLM 调用 |
 
-实测 10 段文本、各跑一次：默认 `light` 还剩 5 段带 AI 腔句式、丢了 5 个事实；`standard` 剩 0 段、丢 0 个事实。完整表格见 [01-pivot-choice.md](01-pivot-choice.md#选择跳数)。
+实测 10 段文本、各跑一次：`light` 还剩 5 段带 AI 腔句式、丢了 5 个事实；`standard` 剩 0 段、丢 0 个事实。完整表格见 [01-pivot-choice.md](01-pivot-choice.md#选择跳数)。
 
-目标是让文字读起来像人写的，同时事实不丢。translatex 对 AI 检测器不做任何承诺，也不保证文本"检测不出"。
+目标是让文字读起来像人写的，同时事实不丢。not-a-bot 对 AI 检测器不做任何承诺，也不保证文本"检测不出"。
 
 ## 与翻译的先后
 
-`roundtrip` 返回的是起始语言的文本，目标语言不同时要先翻译：
+`rewrite` 返回的是起始语言的文本，目标语言不同时要先翻译：
 
 ```bash
-translatex translate "<text>" -t zh --format json          # 先译成中文
-translatex roundtrip "<中文文本>" --from zh --format json   # 再对中文做人性化改写
+not-a-bot translate "<text>" -t zh --format json          # 先译成中文
+not-a-bot rewrite "<中文文本>" --from zh --format json   # 再对中文做人性化改写
 ```
 
 ## 不适合
@@ -51,21 +51,21 @@ translatex roundtrip "<中文文本>" --from zh --format json   # 再对中文�
 ## 接口
 
 ```bash
-translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
-translatex roundtrip "…" --from en --preset standard              # LLM 出去再回来（需要 claude-cli 或 opencode-cli）
-translatex roundtrip "…" --from en --preset strong       # 改写最强，外加一次修复
-translatex roundtrip "…" --from en --depth 3                 # zh -> ja -> fi -> en，只用机器翻译
-translatex roundtrip "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
-translatex roundtrip --from en --pivot ja < draft.md         # 别名：translatex polish
-translatex roundtrip "Run \`make test\`" --from en --preset standard --preserve @code
+not-a-bot rewrite "In today's fast-paced landscape, …" --from en --format json
+not-a-bot rewrite "…" --from en --preset standard              # LLM 出去再回来（需要 claude-cli 或 opencode-cli）
+not-a-bot rewrite "…" --from en --preset strong       # 改写最强，外加一次修复
+not-a-bot rewrite "…" --from en --depth 3                 # zh -> ja -> fi -> en，只用机器翻译
+not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
+not-a-bot rewrite --from en --pivot ja < draft.md         # 别名：not-a-bot polish
+not-a-bot rewrite "Run \`make test\`" --from en --preset standard --preserve @code
 ```
 
-选跳规则，先匹配者生效：`--chain`、`--preset`、`--depth`、`--pivot`，最后是配置里的 `roundtrip_preset`（默认 `light`）。
+选跳规则，先匹配者生效：`--chain`、`--preset`、`--depth`、`--pivot`，最后是配置里的 `rewrite_preset`（默认 `standard`）。
 
 | 参数 | 含义 |
 | --- | --- |
 | `--chain "<[engine:]lang,...>"` | 显式指定每一跳；末尾没回到原语言时自动补一跳 |
-| `--preset <name>` | `light`（默认）、`standard`、`strong` |
+| `--preset <name>` | `light`、`standard`、`strong` |
 | `--depth 1-3` | 只用机器翻译，依次经过 zh、ja、fi（中文原文为 en、ja、fi） |
 | `--pivot <lang>` | 单个中转语言，或 `auto` |
 | `--preserve <pattern>` | 正则，或具名模式 `@code`、`@url` |
@@ -101,17 +101,17 @@ translatex roundtrip "Run \`make test\`" --from en --preset standard --preserve 
 | `warnings` | 非空时出现：`fact check:`、`preserve:` 和引擎回退提示 |
 | `latencyMs`、`requestId`、`chars` | 总耗时、关联 id、输入长度 |
 
-`translatex polish` 是 `roundtrip` 的别名。
+`not-a-bot polish` 是 `rewrite` 的别名。
 
 ## 中转语言怎么选
 
-`pivot: "auto"` 对非中文用中文、对中文用英文，是默认 `light` 预设的第一跳。依据与例外见 [01-pivot-choice.md](01-pivot-choice.md)。
+`pivot: "auto"` 对非中文用中文、对中文用英文，是 `light` 预设的第一跳。依据与例外见 [01-pivot-choice.md](01-pivot-choice.md)。
 
-单次覆盖用 `--pivot` / `"pivot"`，全局默认用 `config.toml` 的 `roundtrip_pivot`。
+单次覆盖用 `--pivot` / `"pivot"`，全局默认用 `config.toml` 的 `rewrite_pivot`。
 
 ## 成本
 
-一次往返的 Provider 调用数等于跳数：默认 `light` 是三次（中文输入在 auto 下偶尔更多，见 [01-pivot-choice.md](01-pivot-choice.md#auto-中转的重试逻辑)）。延迟约等于各跳之和，不是最大值。LLM 跳每跳几秒，并消耗订阅额度。
+一次往返的 Provider 调用数等于跳数：`light` 是三次（中文输入在 auto 下偶尔更多，见 [01-pivot-choice.md](01-pivot-choice.md#auto-中转的重试逻辑)）。延迟约等于各跳之和，不是最大值。LLM 跳每跳几秒，并消耗订阅额度。
 
 ## 导航
 

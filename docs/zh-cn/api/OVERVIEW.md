@@ -19,8 +19,8 @@ CLI 的每条命令共用同一套线格式契约：一个请求对象进，一�
 | --- | --- | --- |
 | `TranslateRequest` | `translate`、`batch` | 翻译什么、怎么翻 |
 | `TranslateResponse` | 成功路径 | 结果与来源信息 |
-| `RoundtripRequest` | `roundtrip` | 文本，加 `chain`、`preset`、`depth` 或 `pivot` |
-| `RoundtripResponse` | `roundtrip` 成功 | 最终文本、`chain`、每跳 `hops`（修复跳带 `edits`）、`missingFacts`、`warnings` |
+| `RewriteRequest` | `rewrite` | 文本，加 `chain`、`preset`、`depth` 或 `pivot` |
+| `RewriteResponse` | `rewrite` 成功 | 最终文本、`chain`、每跳 `hops`（修复跳带 `edits`）、`missingFacts`、`warnings` |
 | `ErrorResponse` | CLI 失败 | 强类型错误，外加已经试过的跳 |
 | `WireError` | `ErrorResponse` 内部 | 错误码、消息、重试提示 |
 | `ProviderInfo` | `providers` | 能力与配置状态 |
@@ -30,7 +30,7 @@ CLI 的每条命令共用同一套线格式契约：一个请求对象进，一�
 Schema 直接从二进制生成，不要手抄：
 
 ```bash
-translatex schema --format json
+not-a-bot schema --format json
 ```
 
 ## 稳定性

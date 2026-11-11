@@ -84,7 +84,7 @@ One request per line; one result per line, in input order:
 `--format text` prints the translation and nothing else, so shell pipelines stay clean:
 
 ```bash
-translatex translate "Hello" -t zh --format text
+not-a-bot translate "Hello" -t zh --format text
 ```
 
 Errors still go to stderr as JSON when `--format json` is active.

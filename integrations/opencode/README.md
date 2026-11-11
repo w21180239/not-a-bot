@@ -6,8 +6,8 @@ OpenCode reads `AGENTS.md` from the repository and skills from
 ## Skill (recommended)
 
 ```bash
-mkdir -p ~/.config/opencode/skills/translatex
-cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/SKILL.md
+mkdir -p ~/.config/opencode/skills/not-a-bot
+cp integrations/skill/not-a-bot/SKILL.md ~/.config/opencode/skills/not-a-bot/SKILL.md
 ```
 
 The skill is loaded when its description matches the task, so it costs nothing
@@ -26,7 +26,7 @@ on demand.
 ## Verify
 
 ```bash
-translatex translate "Hello world" -t zh --format json
+not-a-bot translate "Hello world" -t zh --format json
 opencode run "translate 'Hello world' to Chinese"
 ```
 
@@ -36,7 +36,7 @@ translation.
 ## Notes
 
 - `opencode.json` needs no entry; the skill and `AGENTS.md` are the whole setup.
-- Provider order and racing are controlled by `translatex.toml` or the global
-  `~/.config/translatex/config.toml`, not by OpenCode.
-- To keep a project self-contained, set `TRANSLATEX_HOME` inside the command
-  the agent runs, for example `TRANSLATEX_HOME=./.tx translatex …`.
+- Provider order and racing are controlled by `not-a-bot.toml` or the global
+  `~/.config/not-a-bot/config.toml`, not by OpenCode.
+- To keep a project self-contained, set `NOT_A_BOT_HOME` inside the command
+  the agent runs, for example `NOT_A_BOT_HOME=./.tx not-a-bot …`.

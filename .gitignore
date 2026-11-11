@@ -7,10 +7,12 @@ Thumbs.db
 node_modules/
 
 # npm package: binaries staged for the platform packages are build artifacts
-npm/bin/translatex
-npm/bin/translatex.exe
-npm/platforms/*/translatex
-npm/platforms/*/translatex.exe
+npm/bin/not-a-bot
+npm/bin/not-a-bot.exe
+npm/platforms/*/not-a-bot
+npm/platforms/*/not-a-bot.exe
+npm/platforms/*/nab
+npm/platforms/*/nab.exe
 npm/*.tgz
 npm/platforms/*/*.tgz
 __pycache__/

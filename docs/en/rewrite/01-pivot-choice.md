@@ -1,4 +1,4 @@
-**English** · [简体中文](../../zh-cn/roundtrip/01-pivot-choice.md)
+**English** · [简体中文](../../zh-cn/rewrite/01-pivot-choice.md)
 
 # Round trip — Choosing the pivot and the depth
 
@@ -27,7 +27,7 @@ Five deliberately AI-flavoured English sentences (stock openers, hedge phrases,
 The 2026-11-04 script was not kept. For a quick check on one text, run:
 
 ```bash
-translatex roundtrip "In today's fast-paced digital landscape, …" --from en --pivot ja --format json
+not-a-bot rewrite "In today's fast-paced digital landscape, …" --from en --pivot ja --format json
 ```
 
 ## Results
@@ -64,7 +64,7 @@ returns almost the input. They are the wrong tool for this job.
 | Anything non-Chinese | `zh` | Rewrites as much as Japanese, and is served by every provider including the Chinese-anchored ones |
 | Chinese (`zh`, `zh-TW`, `yue`) | `en` | The mirror of the same rule |
 
-`auto` implements exactly that table. It is the first hop of the default `light`
+`auto` implements exactly that table. It is the first hop of the `light`
 preset and the only hop of `--pivot`; `--depth` adds ja and fi after it.
 
 **Japanese is the documented alternative.** It rewrites slightly more and keeps
@@ -72,7 +72,7 @@ more grammatical structure, which is an advantage for technical English where
 Chinese drops articles and plurals. Set it when the text must stay precise:
 
 ```bash
-translatex roundtrip api-notes.md --from en --pivot ja
+not-a-bot rewrite api-notes.md --from en --pivot ja
 ```
 
 **Russian rewrites most but drifts most.** It is not the default for a reason:
@@ -98,15 +98,15 @@ Per request:
 Every request:
 
 ```toml
-# ~/.config/translatex/config.toml
-roundtrip_pivot = "zh"
+# ~/.config/not-a-bot/config.toml
+rewrite_pivot = "zh"
 ```
 
 ## Choosing the depth
 
 Does a second or third machine-translation hop rewrite more? Does an LLM hop
 change the picture? The bench in
-[`benches/roundtrip-depth/`](../../../benches/roundtrip-depth/README.md) answers
+[`benches/rewrite-depth/`](../../../benches/rewrite-depth/README.md) answers
 with ten texts per configuration: five AI-flavoured English paragraphs, three
 fact-heavy workplace texts (names, numbers, IDs, code) and two Chinese texts.
 
@@ -118,15 +118,15 @@ Method, per text and configuration:
 - **Latency**: mean wall clock for the whole chain.
 
 ```bash
-python benches/roundtrip-depth/measure.py --bin target/release/translatex.exe --out out --configs light,standard-opencode
+python benches/rewrite-depth/measure.py --bin target/release/not-a-bot.exe --out out --configs light,standard-opencode
 ```
 
 Results (run on 2026-11-11; 10 texts, one run per configuration):
 
 | Configuration | Overlap | Tells left (of 10) | Facts missing | Latency |
 | --- | --- | --- | --- | --- |
-| light, 1 hop (`--depth 1`, 0.1.x default) | 0.556 | 7 | 5 | 0.5 s |
-| light, 2 hops (0.3 default) | 0.520 | 5 | 5 | 0.9 s |
+| light, 1 hop (`--depth 1`, earliest default) | 0.556 | 7 | 5 | 0.5 s |
+| light, 2 hops (previous default) | 0.520 | 5 | 5 | 0.9 s |
 | 3 machine-translation hops (`--depth 3`) | 0.480 | 6 | 8 | 1.1 s |
 | standard via opencode-cli (DeepSeek) | 0.446 | 0 | 0 | 14 s |
 | standard via claude-cli (Haiku) | 0.535 | 0 | 0 | 8 s |

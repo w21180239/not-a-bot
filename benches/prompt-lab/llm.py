@@ -28,7 +28,7 @@ def strip_meta_line(text):
 
 
 def _run_opencode(model, prompt, timeout):
-    """Same invocation as translatex's opencode-cli provider; model like opencode-go/deepseek-v4.1-flash."""
+    """Same invocation as not-a-bot's opencode-cli provider; model like opencode-go/deepseek-v4.1-flash."""
     exe = shutil.which("opencode")
     p = subprocess.run([exe, "run", "--archived", "-m", model, "--format", "json"],
                        input=prompt.encode("utf-8"), capture_output=True, cwd=NEUTRAL_CWD, timeout=timeout)

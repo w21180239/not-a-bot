@@ -40,7 +40,7 @@
 | 26 | Tencent | `tencent` | `secret_id`, `secret_key` | TC3-HMAC-SHA256 |
 | 27 | Youdao | `youdao` | `app_key`, `app_secret` | v3 sign with SHA-256 |
 
-All official providers are registered only when their credential set is complete. `translatex providers` reflects that.
+All official providers are registered only when their credential set is complete. `not-a-bot providers` reflects that.
 
 ## LLM providers
 
@@ -59,7 +59,7 @@ LLMs translate through a chat completion prompt. They are the last resort becaus
 | 60 | Claude Code CLI | `claude-cli` | `claude -p` | your Claude subscription | haiku |
 | 61 | OpenCode CLI | `opencode-cli` | `opencode run` | your OpenCode quota | `opencode-go/deepseek-v4.1-flash` |
 
-No API key. Set `model` and `bin` under `[provider.claude-cli]` or `[provider.opencode-cli]`. They never join the automatic chain: they run when named, as a `roundtrip` hop, a preset, `--provider` or `--fallback`. See [../roundtrip/02-chains-presets-and-llm.md](../roundtrip/02-chains-presets-and-llm.md).
+No API key. Set `model` and `bin` under `[provider.claude-cli]` or `[provider.opencode-cli]`. They never join the automatic chain: they run when named, as a `rewrite` hop, a preset, `--provider` or `--fallback`. See [../rewrite/02-chains-presets-and-llm.md](../rewrite/02-chains-presets-and-llm.md).
 
 ## Retired names
 

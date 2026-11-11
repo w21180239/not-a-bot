@@ -20,14 +20,14 @@ pub const OPENCODE_CLI: &str = "opencode-cli";
 pub const DEFAULT_TIMEOUT_MS: u64 = 180_000;
 
 /// Metadata keys read by [`build_prompt`].
-pub const STYLE_KEY: &str = "translatex.style";
-pub const HISTORY_KEY: &str = "translatex.history";
+pub const STYLE_KEY: &str = "not-a-bot.style";
+pub const HISTORY_KEY: &str = "not-a-bot.history";
 /// Source text of the whole round trip, and its language, for drift repair.
-pub const ORIGINAL_KEY: &str = "translatex.original";
-pub const ORIGINAL_LANG_KEY: &str = "translatex.original_lang";
+pub const ORIGINAL_KEY: &str = "not-a-bot.original";
+pub const ORIGINAL_LANG_KEY: &str = "not-a-bot.original_lang";
 /// JSON array of spans the output must carry verbatim (`--preserve` matches,
 /// sent unmasked because LLMs mangle opaque placeholders).
-pub const PRESERVE_KEY: &str = "translatex.preserve";
+pub const PRESERVE_KEY: &str = "not-a-bot.preserve";
 
 /// Prompt clause listing [`PRESERVE_KEY`] spans; `None` when there are none.
 pub fn preserve_clause(req: &TranslateRequest) -> Option<String> {

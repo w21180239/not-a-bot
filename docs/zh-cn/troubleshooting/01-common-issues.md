@@ -10,16 +10,16 @@
 
 | 原因 | 检查 | 处理 |
 | --- | --- | --- |
-| 该语言对把所有 Provider 都过滤掉了 | `translatex providers --format json` | 换目标语言，或换覆盖该语言的 Provider |
-| 配置的 `chain` 只列了未注册的 Provider | `translatex providers` | 换成已注册 id，或删掉 `chain` |
-| 只有需要 Key 的链且没有凭据 | `translatex keys` | 添加凭据 |
+| 该语言对把所有 Provider 都过滤掉了 | `not-a-bot providers --format json` | 换目标语言，或换覆盖该语言的 Provider |
+| 配置的 `chain` 只列了未注册的 Provider | `not-a-bot providers` | 换成已注册 id，或删掉 `chain` |
+| 只有需要 Key 的链且没有凭据 | `not-a-bot keys` | 添加凭据 |
 
 ## `PROVIDER_NOT_CONFIGURED`
 
 id 存在于二进制里，但没有注册。对有 Key 的 Provider 意味着凭据不完整，例如百度需要同时有 `appid` 与 `secret_key`。核对字段名后：
 
 ```bash
-translatex providers --format json | jq '.providers[] | select(.name=="baidu")'
+not-a-bot providers --format json | jq '.providers[] | select(.name=="baidu")'
 ```
 
 ## `AUTO_DETECT_UNSUPPORTED`
@@ -48,8 +48,8 @@ Cloudflare 拒绝 rustls 客户端的 TLS 指纹。接口本身是活的，浏�
 
 ## 所有 Provider 都 `TIMEOUT`
 
-1. 确认预算：`translatex translate "hi" -t zh --timeout-ms 30000`。
-2. 确认出口：`translatex health --format json`。
+1. 确认预算：`not-a-bot translate "hi" -t zh --timeout-ms 30000`。
+2. 确认出口：`not-a-bot health --format json`。
 3. 在代理后面时设置 `HTTPS_PROXY`，reqwest 会遵循。
 
 记住超时按设计不原地重试，所以一个慢 Provider 只消耗一次预算，然后换下一跳。
@@ -70,8 +70,8 @@ Cloudflare 拒绝 rustls 客户端的 TLS 指纹。接口本身是活的，浏�
 ## 冷却清不掉
 
 ```bash
-translatex keys --reset
-ls ~/.config/translatex/cache/
+not-a-bot keys --reset
+ls ~/.config/not-a-bot/cache/
 ```
 
 如果目录不可写，冷却只存在于该进程内存里，每次调用都是干净的。
@@ -79,7 +79,7 @@ ls ~/.config/translatex/cache/
 ## Agent 不调用 CLI，而是自己翻译
 
 1. 确认 skill 或指令文件放在该 harness 文档指定的路径。
-2. Agent 所在 shell 里 `translatex --version` 必须成功；从图形界面启动的 Agent 常常拿不到同样的 `PATH`。
+2. Agent 所在 shell 里 `not-a-bot --version` 必须成功；从图形界面启动的 Agent 常常拿不到同样的 `PATH`。
 3. 让 Agent 翻译一句，回复里应出现 `provider`。没有就是根本没执行命令。
 
 ## 导航

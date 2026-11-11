@@ -16,15 +16,15 @@
 
 | 方式 | 命令 | 说明 |
 | --- | --- | --- |
-| Cargo | `cargo install translatex` | 开启 LTO 编译，需要几分钟 |
-| 预编译 | 从 [Releases](https://github.com/w21180239/translatex/releases/latest) 下载 | Windows、Linux、macOS |
-| 源码 | `cargo build --release` | 产物在 `target/release/translatex` |
+| Cargo | `cargo install not-a-bot` | 开启 LTO 编译，需要几分钟 |
+| 预编译 | 从 [Releases](https://github.com/w21180239/not-a-bot/releases/latest) 下载 | Windows、Linux、macOS |
+| 源码 | `cargo build --release` | 产物在 `target/release/not-a-bot` |
 
 ## 验证
 
 ```bash
-translatex --version
-translatex providers --format text
+not-a-bot --version
+not-a-bot providers --format text
 ```
 
 `providers` 列出经过凭据筛选后实际注册的 Provider。免费接口总会出现；需要 Key 的 Provider 只有在凭据可用时才出现。
@@ -32,29 +32,29 @@ translatex providers --format text
 ## 第一次请求
 
 ```bash
-translatex translate "Hello world" -t zh
+not-a-bot translate "Hello world" -t zh
 ```
 
 如果没有 Provider 可用，错误会说明原因：
 
 ```bash
-translatex translate "Hello world" -t zh --verbose
-translatex health --format json
+not-a-bot translate "Hello world" -t zh --verbose
+not-a-bot health --format json
 ```
 
 ## Shell 补全
 
 ```bash
-translatex completions bash       > /etc/bash_completion.d/translatex
-translatex completions zsh        > ~/.zfunc/_translatex
-translatex completions fish       > ~/.config/fish/completions/translatex.fish
+not-a-bot completions bash       > /etc/bash_completion.d/not-a-bot
+not-a-bot completions zsh        > ~/.zfunc/_not-a-bot
+not-a-bot completions fish       > ~/.config/fish/completions/not-a-bot.fish
 ```
 
 PowerShell 需要把生成的脚本从 profile 里点源引入：
 
 ```powershell
-translatex completions powershell > "$HOME\Documents\PowerShell\translatex-completion.ps1"
-Add-Content $PROFILE '. "$HOME\Documents\PowerShell\translatex-completion.ps1"'
+not-a-bot completions powershell > "$HOME\Documents\PowerShell\not-a-bot-completion.ps1"
+Add-Content $PROFILE '. "$HOME\Documents\PowerShell\not-a-bot-completion.ps1"'
 ```
 
 ## 导航

@@ -1,12 +1,12 @@
 {
-  "name": "translatex",
-  "description": "Translate text and rewrite machine-flavoured prose through a pivot language with the translatex CLI.",
+  "name": "not-a-bot",
+  "description": "Translate text and rewrite machine-flavoured prose through a pivot language with the not-a-bot CLI.",
   "version": "0.1.0",
   "author": {
     "name": "w21180239"
   },
-  "homepage": "https://github.com/w21180239/translatex",
-  "repository": "https://github.com/w21180239/translatex",
+  "homepage": "https://github.com/w21180239/not-a-bot",
+  "repository": "https://github.com/w21180239/not-a-bot",
   "license": "MIT OR Apache-2.0",
   "keywords": ["translation", "cli", "i18n", "humanize"]
 }

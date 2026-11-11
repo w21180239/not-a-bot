@@ -112,7 +112,7 @@ mod tests {
 Live-check it before shipping:
 
 ```bash
-translatex translate "Hello world" -t zh --provider example --format json
+not-a-bot translate "Hello world" -t zh --provider example --format json
 ```
 
 A provider that returns the source unchanged is a silent failure. Parse the response body and return `Error::BadResponse` when the translation is missing.

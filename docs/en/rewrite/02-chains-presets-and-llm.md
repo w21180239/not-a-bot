@@ -1,4 +1,4 @@
-**English** · [简体中文](../../zh-cn/roundtrip/02-chains-presets-and-llm.md)
+**English** · [简体中文](../../zh-cn/rewrite/02-chains-presets-and-llm.md)
 
 # Round trip — Chains, presets and LLM hops
 
@@ -14,7 +14,7 @@ A hop is `[engine:]lang`. A chain is a comma-separated list of hops, in any
 order of engines and languages:
 
 ```bash
-translatex roundtrip "<text>" --from en --chain "opencode-cli:zh,google:ja,edge:en"
+not-a-bot rewrite "<text>" --from en --chain "opencode-cli:zh,google:ja,edge:en"
 ```
 
 - No engine in a hop: the automatic provider chain serves it (up to `race_width` providers race).
@@ -35,19 +35,19 @@ Shortcuts that expand to a chain:
 Chinese sources use en instead of zh: depth 3 runs en, ja, fi, then back to Chinese.
 
 Precedence, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, then
-`roundtrip_preset` from the config (default `light`).
+`rewrite_preset` from the config (default `standard`).
 
 ## Presets
 
 | Preset | Hops (English source) | Needs a subscription | Typical latency |
 | --- | --- | --- | --- |
-| `light` (default) | zh, ja, en: two machine-translation hops out | no | about 1 s |
+| `light` | zh, ja, en: two machine-translation hops out | no | about 1 s |
 | `standard` | LLM to zh, LLM back to en; both hops "translate and rewrite like a person" | yes | 8 to 14 s |
 | `strong` | LLM to zh, LLM to ja (previous step as history), google to fi, edge back to en, then a repair hop | yes | about 25 s |
 
 `strong` pushes the text through distant languages with LLM hops, adds
 machine-translation hops, and ends with the repair hop that restores facts the
-rewrite dropped. No method makes text reliably undetectable, and translatex does
+rewrite dropped. No method makes text reliably undetectable, and not-a-bot does
 not promise it. The aim is prose that reads like a person wrote it, with the
 facts intact. `--depth 1-3` and `--chain` build other chains by hand. Any other
 preset name fails with `INVALID_INPUT`, listing `light, standard, strong`.
@@ -55,11 +55,11 @@ preset name fails with `INVALID_INPUT`, listing `light, standard, strong`.
 Set the default in `config.toml`:
 
 ```toml
-roundtrip_preset = "standard"  # default: light
-roundtrip_llm = "claude-cli"   # default: opencode-cli
+rewrite_preset = "standard"  # default: standard
+rewrite_llm = "claude-cli"   # default: opencode-cli
 ```
 
-Environment: `TRANSLATEX_ROUNDTRIP_PRESET`, `TRANSLATEX_ROUNDTRIP_LLM`.
+Environment: `NOT_A_BOT_REWRITE_PRESET`, `NOT_A_BOT_REWRITE_LLM`.
 
 ## LLM providers and quota
 
@@ -90,12 +90,12 @@ a preset or `--provider`.
 - The hop instruction: translate, and rewrite the way a person would.
 - In a round trip, the original text as well. The hop first repairs meaning that earlier machine-translation hops lost, with the smallest change that fixes it, then rewrites.
 - For a later LLM hop, the previous LLM hop as history.
-- The protected spans, as-is. An LLM hop gets no placeholders; the prompt lists the spans to keep, and translatex checks the output afterwards. A dropped span adds a `preserve: <provider> dropped <span>` warning. Machine-translation hops still mask spans.
+- The protected spans, as-is. An LLM hop gets no placeholders; the prompt lists the spans to keep, and not-a-bot checks the output afterwards. A dropped span adds a `preserve: <provider> dropped <span>` warning. Machine-translation hops still mask spans.
 
 Name patterns instead of writing regexes: `--preserve @code` (inline and fenced
 code) and `--preserve @url`. On Windows the npm `.cmd` shim runs through
 cmd.exe, which strips `^` from a regex such as `` `[^`]*` `` when Python or Node
-spawns translatex without a shell. The named patterns avoid that.
+spawns not-a-bot without a shell. The named patterns avoid that.
 
 ## The repair hop
 
@@ -107,7 +107,7 @@ small edits instead of a new text:
 [{"from": "Aloha's team", "to": "Aroha's team", "why": "name respelled"}]
 ```
 
-translatex applies an edit only when it is exact and small:
+not-a-bot applies an edit only when it is exact and small:
 
 - `from` must appear exactly once in the current text, must not be empty, and may be at most 40 characters or 25% of the text, whichever is larger.
 - `to` may be at most three times the length of `from` plus 80 characters.
@@ -158,18 +158,18 @@ failure there is returned as the error.
 ## Detector score, best of N and target score
 
 LLM hops vary between runs, so a second run can read differently. A scorer lets
-translatex pick between runs by a detector's score, under a hard rule: a run that
+not-a-bot pick between runs by a detector's score, under a hard rule: a run that
 keeps every fact always beats one that lost a fact, whatever the scores. Use it to benchmark and tune presets; a local detector loads a model on every call, which is too slow and heavy for live requests.
 
 ```bash
-translatex roundtrip "<text>" --from en --preset standard --best-of 3 --scorer "python score.py" --format json
-translatex roundtrip "<text>" --from en --target-score 0.4 --scorer "python score.py" --format json
+not-a-bot rewrite "<text>" --from en --preset standard --best-of 3 --scorer "python score.py" --format json
+not-a-bot rewrite "<text>" --from en --target-score 0.4 --scorer "python score.py" --format json
 ```
 
-- `--scorer "<command>"` (config `roundtrip_scorer`): translatex writes each result to the command's stdin and reads a score from 0 to 1 (higher = more AI-like) from the last non-empty line of stdout. The command is split into words (quotes group, backslashes stay literal) and run without a shell; programs on `PATH` resolve the same way as the CLI providers, `.cmd` shims included. Each call has the `--timeout-ms` budget, but never less than 120 s, since local detectors load a model per call.
+- `--scorer "<command>"` (config `rewrite_scorer`): not-a-bot writes each result to the command's stdin and reads a score from 0 to 1 (higher = more AI-like) from the last non-empty line of stdout. The command is split into words (quotes group, backslashes stay literal) and run without a shell; programs on `PATH` resolve the same way as the CLI providers, `.cmd` shims included. Each call has the `--timeout-ms` budget, but never less than 120 s, since local detectors load a model per call.
 - A scorer that fails, times out or prints something other than a number in [0, 1] adds a `scorer: run <n> (<preset>) unscored: <reason>` warning, and that run is unscored. When no run gets a score, the result is the same as without a scorer.
 - `--best-of N` (1-5, default 1) runs the planned chain N times. Selection: no missing facts first (else the fewest), then the lowest score, with unscored runs after scored ones. Above 1 it needs a scorer and fails with `INVALID_INPUT` otherwise.
-- `--target-score X` (0-1, needs a scorer) tries the requested chain first, with `--best-of`, then each preset of `roundtrip_ladder` (default `["standard", "strong"]`) not yet tried. It stops at the first rung where the best run so far scores at or below X; otherwise it returns the best run overall with a `target score not met` warning.
+- `--target-score X` (0-1, needs a scorer) tries the requested chain first, with `--best-of`, then each preset of `rewrite_ladder` (default `["standard", "strong"]`) not yet tried. It stops at the first rung where the best run so far scores at or below X; otherwise it returns the best run overall with a `target score not met` warning.
 
 The response adds `score` (the selected run's score, `null` without a usable
 scorer), `scorer` (program name, no arguments) and, when more than one run
@@ -177,8 +177,8 @@ happened, `candidates`: one `{presetOrChain, score, missingFacts}` per run,
 `missingFacts` as a count. Only the selected run's text and hops are returned.
 
 ```toml
-roundtrip_scorer = "python score.py"
-roundtrip_ladder = ["standard", "strong"]
+rewrite_scorer = "python score.py"
+rewrite_ladder = ["standard", "strong"]
 ```
 
 A score is a measurement from one detector on one text. Report it with the

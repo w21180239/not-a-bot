@@ -28,7 +28,7 @@ all an agent needs to produce a correct result.
 ## Verify
 
 ```bash
-translatex translate "Hello world" -t zh --format json
+not-a-bot translate "Hello world" -t zh --format json
 ```
 
 Then ask the agent to translate a sentence. It should run the command and quote

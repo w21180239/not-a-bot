@@ -1,12 +1,12 @@
 {
-  "name": "translatex-windows-x64",
-  "version": "0.3.0",
-  "description": "The translatex binary for Windows x64. Installed automatically by translatex.",
+  "name": "not-a-bot-windows-x64",
+  "version": "0.1.0",
+  "description": "The not-a-bot binary for Windows x64. Installed automatically by not-a-bot.",
   "license": "MIT OR Apache-2.0",
-  "homepage": "https://github.com/w21180239/translatex",
+  "homepage": "https://github.com/w21180239/not-a-bot",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/w21180239/translatex.git"
+    "url": "git+https://github.com/w21180239/not-a-bot.git"
   },
   "os": [
     "win32"
@@ -15,6 +15,6 @@
     "x64"
   ],
   "files": [
-    "translatex.exe"
+    "not-a-bot.exe"
   ]
 }

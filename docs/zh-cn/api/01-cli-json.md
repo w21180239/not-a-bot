@@ -84,7 +84,7 @@
 `--format text` 只打印译文，便于 shell 管道：
 
 ```bash
-translatex translate "Hello" -t zh --format text
+not-a-bot translate "Hello" -t zh --format text
 ```
 
 `--format json` 下，错误仍以 JSON 打到 stderr。

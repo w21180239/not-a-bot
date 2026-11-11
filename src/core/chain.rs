@@ -4,7 +4,7 @@
 use crate::core::config::Settings;
 use crate::core::error::{Error, Result};
 use crate::core::lang::{alternate_pivot, default_pivot, is_chinese, is_known, normalize};
-use crate::core::types::RoundtripRequest;
+use crate::core::types::RewriteRequest;
 
 pub const PRESETS: &[&str] = &["light", "standard", "strong"];
 
@@ -70,9 +70,9 @@ pub fn parse_hop(spec: &str, is_llm: &dyn Fn(&str) -> bool) -> Result<HopSpec> {
 
 /// Hops for a request. `source` is the normalised source language (`auto`
 /// allowed). Precedence: `chain` > `preset` > `depth` > non-auto `pivot` >
-/// configured `roundtrip_preset`.
+/// configured `rewrite_preset`.
 pub fn plan(
-    req: &RoundtripRequest,
+    req: &RewriteRequest,
     settings: &Settings,
     source: &str,
     is_llm: &dyn Fn(&str) -> bool,
@@ -90,7 +90,7 @@ pub fn plan(
     if pivot != "auto" {
         return single_pivot(&pivot, source);
     }
-    expand_preset(&settings.roundtrip_preset(), source, settings, is_llm)
+    expand_preset(&settings.rewrite_preset(), source, settings, is_llm)
 }
 
 fn explicit(chain: &[String], source: &str, is_llm: &dyn Fn(&str) -> bool) -> Result<Plan> {
@@ -200,7 +200,7 @@ fn expand_preset(
     is_llm: &dyn Fn(&str) -> bool,
 ) -> Result<Plan> {
     let name = name.trim().to_lowercase();
-    let llm = settings.roundtrip_llm();
+    let llm = settings.rewrite_llm();
     let hop = |engine: &str, to: Target| HopSpec {
         engine: Some(engine.to_string()),
         to,
@@ -219,7 +219,7 @@ fn expand_preset(
         ],
         other => {
             return Err(Error::InvalidInput(format!(
-                "unknown roundtrip preset {other:?}; valid: {}",
+                "unknown rewrite preset {other:?}; valid: {}",
                 PRESETS.join(", ")
             )))
         }
@@ -308,7 +308,7 @@ mod tests {
             ]
         );
         let s = Settings {
-            roundtrip_llm: Some("google".into()),
+            rewrite_llm: Some("google".into()),
             ..Settings::default()
         };
         assert_eq!(
@@ -330,15 +330,15 @@ mod tests {
     }
 
     #[test]
-    fn default_preset_is_light() {
+    fn default_preset_is_standard() {
         let s = Settings::default();
-        assert_eq!(s.roundtrip_preset(), "light");
-        assert_eq!(s.roundtrip_ladder(), vec!["standard", "strong"]);
+        assert_eq!(s.rewrite_preset(), "standard");
+        assert_eq!(s.rewrite_ladder(), vec!["standard", "strong"]);
         let p = plan(&req(), &s, "en", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["zh", "ja", "SRC"]);
+        assert_eq!(langs(&p), vec!["zh", "SRC"]);
     }
 
-    fn req() -> RoundtripRequest {
+    fn req() -> RewriteRequest {
         serde_json::from_str(r#"{"text":"hi"}"#).unwrap()
     }
 
@@ -442,7 +442,7 @@ mod tests {
 
         r.preset = Some("standard".into());
         let s = Settings {
-            roundtrip_llm: Some("opencode-cli".into()),
+            rewrite_llm: Some("opencode-cli".into()),
             ..Settings::default()
         };
         let p = plan(&r, &s, "en", &llm).unwrap();
@@ -465,7 +465,7 @@ mod tests {
     #[test]
     fn precedence_is_chain_preset_depth_pivot_setting() {
         let s = Settings {
-            roundtrip_preset: Some("strong".into()),
+            rewrite_preset: Some("strong".into()),
             ..Settings::default()
         };
         let mut r = req();
@@ -493,7 +493,7 @@ mod tests {
     #[test]
     fn configured_pivot_steers_the_default_path() {
         let s = Settings {
-            roundtrip_pivot: Some("ja".into()),
+            rewrite_pivot: Some("ja".into()),
             ..Settings::default()
         };
         let mut r = req();
@@ -501,8 +501,9 @@ mod tests {
         let p = plan(&r, &s, "auto", &llm).unwrap();
         assert_eq!(langs(&p), vec!["ja", "SRC"]);
         assert!(!p.guessed, "a configured pivot is not a guess");
-        // The default preset (depth 2) still leads with the configured pivot.
+        // The light preset (depth 2) still leads with the configured pivot.
         r.depth = None;
+        r.preset = Some("light".into());
         let p = plan(&r, &s, "en", &llm).unwrap();
         assert_eq!(langs(&p), vec!["ja", "zh", "SRC"]);
     }

@@ -13,21 +13,21 @@ use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(
-    name = "translatex",
+    name = "not-a-bot",
     version,
     about = "Agent-first translation CLI. Structured JSON output, provider fallback, key rotation.",
     long_about = None,
     after_help = "EXAMPLES\n  \
-      translatex translate \"Hello world\" -t zh\n  \
-      translatex translate -t zh --json '{\"text\":\"Hello\",\"sourceLang\":\"en\"}'\n  \
-      echo 'Hello' | translatex translate -t ja\n  \n\
-      translatex batch --file jobs.ndjson --parallel 4\n  \
-      translatex providers --json\n  \n\
-      translatex languages --provider baidu\n  \
-      translatex keys deepl --json\n  \n\
-      translatex health\n  \
-      translatex schema\n  \
-      translatex roundtrip \"In today's landscape, …\" --from en\n\n\
+      not-a-bot translate \"Hello world\" -t zh\n  \
+      not-a-bot translate -t zh --json '{\"text\":\"Hello\",\"sourceLang\":\"en\"}'\n  \
+      echo 'Hello' | not-a-bot translate -t ja\n  \n\
+      not-a-bot batch --file jobs.ndjson --parallel 4\n  \
+      not-a-bot providers --json\n  \n\
+      not-a-bot languages --provider baidu\n  \
+      not-a-bot keys deepl --json\n  \n\
+      not-a-bot health\n  \
+      not-a-bot schema\n  \
+      not-a-bot rewrite \"In today's landscape, …\" --from en\n\n\
 EXIT CODES\n  \
   0 success  1 request error  2 config error  3 chain exhausted  4 network error"
 )]
@@ -49,15 +49,15 @@ pub struct Cli {
     pub race: Option<usize>,
 
     /// Override the config file path.
-    #[arg(long, global = true, env = "TRANSLATEX_CONFIG")]
+    #[arg(long, global = true, env = "NOT_A_BOT_CONFIG")]
     pub config: Option<String>,
 
     /// Override the credentials file path.
-    #[arg(long, global = true, env = "TRANSLATEX_CREDENTIALS")]
+    #[arg(long, global = true, env = "NOT_A_BOT_CREDENTIALS")]
     pub credentials: Option<String>,
 
     /// Emit logs on stderr at this level (error, warn, info, debug).
-    #[arg(long, global = true, env = "TRANSLATEX_LOG")]
+    #[arg(long, global = true, env = "NOT_A_BOT_LOG")]
     pub log: Option<String>,
 
     #[command(subcommand)]
@@ -112,7 +112,7 @@ pub enum Command {
 
     /// Translate out through one or more hops and back, to strip machine-flavoured phrasing.
     #[command(alias = "polish")]
-    Roundtrip {
+    Rewrite {
         /// Text to round-trip. Omit to read stdin.
         text: Option<String>,
 
@@ -132,7 +132,7 @@ pub enum Command {
         #[arg(long, value_parser = clap::value_parser!(u8).range(1..=3))]
         depth: Option<u8>,
 
-        /// Built-in chain: light (2 MT hops), standard (LLM out and back), strong (LLM hops, MT hops, repair).
+        /// Built-in chain (default standard): light (2 MT hops), standard (LLM out and back), strong (LLM hops, MT hops, repair).
         #[arg(long)]
         preset: Option<String>,
 
@@ -166,7 +166,7 @@ pub enum Command {
         #[arg(long, value_parser = clap::value_parser!(u8).range(1..=5))]
         best_of: Option<u8>,
 
-        /// Climb the preset ladder (roundtrip_ladder) until the score is at or
+        /// Climb the preset ladder (rewrite_ladder) until the score is at or
         /// below this (0-1). Needs a scorer.
         #[arg(long)]
         target_score: Option<f64>,
@@ -247,7 +247,9 @@ pub fn exit_code(err: &Error) -> i32 {
     }
 }
 
-pub async fn run(cli: Cli) -> i32 {
+/// Shared entry for both binaries: parse argv, run, return the exit code.
+pub async fn main() -> i32 {
+    let cli = Cli::parse();
     init_tracing(cli.log.as_deref());
     match dispatch(&cli).await {
         Ok(()) => exit::OK,
@@ -312,7 +314,7 @@ async fn dispatch(cli: &Cli) -> std::result::Result<(), Failure> {
             clap_complete::generate(
                 *shell,
                 &mut Cli::command(),
-                "translatex",
+                "not-a-bot",
                 &mut std::io::stdout(),
             );
             Ok(())
@@ -321,7 +323,7 @@ async fn dispatch(cli: &Cli) -> std::result::Result<(), Failure> {
             let ctx = Ctx::build(cli)?;
             match other {
                 Command::Translate { .. } => cmd_translate(cli, &ctx).await,
-                Command::Roundtrip { .. } => cmd_roundtrip(cli, &ctx).await.map_err(Failure::from),
+                Command::Rewrite { .. } => cmd_rewrite(cli, &ctx).await.map_err(Failure::from),
                 Command::Batch { .. } => cmd_batch(cli, &ctx).await.map_err(Failure::from),
                 Command::Providers => cmd_providers(cli, &ctx).map_err(Failure::from),
                 Command::Languages { provider } => {
@@ -529,10 +531,10 @@ fn normalize_provider(name: &str) -> Option<String> {
     }
 }
 
-async fn cmd_roundtrip(cli: &Cli, ctx: &Ctx) -> Result<()> {
-    use crate::core::types::RoundtripRequest;
+async fn cmd_rewrite(cli: &Cli, ctx: &Ctx) -> Result<()> {
+    use crate::core::types::RewriteRequest;
 
-    let Command::Roundtrip {
+    let Command::Rewrite {
         text,
         from,
         pivot,
@@ -553,11 +555,11 @@ async fn cmd_roundtrip(cli: &Cli, ctx: &Ctx) -> Result<()> {
         unreachable!()
     };
 
-    let req: RoundtripRequest = match json {
+    let req: RewriteRequest = match json {
         Some(raw) => {
             serde_json::from_str(raw).map_err(|e| Error::InvalidInput(format!("--json: {e}")))?
         }
-        None => RoundtripRequest {
+        None => RewriteRequest {
             text: text.clone().map(Ok).unwrap_or_else(read_stdin_text)?,
             source_lang: from.clone(),
             pivot: pivot.clone(),
@@ -576,7 +578,7 @@ async fn cmd_roundtrip(cli: &Cli, ctx: &Ctx) -> Result<()> {
         },
     };
 
-    let out = ctx.engine.roundtrip(&req).await?;
+    let out = ctx.engine.rewrite(&req).await?;
     if cli.format == Format::Text {
         println!("{}", out.response.text);
         return Ok(());
@@ -889,13 +891,13 @@ pub fn schema_document() -> Result<serde_json::Value> {
                 .map_err(|e| Error::Internal(e.to_string()))?,
         ),
         (
-            "RoundtripRequest",
-            serde_json::to_value(schema_for!(crate::core::types::RoundtripRequest))
+            "RewriteRequest",
+            serde_json::to_value(schema_for!(crate::core::types::RewriteRequest))
                 .map_err(|e| Error::Internal(e.to_string()))?,
         ),
         (
-            "RoundtripResponse",
-            serde_json::to_value(schema_for!(crate::core::types::RoundtripResponse))
+            "RewriteResponse",
+            serde_json::to_value(schema_for!(crate::core::types::RewriteResponse))
                 .map_err(|e| Error::Internal(e.to_string()))?,
         ),
     ] {
@@ -909,7 +911,7 @@ pub fn schema_document() -> Result<serde_json::Value> {
     );
     doc.insert(
         "title".into(),
-        serde_json::Value::String("translatex".into()),
+        serde_json::Value::String("not-a-bot".into()),
     );
     doc.insert(
         "version".into(),
@@ -928,8 +930,8 @@ fn schema_types() -> &'static [&'static str] {
         "ProviderInfo",
         "HealthRecord",
         "AttemptRecord",
-        "RoundtripRequest",
-        "RoundtripResponse",
+        "RewriteRequest",
+        "RewriteResponse",
     ]
 }
 
@@ -937,48 +939,48 @@ fn schema_types() -> &'static [&'static str] {
 pub fn manifest_document() -> Result<serde_json::Value> {
     let translate_schema = serde_json::to_value(schemars::schema_for!(TranslateRequest))
         .map_err(|e| Error::Internal(e.to_string()))?;
-    let roundtrip_schema =
-        serde_json::to_value(schemars::schema_for!(crate::core::types::RoundtripRequest))
+    let rewrite_schema =
+        serde_json::to_value(schemars::schema_for!(crate::core::types::RewriteRequest))
             .map_err(|e| Error::Internal(e.to_string()))?;
     Ok(serde_json::json!({
-        "name": "translatex",
+        "name": "not-a-bot",
         "version": crate::core::types::VERSION,
         "description": "Translation with web-first provider fallback, key rotation and structured output.",
         "interface": "cli",
-        "skill": "https://github.com/w21180239/translatex/blob/main/integrations/skill/translatex/SKILL.md",
+        "skill": "https://github.com/w21180239/not-a-bot/blob/main/integrations/skill/not-a-bot/SKILL.md",
         "commands": [
             {
                 "name": "translate",
-                "command": "translatex translate --json '{request}' --format json",
+                "command": "not-a-bot translate --json '{request}' --format json",
                 "description": "Translate text between languages. Falls back across providers and rotates API keys automatically.",
                 "inputSchema": translate_schema
             },
             {
-                "name": "roundtrip",
-                "command": "translatex roundtrip --json '{request}' --format json",
+                "name": "rewrite",
+                "command": "not-a-bot rewrite --json '{request}' --format json",
                 "description": "Translate through a chain of languages (machine translation or a local LLM CLI) and back into the source language, which rewrites the phrasing and strips machine-flavoured cadence. Reports missingFacts for names, numbers and IDs the output lost.",
-                "inputSchema": roundtrip_schema
+                "inputSchema": rewrite_schema
             },
             {
                 "name": "providers",
-                "command": "translatex providers --format json",
+                "command": "not-a-bot providers --format json",
                 "description": "List translation providers, their capabilities and whether credentials are configured."
             },
             {
                 "name": "languages",
-                "command": "translatex languages --provider <name> --format json",
+                "command": "not-a-bot languages --provider <name> --format json",
                 "description": "List supported language codes, optionally filtered by provider."
             },
             {
                 "name": "health",
-                "command": "translatex health --format json",
+                "command": "not-a-bot health --format json",
                 "description": "Probe configured providers and report latency and errors."
             }
         ],
         "install": {
-            "cargo": "cargo install translatex",
-            "npm": "npm install -g translatex",
-            "binary": "https://github.com/w21180239/translatex/releases/latest"
+            "cargo": "cargo install not-a-bot",
+            "npm": "npm install -g not-a-bot",
+            "binary": "https://github.com/w21180239/not-a-bot/releases/latest"
         }
     }))
 }
@@ -1046,9 +1048,9 @@ mod tests {
             .filter_map(|t| t["name"].as_str())
             .collect();
         assert!(names.contains(&"translate"), "got {names:?}");
-        assert!(names.contains(&"roundtrip"));
+        assert!(names.contains(&"rewrite"));
         assert!(names.contains(&"providers"));
-        assert_eq!(doc["name"], "translatex");
+        assert_eq!(doc["name"], "not-a-bot");
         assert_eq!(doc["interface"], "cli");
         assert!(doc.get("transport").is_none());
     }

@@ -119,7 +119,7 @@ pub fn is_known_provider(name: &str) -> bool {
 /// browsers and Python `requests` get through. Appending it to every automatic
 /// chain buys a failed round trip, so it only runs when the caller names it in
 /// `--provider`, `--fallback` or the configured `chain`. It stays visible in
-/// `translatex providers`.
+/// `not-a-bot providers`.
 ///
 /// `claude-cli` and `opencode-cli` run a local agent CLI: tens of seconds per
 /// call and they spend the user's subscription quota, so they too run only

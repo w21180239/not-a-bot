@@ -188,14 +188,14 @@ impl CredentialStore {
         Ok(())
     }
 
-    /// `TRANSLATEX_<PROVIDER>_<FIELD>` env vars become an env-labelled entry.
-    /// Aliased section names work here too: `TRANSLATEX_DEEPLAPI_API_KEY`.
+    /// `NOT_A_BOT_<PROVIDER>_<FIELD>` env vars become an env-labelled entry.
+    /// Aliased section names work here too: `NOT_A_BOT_DEEPLAPI_API_KEY`.
     fn load_env(&mut self) {
         for (provider, fields) in KEY_TABLE.iter() {
             let mut collected = BTreeMap::new();
             for field in *fields {
                 for name in env_prefixes(provider) {
-                    let var = format!("TRANSLATEX_{}_{}", name, field.to_uppercase());
+                    let var = format!("NOT_A_BOT_{}_{}", name, field.to_uppercase());
                     if let Ok(v) = std::env::var(&var) {
                         if !v.is_empty() {
                             collected.insert((*field).to_string(), v);
@@ -298,13 +298,13 @@ pub fn legacy_account(provider: &str, field: &str) -> String {
 }
 
 pub fn default_path() -> Option<PathBuf> {
-    if let Ok(p) = std::env::var("TRANSLATEX_CREDENTIALS") {
+    if let Ok(p) = std::env::var("NOT_A_BOT_CREDENTIALS") {
         return Some(PathBuf::from(p));
     }
     let home = dirs_home()?;
     Some(
         home.join(".config")
-            .join("translatex")
+            .join("not-a-bot")
             .join("credentials.toml"),
     )
 }

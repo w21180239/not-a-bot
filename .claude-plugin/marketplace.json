@@ -1,13 +1,13 @@
 {
-  "name": "translatex",
+  "name": "not-a-bot",
   "owner": {
     "name": "w21180239"
   },
   "plugins": [
     {
-      "name": "translatex",
+      "name": "not-a-bot",
       "source": "./integrations/claude-code/plugin",
-      "description": "Translate text and rewrite machine-flavoured prose through a pivot language with the translatex CLI."
+      "description": "Translate text and rewrite machine-flavoured prose through a pivot language with the not-a-bot CLI."
     }
   ]
 }
