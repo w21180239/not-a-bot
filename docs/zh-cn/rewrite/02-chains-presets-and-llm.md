@@ -35,17 +35,20 @@ not-a-bot rewrite "<text>" --from en --chain "opencode-cli:zh,google:ja,edge:en"
 
 ## 预设
 
-| 预设 | 跳（英文原文） | 需要订阅 | 典型延迟 |
+| 预设 | 跳（英文原文） | 输出中显示的链 | 典型延迟 |
 | --- | --- | --- | --- |
-| `light` | zh、ja、en：出去两跳机器翻译 | 否 | 约 1 秒 |
-| `standard` | LLM 译到 zh，LLM 再回 en，最后一次只修事实的修复跳（`<llm>:fix`）；前两跳"像人一样翻译并改写" | 是 | opencode 上约 70 秒（三次 LLM 调用） |
-| `strong` | LLM 到 zh，LLM 再回 en；没有修复跳 | 是 | opencode 上约 30 秒 |
+| `light` | Google 机器翻译到 zh，一跳修复（`<llm>:fix`，在 zh 里修机器翻译），一次 LLM 改写回 en（这一跳同时对照原文就地修复语义），最后再一跳修复 | `["zh","fix","en","fix"]` | 数次 LLM 调用，几十秒 |
+| `standard` | LLM 译到 zh，LLM 自由改写回 en（这一跳拿不到原文），最后一跳修复；前两跳"像人一样翻译并改写" | `["zh","en","fix"]` | 数次 LLM 调用，几十秒 |
 
-人性化跳会删掉只表达感受、承诺或客套的句子。`standard` 随后只修硬事实：名字、地点、产品、数字、日期、金额、币种、ID、版本、路径、代码片段、否定和限定词。修复跳会拿到事实检查列出的缺失片段，并且从不恢复被删的感受或承诺句。`strong` 不带修复跳：改写最远，检测器分数最低，但可能丢一条事实，`missingFacts` 一定会报告。`standard` 和 `strong` 需要 LLM 引擎：`rewrite_llm` 不是 LLM 引擎时返回 `INVALID_INPUT`。
+中文原文的出去语言是 en。`light` 改写最轻、保真度最高：它调用三次 `rewrite_llm`，但只有一次是完整改写，两跳修复只返回简短的编辑列表。`standard` 是默认预设，检测器得分最低。
 
-没有任何方法能让文本稳定地检测不出，not-a-bot 也不做这个承诺。目标是读起来像人写的文字，事实保持不变。`--depth 1-3` 和 `--chain` 可以手动搭出其他链。其他预设名会返回 `INVALID_INPUT`，并列出 `light, standard, strong`。
+每个预设都以一跳 LLM 最小语义修复（`<llm>:fix`）收尾。它能看到原文，只返回小的 JSON 片段编辑，恢复前面各跳丢失或改变的含义：缺失或被改动的名字、数字、日期、金额、ID 和代码片段；被翻转的否定；被改动的限定词或确定程度；被改动的行为主体、原因或顺序；被丢掉或凭空添加的论断。它还会收到事实检查列出的缺失 token。事实类编辑一律应用，其他编辑共用一份回填额度。它不会恢复被有意删掉的感受、承诺或客套句，也不会把措辞或结构往原文方向改回去。跳与跳之间也可以插入修复，例如 `--chain "google:zh,opencode-cli:fix,opencode-cli:en,opencode-cli:fix"`。
 
-真实二进制实测（30 段英文、desklib 检测器、每段 2 到 3 次采样，`benches/prompt-lab`）：早先的提示词平均 `p_ai` 0.579，平均 2.3 段丢事实片段；`standard` 0.387 / 1.3；`strong` 0.367 / 2.0。
+两个预设都需要 LLM 引擎（`rewrite_llm`，默认 `opencode-cli`，可选 `claude-cli`）：`rewrite_llm` 不是 LLM 引擎时返回 `INVALID_INPUT`。人性化跳会删掉只表达感受、承诺或客套的句子。
+
+没有任何方法能让文本稳定地检测不出，not-a-bot 也不做这个承诺。目标是读起来像人写的文字，事实保持不变。`--depth 1-3` 和 `--chain` 可以手动搭出其他链；只用机器翻译的 depth 路径没有修复跳，除非链里加上 `<llm>:fix`。其他预设名（包括已移除的 `strong`）会返回 `INVALID_INPUT`，并列出 `light, standard`。
+
+真实二进制实测（30 段英文 x 2 次采样、desklib 检测器、原文 0.999，`benches/prompt-lab`）：`standard` 平均 `p_ai` 0.364，30 段中平均 0.5 段丢事实片段，98% 的文本没有严重语义错误；`light` 为 0.489、0、97%。机器翻译只换词、保留句子结构，所以纯机器翻译的链即使加上修复，得分也接近原文；得分下降来自 LLM 改写跳。成本高于 `standard` 的链没有一条得分更低，因此没有 `strong`。
 
 默认值写在 `config.toml`：
 
@@ -80,7 +83,7 @@ bin = "opencode"
 ## LLM 跳收到什么
 
 - 这一跳的指令：翻译，并像人一样改写。
-- 往返里还会收到原文。这一跳先用最小的改动补回前面机器翻译跳丢掉的硬事实，再做改写。
+- 原文：`light` 的返回跳和每个 `fix` 跳都会收到。`light` 的返回跳先用最小的改动修复机器翻译改变的含义，再做改写。`standard` 的返回跳拿不到原文。
 - 后面的 LLM 跳还会收到上一个 LLM 跳的结果作为历史。
 - 受保护片段原样传入。LLM 跳不使用占位符：提示词里列出要保留的片段，翻译完由 not-a-bot 检查输出。片段丢了会加一条 `preserve: <provider> dropped <span>` 警告。机器翻译跳仍然用占位符遮蔽。
 
@@ -88,7 +91,7 @@ bin = "opencode"
 
 ## 修复跳
 
-`<llm>:fix`（如 `opencode-cli:fix`，或 `standard` 的最后一跳）让文本留在当前语言，只请 LLM 返回一个 JSON 小编辑列表，而不是一份新文本。它对照原文只修事实：名字、地点、产品、数字、日期、金额、币种、ID、版本、路径、代码片段、否定和限定词；会拿到事实检查列出的缺失片段；从不恢复被人性化跳删掉的、只表达感受、承诺或客套的句子，其中的事实并入最近保留的句子：
+`<llm>:fix`（如 `opencode-cli:fix`，或每个预设的最后一跳）让文本留在当前语言，只请 LLM 返回一个 JSON 小编辑列表，而不是一份新文本。它对照原文修复语义：名字、地点、产品、数字、日期、金额、币种、ID、版本、路径、代码片段、否定、限定词和确定程度、行为主体、原因和顺序，以及被丢掉或凭空添加的论断；会拿到事实检查列出的缺失片段；从不恢复被人性化跳删掉的、只表达感受、承诺或客套的句子，其中的事实并入最近保留的句子：
 
 ```json
 [{"from": "Aloha's team", "to": "Aroha's team", "why": "name respelled"}]
@@ -145,13 +148,13 @@ not-a-bot rewrite "<text>" --from en --target-score 0.4 --scorer "python score.p
 - `--scorer "<command>"`（配置项 `rewrite_scorer`）：not-a-bot 把每个结果写进该命令的 stdin，从 stdout 最后一个非空行读一个 0 到 1 的分数（越高越像 AI）。命令按词切分（引号成组，反斜杠保持原样），不经过 shell；`PATH` 上的程序按 CLI provider 的同一套规则解析，包括 `.cmd` 包装脚本。每次调用的时限是 `--timeout-ms`，但不少于 120 秒，因为本地检测器每次调用都要加载模型。
 - 打分器失败、超时，或输出的不是 [0, 1] 内的数字时，加一条 `scorer: run <n> (<preset>) unscored: <reason>` 警告，这次运行记为未打分。所有运行都没有分数时，结果与不配打分器相同。
 - `--best-of N`（1-5，默认 1）把规划好的链独立跑 N 次。挑选顺序：先看没有丢事实的（都丢了就看丢得最少的），再看分数最低的，未打分的排在已打分的后面。N 大于 1 时必须配打分器，否则返回 `INVALID_INPUT`。
-- `--target-score X`（0-1，需要打分器）：先跑请求的链（带上 `--best-of`），再依次跑 `rewrite_ladder`（默认 `["standard", "strong"]`）里还没试过的预设。只要目前最好的运行分数不高于 X 就停下；全部试完仍未达到，就返回总体最好的运行，并加一条 `target score not met` 警告。
+- `--target-score X`（0-1，需要打分器）：先跑请求的链（带上 `--best-of`），再依次跑 `rewrite_ladder`（默认 `["light", "standard"]`）里还没试过的预设。只要目前最好的运行分数不高于 X 就停下；全部试完仍未达到，就返回总体最好的运行，并加一条 `target score not met` 警告。
 
 响应新增 `score`（选中运行的分数，没有可用打分器时为 `null`）、`scorer`（程序名，不含参数），运行多于一次时还有 `candidates`：每次运行一条 `{presetOrChain, score, missingFacts}`，其中 `missingFacts` 是个数。只返回选中运行的文本和各跳。
 
 ```toml
 rewrite_scorer = "python score.py"
-rewrite_ladder = ["standard", "strong"]
+rewrite_ladder = ["light", "standard"]
 ```
 
 分数只是某一个检测器对某一段文本的测量结果。汇报时注明检测器名称；换一个检测器结论可能不同，分数低也不代表文本无法被检测出来。
@@ -160,10 +163,9 @@ rewrite_ladder = ["standard", "strong"]
 
 | 场景 | 选择 |
 | --- | --- |
-| 把 AI 味的文字改得像人写的，事实不丢 | `--preset standard` |
-| 改写力度最大，可能丢一条事实（见 `missingFacts`） | `--preset strong` |
-| 没有订阅，或者要快 | `--preset light`（默认） |
-| 机器翻译，再多改写一点 | `--depth 3`；事实丢失涨得比改写快 |
+| 把 AI 味的文字改得像人写的（检测器得分最低） | `--preset standard`（默认） |
+| 改写最轻，保真度最高 | `--preset light` |
+| 只用机器翻译，不用 LLM | `--depth 1-3`；得分接近原文，事实丢失随深度上升 |
 | 带代码或 URL 的文本 | 任何预设都加 `--preserve @code --preserve @url` |
 | 合同、法律、读者要核对的数字 | 不要往返 |
 

@@ -23,7 +23,7 @@ Cache and cooldown files live under `<home>/cache/`. Setting `NOT_A_BOT_HOME` is
 | `NOT_A_BOT_TIMEOUT_MS` | Default per-attempt budget. `timeoutMs` in a request overrides it. | `8000` |
 | `NOT_A_BOT_REWRITE_PIVOT` | Default `rewrite` pivot when the request says `auto`. `--pivot` wins. | `ja` |
 | `NOT_A_BOT_REWRITE_PRESET` | Default `rewrite` preset when the request names no chain, preset, depth or pivot. | `standard` |
-| `NOT_A_BOT_REWRITE_LLM` | Engine behind the LLM hops of the `standard` and `strong` presets. | `claude-cli` |
+| `NOT_A_BOT_REWRITE_LLM` | Engine behind the LLM hops of the `light` and `standard` presets. | `claude-cli` |
 | `NOT_A_BOT_LOG` | stderr log level | `debug` |
 
 ## Credentials

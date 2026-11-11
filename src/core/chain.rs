@@ -6,7 +6,7 @@ use crate::core::error::{Error, Result};
 use crate::core::lang::{alternate_pivot, default_pivot, is_chinese, is_known, normalize};
 use crate::core::types::RewriteRequest;
 
-pub const PRESETS: &[&str] = &["light", "standard", "strong"];
+pub const PRESETS: &[&str] = &["light", "standard"];
 
 /// Hop target: a language, back to the (possibly still undetected) source, or
 /// a repair pass that stays in the current language.
@@ -33,6 +33,9 @@ pub struct Plan {
     /// The final hop back to the source was appended to an explicit chain, so
     /// it is dropped when the chain already ends in the detected source.
     pub appended_back: bool,
+    /// LLM hops after the first also repair meaning against the original inline.
+    /// Off for `standard`, whose return hop rewrites freely and relies on the final fix hop.
+    pub inline_repair: bool,
 }
 
 /// `[engine:]lang` (`claude-cli:zh`, `zh`, `auto:ja`) or `engine:fix`, a
@@ -122,6 +125,7 @@ fn explicit(chain: &[String], source: &str, is_llm: &dyn Fn(&str) -> bool) -> Re
         hops,
         guessed: false,
         appended_back,
+        inline_repair: true,
     })
 }
 
@@ -190,6 +194,7 @@ fn mt(langs: Vec<String>, guessed: bool) -> Plan {
         hops,
         guessed,
         appended_back: false,
+        inline_repair: true,
     }
 }
 
@@ -207,19 +212,22 @@ fn expand_preset(
     };
     let lang = |code: &str| Target::Lang(code.to_string());
     let out = if is_chinese(source) { "en" } else { "zh" };
-    if matches!(name.as_str(), "standard" | "strong") && !is_llm(&llm) {
+    // Every preset ends with a minimal meaning repair against the original.
+    let fix = hop(&llm, Target::Fix);
+    if PRESETS.contains(&name.as_str()) && !is_llm(&llm) {
         return Err(Error::InvalidInput(format!(
             "rewrite_llm {llm:?} is not an LLM engine; preset {name} needs one"
         )));
     }
     let hops = match name.as_str() {
-        "light" => return expand_depth(2, source, settings),
-        "standard" => vec![
-            hop(&llm, lang(out)),
+        // Free machine translation out, repaired in place; one LLM rewrite back; final repair.
+        "light" => vec![
+            hop("google", lang(out)),
+            fix.clone(),
             hop(&llm, Target::Source),
-            parse_hop(&format!("{llm}:fix"), is_llm)?,
+            fix,
         ],
-        "strong" => vec![hop(&llm, lang(out)), hop(&llm, Target::Source)],
+        "standard" => vec![hop(&llm, lang(out)), hop(&llm, Target::Source), fix],
         other => {
             return Err(Error::InvalidInput(format!(
                 "unknown rewrite preset {other:?}; valid: {}",
@@ -231,6 +239,7 @@ fn expand_preset(
         hops,
         guessed: source == "auto",
         appended_back: false,
+        inline_repair: name != "standard",
     })
 }
 
@@ -294,18 +303,19 @@ mod tests {
     }
 
     #[test]
-    fn strong_preset_is_two_llm_hops_without_repair() {
+    fn standard_preset_rewrites_free_then_repairs() {
         let mut r = req();
         let s = Settings::default();
-        r.preset = Some("strong".into());
+        r.preset = Some("standard".into());
         let p = plan(&r, &s, "zh", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["en", "SRC"]);
-        assert_eq!(engines(&p), vec!["opencode-cli", "opencode-cli"]);
+        assert_eq!(langs(&p), vec!["en", "SRC", "FIX"]);
+        assert_eq!(engines(&p), vec!["opencode-cli"; 3]);
+        assert!(!p.inline_repair);
         let s = Settings {
             rewrite_llm: Some("google".into()),
             ..Settings::default()
         };
-        for preset in ["standard", "strong"] {
+        for preset in ["light", "standard"] {
             r.preset = Some(preset.into());
             assert_eq!(
                 plan(&r, &s, "en", &llm).unwrap_err().code(),
@@ -317,12 +327,12 @@ mod tests {
     #[test]
     fn old_preset_names_are_rejected() {
         let s = Settings::default();
-        for old in ["mt", "mt-deep", "llm", "mt-fix", "llm-fix"] {
+        for old in ["mt", "mt-deep", "llm", "mt-fix", "llm-fix", "strong"] {
             let mut r = req();
             r.preset = Some(old.into());
             let err = plan(&r, &s, "en", &llm).unwrap_err();
             assert_eq!(err.code(), "INVALID_INPUT", "{old}");
-            assert!(err.to_string().contains("light, standard, strong"), "{old}");
+            assert!(err.to_string().contains("valid: light, standard"), "{old}");
         }
     }
 
@@ -330,7 +340,7 @@ mod tests {
     fn default_preset_is_standard() {
         let s = Settings::default();
         assert_eq!(s.rewrite_preset(), "standard");
-        assert_eq!(s.rewrite_ladder(), vec!["standard", "strong"]);
+        assert_eq!(s.rewrite_ladder(), vec!["light", "standard"]);
         let p = plan(&req(), &s, "en", &llm).unwrap();
         assert_eq!(langs(&p), vec!["zh", "SRC", "FIX"]);
     }
@@ -430,13 +440,6 @@ mod tests {
     #[test]
     fn presets_expand_for_both_families() {
         let mut r = req();
-        let s = Settings::default();
-        r.preset = Some("strong".into());
-        let p = plan(&r, &s, "en", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["zh", "SRC"]);
-        let p = plan(&r, &s, "zh", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["en", "SRC"]);
-
         r.preset = Some("standard".into());
         let s = Settings {
             rewrite_llm: Some("opencode-cli".into()),
@@ -448,27 +451,38 @@ mod tests {
             engines(&p),
             vec!["opencode-cli", "opencode-cli", "opencode-cli"]
         );
+        assert!(!p.inline_repair);
         assert_eq!(
             langs(&plan(&r, &s, "zh", &llm).unwrap()),
             vec!["en", "SRC", "FIX"]
         );
 
         r.preset = Some("light".into());
+        let p = plan(&r, &s, "en", &llm).unwrap();
+        assert_eq!(langs(&p), vec!["zh", "FIX", "SRC", "FIX"]);
         assert_eq!(
-            langs(&plan(&r, &s, "en", &llm).unwrap()),
-            vec!["zh", "ja", "SRC"]
+            engines(&p),
+            vec!["google", "opencode-cli", "opencode-cli", "opencode-cli"]
+        );
+        assert!(
+            p.inline_repair,
+            "the LLM return hop repairs against the original"
+        );
+        assert_eq!(
+            langs(&plan(&r, &s, "zh", &llm).unwrap()),
+            vec!["en", "FIX", "SRC", "FIX"]
         );
 
         r.preset = Some("bogus".into());
         let err = plan(&r, &s, "en", &llm).unwrap_err();
         assert_eq!(err.code(), "INVALID_INPUT");
-        assert!(err.to_string().contains("light, standard, strong"));
+        assert!(err.to_string().contains("valid: light, standard"));
     }
 
     #[test]
     fn precedence_is_chain_preset_depth_pivot_setting() {
         let s = Settings {
-            rewrite_preset: Some("strong".into()),
+            rewrite_preset: Some("light".into()),
             ..Settings::default()
         };
         let mut r = req();
@@ -490,8 +504,11 @@ mod tests {
         r.depth = None;
         assert_eq!(langs(&plan(&r, &s, "en", &llm).unwrap()), vec!["ja", "SRC"]);
         r.pivot = "auto".into();
-        // Falls through to the configured preset, strong: no repair hop.
-        assert_eq!(langs(&plan(&r, &s, "en", &llm).unwrap()), vec!["zh", "SRC"]);
+        // Falls through to the configured preset, light.
+        assert_eq!(
+            langs(&plan(&r, &s, "en", &llm).unwrap()),
+            vec!["zh", "FIX", "SRC", "FIX"]
+        );
     }
 
     #[test]
@@ -505,9 +522,8 @@ mod tests {
         let p = plan(&r, &s, "auto", &llm).unwrap();
         assert_eq!(langs(&p), vec!["ja", "SRC"]);
         assert!(!p.guessed, "a configured pivot is not a guess");
-        // The light preset (depth 2) still leads with the configured pivot.
-        r.depth = None;
-        r.preset = Some("light".into());
+        // Depth 2 still leads with the configured pivot.
+        r.depth = Some(2);
         let p = plan(&r, &s, "en", &llm).unwrap();
         assert_eq!(langs(&p), vec!["ja", "zh", "SRC"]);
     }

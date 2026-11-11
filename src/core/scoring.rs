@@ -499,7 +499,7 @@ mod tests {
         let calls = Calls::default();
         let mut r = req("light");
         r.target_score = Some(0.5);
-        let s = scorer(&[("light#1", 0.9), ("standard#1", 0.3), ("strong#1", 0.1)]);
+        let s = scorer(&[("light#1", 0.9), ("standard#1", 0.3)]);
         let out = search(
             &r,
             &Settings::default(),
@@ -519,7 +519,7 @@ mod tests {
         let calls = Calls::default();
         let mut r = req("light");
         r.target_score = Some(0.2);
-        let s = scorer(&[("light#1", 0.9), ("standard#1", 0.4), ("strong#1", 0.6)]);
+        let s = scorer(&[("light#1", 0.9), ("standard#1", 0.4)]);
         let out = search(
             &r,
             &Settings::default(),
@@ -528,7 +528,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(*calls.lock().unwrap(), vec!["light", "standard", "strong"]);
+        assert_eq!(*calls.lock().unwrap(), vec!["light", "standard"]);
         assert_eq!(out.response.text, "standard#1");
         assert!(out
             .response
@@ -543,14 +543,14 @@ mod tests {
         let mut r = req("standard");
         r.target_score = Some(0.1);
         let settings = Settings {
-            rewrite_ladder: Some(vec!["STANDARD".into(), "strong".into()]),
+            rewrite_ladder: Some(vec!["STANDARD".into(), "light".into()]),
             ..Default::default()
         };
-        let s = scorer(&[("standard#1", 0.5), ("strong#1", 0.4)]);
+        let s = scorer(&[("standard#1", 0.5), ("light#1", 0.4)]);
         search(&r, &settings, Some(&s), runner(calls.clone(), &[]))
             .await
             .unwrap();
-        assert_eq!(*calls.lock().unwrap(), vec!["standard", "strong"]);
+        assert_eq!(*calls.lock().unwrap(), vec!["standard", "light"]);
     }
 
     #[tokio::test]

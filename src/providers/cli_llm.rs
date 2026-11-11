@@ -277,13 +277,13 @@ pub fn build_prompt(req: &TranslateRequest) -> Result<String> {
         };
         return Ok(format!(
             "Below are an ORIGINAL text and a REWRITE of it in {target}. The rewrite deliberately changed wording and structure and cut sentences that only express feelings, pledges or pleasantries; that is correct, do not undo it. \
-             Check only hard facts: every name, place, product, number, date, amount, currency, ID, version, path, code span, negation and qualifier in the original must survive in the rewrite. \
-             List the repairs that restore a missing or altered fact, as ONLY a JSON array with no prose and no code fence:\n\
+             Find every place where the REWRITE's meaning differs from the ORIGINAL: a missing or altered name, place, product, number, date, amount, currency, ID, version, path or code span; a flipped negation; a lost or added qualifier or certainty; a changed actor, cause or order (who did what to whom, and why); a dropped or invented claim. \
+             List the smallest repairs that restore that meaning, as ONLY a JSON array with no prose and no code fence:\n\
              [{{\"from\": \"<exact substring of REWRITE>\", \"to\": \"<replacement>\", \"why\": \"<few words>\"}}]\n\
-             Output [] when every fact survives.\n\
+             Output [] when the meaning already matches.\n\
              Rules:\n\
-             - Each \"from\" is the shortest span that contains the error, usually one word or number.\n\
-             - Never restore a cut sentence that carries no fact, and never change wording, style or structure.\n\
+             - Each \"from\" is the shortest span that contains the error, usually one word or number; a clause only when a whole claim is missing, invented or inverted.\n\
+             - Repair meaning, not style: never restore a cut feeling, pledge or pleasantry sentence, never move wording or structure back toward the original, and leave anything already correct in meaning untouched. Fewer edits are better.\n\
              - Names must match the original letter for letter.\n\
              - When a fact is missing, set \"from\" to the word right before where it belongs and \"to\" to that word plus the fact, written in the REWRITE's style; a fact from a cut sentence goes into the nearest kept sentence.\n\
              {missing}\
@@ -582,8 +582,8 @@ Ask Aroha.
         let p = build_prompt(&r).unwrap();
         assert!(p.starts_with("Below are an ORIGINAL text and a REWRITE of it in English (en)."));
         assert!(p.contains("as ONLY a JSON array") && p.contains("Output [] when"));
-        assert!(p.contains("Check only hard facts"));
-        assert!(p.contains("Never restore a cut sentence that carries no fact"));
+        assert!(p.contains("who did what to whom"));
+        assert!(p.contains("Repair meaning, not style: never restore a cut feeling"));
         assert!(p.contains(r#"[{"from": "<exact substring of REWRITE>""#));
         assert!(p.contains(
             "ORIGINAL (English (en)):

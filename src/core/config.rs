@@ -49,9 +49,9 @@ pub struct Settings {
     /// Default pivot for `rewrite` when the request says `auto`.
     pub rewrite_pivot: Option<String>,
     /// Default `rewrite` preset when the request names no chain, preset,
-    /// depth or pivot (`light`, `standard`, `strong`).
+    /// depth or pivot (`light`, `standard`).
     pub rewrite_preset: Option<String>,
-    /// Engine behind the LLM hops of the `standard` and `strong` presets.
+    /// Engine behind the LLM hops and repairs of the presets.
     pub rewrite_llm: Option<String>,
     /// Detector command for rewrite candidates (see `RewriteRequest::scorer`).
     pub rewrite_scorer: Option<String>,
@@ -181,7 +181,7 @@ impl Settings {
     pub fn rewrite_ladder(&self) -> Vec<String> {
         self.rewrite_ladder
             .clone()
-            .unwrap_or_else(|| vec!["standard".into(), "strong".into()])
+            .unwrap_or_else(|| vec!["light".into(), "standard".into()])
             .into_iter()
             .map(|p| p.trim().to_lowercase())
             .filter(|p| !p.is_empty())
@@ -226,10 +226,10 @@ pub const CONFIG_TEMPLATE: &str = r#"# not-a-bot config
 # retries = 2
 # race_width = 3   # provider attempts in flight; 1 is strictly sequential
 # rewrite_pivot = "zh"   # "auto" picks zh for non-Chinese text, en for Chinese
-# rewrite_preset = "standard"  # light (2 MT hops) | standard (LLM out and back) | strong
-# rewrite_llm = "opencode-cli"   # engine for preset LLM hops: opencode-cli | claude-cli
+# rewrite_preset = "standard"  # light (machine out + repair, LLM back) | standard (LLM out, LLM back rewriting freely); both end in an LLM meaning repair
+# rewrite_llm = "opencode-cli"   # engine for preset LLM hops and the repair: opencode-cli | claude-cli
 # rewrite_scorer = "python score.py"   # detector: text on stdin, score 0-1 on the last stdout line
-# rewrite_ladder = ["standard", "strong"]   # presets tried when --target-score is not met
+# rewrite_ladder = ["light", "standard"]   # presets tried when --target-score is not met
 # log = "warn"
 
 # [provider.googlecloud]

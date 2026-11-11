@@ -17,18 +17,18 @@ With machine-translation hops that rewrite is a side effect. With LLM hops it is
 the instruction: each hop translates and rewrites the way a person would. The
 result reads less like generated text, with names, numbers and code checked
 against the source. The main use is English copy: AI-sounding English goes out
-through Chinese and back, and the `standard` and `strong` presets are tuned and
+through Chinese and back, and the `light` and `standard` presets are tuned and
 measured on it. Chinese text works with the same presets.
 
 ## What each kind of hop does
 
 | Hop | Changes | Keeps | Cost |
 | --- | --- | --- | --- |
-| Machine translation (`light`) | Words | Sentence structure, so "not just X, it's Y" survives | Free, about 1 s |
-| LLM (`standard`, `strong`) | Words and sentence structure; removes the structural tells | Facts, checked by the fact guard | Your Claude or OpenCode subscription, several seconds per hop |
-| Repair (`<llm>:fix`, last hop of `standard`) | A few exact edits that restore lost hard facts (names, numbers, dates, IDs, code, negations); never cut feeling or pledge sentences | The rewrite | One more LLM call |
+| Machine translation (first hop of `light`) | Words | Sentence structure, so "not just X, it's Y" survives | Free |
+| LLM (`light` return hop, `standard`) | Words and sentence structure; removes the structural tells | Facts, checked by the fact guard | Your Claude or OpenCode subscription, several seconds per hop |
+| Repair (`<llm>:fix`, last hop of every preset) | A few exact edits that restore lost meaning (names, numbers, dates, IDs, code, negations, certainty, actor, cause, dropped or invented claims); never cut feeling or pledge sentences | The rewrite | One more LLM call |
 
-Measured on 10 texts, one run: `light` left 5 of 10 tells and lost 5
+Measured on 10 texts, one run: a two-hop machine-translation chain left 5 of 10 tells and lost 5
 facts; `standard` left 0 tells and lost 0 facts. Details and the full table:
 [01-pivot-choice.md](01-pivot-choice.md#choosing-the-depth).
 
@@ -67,8 +67,8 @@ so the intermediates can be audited.
 
 ```bash
 not-a-bot rewrite "In today's fast-paced landscape, …" --from en --format json
-not-a-bot rewrite "…" --from en --preset standard              # LLM out and back, then a fact repair (needs claude-cli or opencode-cli)
-not-a-bot rewrite "…" --from en --preset strong       # LLM out and back, no repair: rewrites furthest, may drop a fact
+not-a-bot rewrite "…" --from en --preset standard              # LLM out, free LLM back, then a meaning repair (needs claude-cli or opencode-cli)
+not-a-bot rewrite "…" --from en --preset light         # Google out, repair, LLM back, repair: lightest rewrite, highest fidelity
 not-a-bot rewrite "…" --from en --depth 3                 # zh -> ja -> fi -> en, machine translation only
 not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
 not-a-bot rewrite --from en --pivot ja < draft.md         # alias: not-a-bot polish
@@ -81,7 +81,7 @@ the configured `rewrite_preset` (default `standard`).
 | Flag | Meaning |
 | --- | --- |
 | `--chain "<[engine:]lang,...>"` | Explicit hops; a final hop back to the source is appended when missing |
-| `--preset <name>` | `light`, `standard`, `strong` |
+| `--preset <name>` | `light`, `standard` |
 | `--depth 1-3` | Machine translation only, through zh, ja, fi (Chinese sources: en, ja, fi) |
 | `--pivot <lang>` | One bridge language, or `auto` |
 | `--preserve <pattern>` | Regex, or the named patterns `@code` and `@url` |

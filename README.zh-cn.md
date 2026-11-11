@@ -43,8 +43,8 @@ nab rewrite --from en --format json --quiet --preserve @code < draft.txt
 
 <table>
 <tr>
-<td align="center" width="25%"><a href="#实测结果"><b>0.999 → 0.39</b><br/><sub>检测器平均得分，30 篇文本</sub></a></td>
-<td align="center" width="25%"><a href="#实测结果"><b>96%</b><br/><sub>的文本事实全部保留</sub></a></td>
+<td align="center" width="25%"><a href="#实测结果"><b>0.999 → 0.36</b><br/><sub>检测器平均得分，30 篇文本</sub></a></td>
+<td align="center" width="25%"><a href="#实测结果"><b>98%</b><br/><sub>的文本没有严重语义错误</sub></a></td>
 <td align="center" width="25%"><a href="#lint离线且结果确定"><b>0</b><br/><sub><code>nab lint</code> 的网络请求数</sub></a></td>
 <td align="center" width="25%"><a href="#安装"><b>1</b><br/><sub>个二进制，无运行时依赖</sub></a></td>
 </tr>
@@ -82,8 +82,8 @@ mkdir -p ~/.claude/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.c
 # 改写草稿（默认预设 standard）
 nab rewrite --from en --preserve @code < draft.md
 
-# 检测器得分最低，可能丢事实（会列在 missingFacts 里）
-nab rewrite --from en --preset strong < draft.md
+# 改写最轻，保真度最高
+nab rewrite --from en --preset light < draft.md
 
 # 拿改写结果对照原文检查；有 AI 味或丢事实就以退出码 1 结束
 nab lint rewrite.md --source draft.md --strict
@@ -106,25 +106,28 @@ for f in $(git diff --cached --name-only -- '*.md'); do nab lint "$f" --strict |
 
 | 预设 | 执行内容 | 适用场景 |
 | --- | --- | --- |
-| `standard`（默认） | LLM 译出到另一种语言，LLM 译回，再跑一跳只修事实的修复，修复时会告知丢了哪些 token | 大多数文本，事实丢失最少 |
-| `strong` | LLM 译出再译回，不做修复 | 检测器得分最低，可能丢事实，丢了会报告 |
-| `light` | 两跳免费机器翻译 | 不用订阅的快速一遍，词会变，句式不变 |
+| `standard`（默认） | LLM 译出到另一种语言，LLM 自由改写译回（这一跳看不到原文），最后一跳最小语义修复 | 大多数文本，检测器得分最低 |
+| `light` | Google 机器翻译译出，一跳修复，一次 LLM 改写译回，最后再一跳修复 | 改写最轻，保真度最高 |
+
+两个预设都需要 LLM（`rewrite_llm`，默认 `opencode-cli`，可选 `claude-cli`），共调用数次 LLM，总计几十秒。`light` 里只有一次是完整改写，两跳修复只返回简短的编辑列表。
 
 `--preserve @code` 和 `--preserve @url` 让代码片段和链接原样保留。法律文本、API 参考，以及读者会逐行核对的数字，不要做往返改写。
 
 ## 原理
 
-译成另一种语言再译回来，句子会被重新组织，所以生成文本的套话不会原样回来。`standard` 和 `strong` 的两跳都是 LLM 调用，要求它们像人一样改写，同时删掉只表达感受、表态或客套的句子，AI 味有不少就藏在这些句子里。
+译成另一种语言再译回来，句子会被重新组织，所以生成文本的套话不会原样回来。`standard` 的两跳都是 LLM 调用，要求它们像人一样改写，同时删掉只表达感受、表态或客套的句子，AI 味有不少就藏在这些句子里。
 
 ```mermaid
 flowchart LR
     A[AI 味草稿] --> B[LLM 跳：改写成 zh]
     B --> C[LLM 跳：改写回 en]
-    C --> D{对照草稿核对事实}
-    D -->|有 token 丢失| E[只修事实的修复跳]
-    D -->|全部在| F[结果]
-    E --> F
+    C --> D[修复跳：对照草稿做最小语义修复]
+    D --> E{对照草稿核对事实}
+    E -->|全部在| F[结果]
+    E -->|有 token 丢失| G[列入 missingFacts]
 ```
+
+每个预设都以修复跳收尾：LLM 能看到原文，只返回小的 JSON 片段编辑，恢复前面各跳丢失或改变的含义（人名、数字、日期、金额、ID、代码片段，被翻转的否定，被改动的限定词或确定程度，被改动的行为主体、原因或顺序，被丢掉或凭空添加的论断）。事实类编辑一律应用，其他编辑共用一份回填额度。它不会恢复被有意删掉的感受、表态或客套句，也不会把措辞往原文方向改回去。它还会收到事实核对给出的缺失 token 列表。
 
 事实核对会拿人名、数字、版本号、路径、ID 和代码片段与原文比对。最后仍然缺的会出现在 `missingFacts` 里，丢了什么是明确报告的，不会悄悄交付。
 
@@ -134,23 +137,23 @@ flowchart LR
 
 ## 实测结果
 
-`benches/prompt-lab`：30 篇合成的 AI 味英文职场文本（客户邮件、Slack 更新、营销文案、文档、LinkedIn 帖子），用真实二进制跑，每种配置 2 到 3 个样本。每条输出由 `desklib/ai-text-detector-v1.01` 打分，分数是 P(AI)，越高越像 AI。事实按 token 精确、区分大小写地对照原文。
+`benches/prompt-lab`：30 篇合成的 AI 味英文职场文本（客户邮件、Slack 更新、营销文案、文档、LinkedIn 帖子），用真实二进制跑，每种配置 2 个样本。每条输出由 `desklib/ai-text-detector-v1.01` 打分，分数是 P(AI)，越高越像 AI。事实丢失指 30 篇中至少缺一个精确（区分大小写）事实 token 的文本数。语义由 Claude Sonnet 逐篇判定：没有严重语义错误的文本占比。
 
-| 配置 | 平均 P(AI) | 得分低于 0.5 的输出 | 丢过事实 token 的文本（共 30） | opencode 延迟 |
-| --- | --- | --- | --- | --- |
-| 原文 | 0.999 | 0% | 无 | 无 |
-| 早期 prompt | 0.579 | 43% | 2.3 | 无 |
-| `standard` | 0.387 | 63% | 1.3 | 约 70 秒 |
-| `strong` | 0.367 | 68% | 2.0 | 约 30 秒 |
+| 配置 | 平均 P(AI) | 事实丢失（共 30） | 无严重语义错误 |
+| --- | --- | --- | --- |
+| 原文 | 0.999 | 无 | 无 |
+| `standard`（LLM 译出，LLM 自由译回，修复） | 0.364 | 0.5 | 98% |
+| `light`（Google 译出，修复，LLM 译回，修复） | 0.489 | 0 | 97% |
+| Google 译出，LLM 译回，只做最后一次修复 | 0.515 | 0 | 87% |
+| 两跳机器翻译加最后一次修复 | 0.930 | 5.0 | 80% |
 
-`standard` 保留了约 99.6% 的事实 token。方法、各变体的表格和失败的实验见 [benches/prompt-lab](./benches/prompt-lab/README.md)。另有一个 8 篇文本的测试在 [benches/rewrite-depth](./benches/rewrite-depth/README.md)。
+机器翻译只换词、保留句子结构，所以纯机器翻译的链即使加上修复，得分也接近原文；得分下降来自 LLM 改写跳。成本高于 `standard` 的链没有一条得分更低。方法、完整表格和失败的实验见 [benches/prompt-lab](./benches/prompt-lab/README.md)。另有一个 8 篇文本的测试在 [benches/rewrite-depth](./benches/rewrite-depth/README.md)。
 
 这些数据没有说明的事：
 
 - 这只是一个检测器。检测器之间会有分歧，版本之间也会变，没有任何工具能让文本稳定地检测不出。在这个检测器上低于 0.5，不代表在别的检测器上也低。
-- `standard` 仍有 37% 的输出得分在 0.5 以上。
-- 语料是合成的，只有英文。LLM 跳会把文本缩短约 30%，因为它们删掉了客套和表态。
-- 延迟取决于你的模型和套餐。上面那段 60 个词的文案用了 39 秒。
+- 语料是合成的，只有英文。LLM 跳会缩短文本，因为它们删掉了客套和表态。
+- 延迟取决于你的模型和套餐。每个预设调用数次 LLM，总计几十秒。
 
 ## 横向对比
 
@@ -194,7 +197,7 @@ blader/humanizer 只要一个 skill 文件，不需要额外安装，对 AI 文�
 `~/.config/not-a-bot/config.toml`，或用 `NOT_A_BOT_CONFIG` 指定：
 
 ```toml
-rewrite_preset = "standard"     # light, standard, strong
+rewrite_preset = "standard"     # light, standard
 rewrite_llm = "opencode-cli"    # 或 "claude-cli"
 ```
 

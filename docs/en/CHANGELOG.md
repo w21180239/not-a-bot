@@ -2,6 +2,19 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.2.0 — 2026-11-12
+
+### Breaking
+
+- `strong` is removed and fails with `INVALID_INPUT` as an unknown preset. The presets are `light` and `standard`, and the default `rewrite_ladder` is `["light", "standard"]`.
+- `light` is Google machine translation out, a fix hop, one LLM rewrite back and a final fix hop (chain `["zh","fix","en","fix"]`). It needs an LLM `rewrite_llm`, else `INVALID_INPUT`.
+
+### Changed
+
+- Every preset ends with an LLM minimal meaning-repair hop (`<llm>:fix`). The fix prompt covers meaning, not only facts: negations, qualifiers and certainty, actor and cause, order, dropped or invented claims. It still never restores cut feeling, pledge or pleasantry sentences. Fact edits always apply; other edits share one copy-back budget.
+- The `standard` return hop rewrites freely without the original (chain `["zh","en","fix"]`).
+- Results (`benches/prompt-lab`, 30 English texts x 2 samples, desklib detector, source texts 0.999): `standard` mean P(AI) 0.364, 0.5 texts with a lost fact token, 98% of texts with no major meaning error; `light` 0.489, 0, 97%. No chain that costs more than `standard` scored lower.
+
 ## 0.1.1 — 2026-11-11
 
 ### Fixed
