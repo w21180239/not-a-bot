@@ -1,0 +1,16 @@
+name: Feature request
+description: A new tell for lint, a preset, a provider, or an integration
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The text or workflow where not-a-bot falls short today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What you would like it to do. Examples of input and expected output help most.
