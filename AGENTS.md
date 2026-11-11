@@ -178,7 +178,7 @@ more than one run happened, `candidates` (`presetOrChain`, `score`,
 ## Installation
 
 ```bash
-npm install -g not-a-bot
+npm install -g not-a-bot-cli
 cargo install --git https://github.com/w21180239/not-a-bot
 # or: https://github.com/w21180239/not-a-bot/releases/latest
 ```

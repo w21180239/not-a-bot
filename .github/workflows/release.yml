@@ -163,7 +163,7 @@ jobs:
           ls -l npm/platforms/*/not-a-bot*
 
       # Platform packages first: the main package pins their exact version, so a
-      # half-finished release would leave `npm install -g not-a-bot` broken.
+      # half-finished release would leave `npm install -g not-a-bot-cli` broken.
       - name: Publish the platform packages
         if: env.NPM_TOKEN != ''
         shell: bash
@@ -190,8 +190,8 @@ jobs:
         run: |
           set -euo pipefail
           version=$(node -p "require('./package.json').version")
-          if npm view "not-a-bot@${version}" version >/dev/null 2>&1; then
-            echo "skip not-a-bot@${version}: already on the registry"
+          if npm view "not-a-bot-cli@${version}" version >/dev/null 2>&1; then
+            echo "skip not-a-bot-cli@${version}: already on the registry"
             exit 0
           fi
           npm publish --access public --provenance

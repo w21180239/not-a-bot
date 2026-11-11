@@ -1,6 +1,6 @@
 # CLI reference for the not-a-bot skill
 
-`nab` is the short name of `not-a-bot`; both behave the same. Every answer is JSON with a `text` field and a typed error unless `--format text` is given. Confirm the binary once with `nab --version` (missing: `npm install -g not-a-bot`, or `cargo install --git https://github.com/w21180239/not-a-bot`).
+`nab` is the short name of `not-a-bot`; both behave the same. Every answer is JSON with a `text` field and a typed error unless `--format text` is given. Confirm the binary once with `nab --version` (missing: `npm install -g not-a-bot-cli`, or `cargo install --git https://github.com/w21180239/not-a-bot`).
 
 ## Operations
 
