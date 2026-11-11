@@ -8,14 +8,14 @@ Project scope:
 
 ```bash
 mkdir -p .claude/skills/not-a-bot
-cp integrations/skill/not-a-bot/SKILL.md .claude/skills/not-a-bot/SKILL.md
+cp -r integrations/skill/not-a-bot/. .claude/skills/not-a-bot/
 ```
 
 Personal, every project:
 
 ```bash
 mkdir -p ~/.claude/skills/not-a-bot
-cp integrations/skill/not-a-bot/SKILL.md ~/.claude/skills/not-a-bot/SKILL.md
+cp -r integrations/skill/not-a-bot/. ~/.claude/skills/not-a-bot/
 ```
 
 Claude Code discovers the skill from the frontmatter description and loads the

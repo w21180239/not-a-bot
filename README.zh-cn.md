@@ -33,6 +33,7 @@ not-a-bot 以新名字延续 translatex 0.3.0。
 - [安装](#安装)
 - [快速开始](#快速开始)
 - [检查草稿](#检查草稿)
+- [Agent skill](#agent-skill)
 - [支持的 harness](#支持的-harness)
 - [往返改写：原理](#往返改写原理)
 - [Provider 一览](#provider-一览)
@@ -260,6 +261,16 @@ not-a-bot rewrite "In today's fast-paced landscape, it's important to note that 
 not-a-bot lint draft.md --source original.md --format text --strict   # 有任何 tell 或缺失事实就退出 1
 ```
 
+## Agent skill
+
+`not-a-bot` skill 教编码 Agent 一开始就按人的写法写，再自行核对。它包含写作方法（事实全留、先说结论、不搭靶子）、六种受众 profile、AI 腔对照表和 CLI 命令。Agent 按方法起草，用离线的 `nab lint draft.txt --source source.txt` 查漏掉或多出的事实，只有你要求往返改写时才调用 `nab rewrite`。语体默认中性国际英语，另附 `nz`、`uk`、`us` 说明。
+
+```bash
+mkdir -p ~/.claude/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.claude/skills/not-a-bot/
+```
+
+想覆盖内置 profile，把自己的文件放到 `~/.config/not-a-bot/profiles/<name>.md`。各 harness 的安装路径见 [integrations/README.md](./integrations/README.md)，skill 的评测工具在 [benches/skill-evals](./benches/skill-evals/README.md)。
+
 ## 支持的 harness
 
 接入方式是一条命令加一份文档：宿主会加载 skill 就给 skill，读项目规则就给规则文件，读项目指令就追加一段。没有服务要启动，也没有协议要协商。
@@ -309,9 +320,9 @@ not-a-bot lint draft.md --source original.md --format text --strict   # 有任�
 
 ```bash
 # 会加载 skill 的宿主
-mkdir -p .claude/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md .claude/skills/not-a-bot/
-mkdir -p ~/.config/opencode/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.config/opencode/skills/not-a-bot/
-mkdir -p ~/.agents/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/   # Codex、Gemini CLI
+mkdir -p .claude/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. .claude/skills/not-a-bot/
+mkdir -p ~/.config/opencode/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.config/opencode/skills/not-a-bot/
+mkdir -p ~/.agents/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.agents/skills/not-a-bot/   # Codex、Gemini CLI
 
 # 其余宿主按自己的文件名读同一段内容
 cat integrations/guidance/AGENTS.md >> AGENTS.md

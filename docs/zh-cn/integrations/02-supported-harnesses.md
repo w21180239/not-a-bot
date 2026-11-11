@@ -64,14 +64,14 @@ harness 指承载 Agent 的宿主：终端里的编码 Agent、编辑器助手�
 
 | Harness | 通道 | 写到 | 命令 |
 | --- | --- | --- | --- |
-| Claude Code | Skill | `.claude/skills/not-a-bot/SKILL.md` | `mkdir -p .claude/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md .claude/skills/not-a-bot/` |
+| Claude Code | Skill | `.claude/skills/not-a-bot/SKILL.md` | `mkdir -p .claude/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. .claude/skills/not-a-bot/` |
 | Claude Code | Skill（个人级） | `~/.claude/skills/not-a-bot/SKILL.md` | 同上，放到 `$HOME` 下 |
 | Claude Code | 插件 | 由 CLI 安装 | `/plugin marketplace add w21180239/not-a-bot`，再 `/plugin install not-a-bot@not-a-bot` |
-| Codex CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.agents/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/` |
+| Codex CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.agents/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.agents/skills/not-a-bot/` |
 | Codex CLI | 指令 | `AGENTS.md`、`~/.codex/AGENTS.md` | `cat integrations/guidance/AGENTS.md >> AGENTS.md` |
 | Gemini CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` | 与 Codex 共用 |
 | Gemini CLI | 指令 | `GEMINI.md` | `cat integrations/guidance/AGENTS.md >> GEMINI.md` |
-| OpenCode | Skill | `~/.config/opencode/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.config/opencode/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.config/opencode/skills/not-a-bot/` |
+| OpenCode | Skill | `~/.config/opencode/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.config/opencode/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.config/opencode/skills/not-a-bot/` |
 | OpenCode | 指令 | `AGENTS.md` | `cat integrations/guidance/AGENTS.md >> AGENTS.md` |
 | Cursor | 规则 | `.cursor/rules/not-a-bot.mdc` | `mkdir -p .cursor/rules && cp integrations/cursor/not-a-bot.mdc .cursor/rules/` |
 | Cline | 规则 | `.clinerules/not-a-bot.md` | `mkdir -p .clinerules && cat integrations/guidance/AGENTS.md > .clinerules/not-a-bot.md` |

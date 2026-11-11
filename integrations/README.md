@@ -10,7 +10,7 @@ npm install -g not-a-bot     # or: cargo install not-a-bot
 not-a-bot --version
 ```
 
-[`skill/not-a-bot/SKILL.md`](skill/not-a-bot/SKILL.md) is the canonical skill,
+[`skill/not-a-bot/`](skill/not-a-bot/SKILL.md) is the canonical skill folder (`SKILL.md`, `patterns.md`, `profiles/`, `references/`; copy the whole folder),
 [`guidance/AGENTS.md`](guidance/AGENTS.md) the short block for harnesses that
 read project instructions, and [`cursor/not-a-bot.mdc`](cursor/not-a-bot.mdc)
 the Cursor rule with frontmatter.
@@ -78,13 +78,13 @@ Skill harnesses:
 
 ```bash
 # Claude Code, project scope
-mkdir -p .claude/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md .claude/skills/not-a-bot/
+mkdir -p .claude/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. .claude/skills/not-a-bot/
 
 # OpenCode
-mkdir -p ~/.config/opencode/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.config/opencode/skills/not-a-bot/
+mkdir -p ~/.config/opencode/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.config/opencode/skills/not-a-bot/
 
 # Codex and Gemini CLI share the cross-runtime location
-mkdir -p ~/.agents/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/
+mkdir -p ~/.agents/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.agents/skills/not-a-bot/
 ```
 
 Rule and instructions harnesses read the same block under their own filename:
@@ -97,7 +97,7 @@ mkdir -p .cursor/rules && cp integrations/cursor/not-a-bot.mdc .cursor/rules/
 ```
 
 PowerShell: `New-Item -ItemType Directory -Force <dir>` then
-`Copy-Item <src> <dir>`, or `Get-Content <src> | Add-Content <dst>` to append.
+`Copy-Item -Recurse <src>\* <dir>` for the skill folder, or `Get-Content <src> | Add-Content <dst>` to append.
 
 ## Harness matrix
 
@@ -136,12 +136,26 @@ under `$HOME` where marked.
 | QwenPaw | Instructions | the project instructions file |
 | Anything else | CLI | the agent runs `not-a-bot … --format json` directly |
 
+## What the skill adds
+
+The skill is more than a command reference. It teaches the agent to write
+plain, fact-complete prose for one reader, then audit the draft against its
+source with `nab lint --source` (offline, no model). `nab rewrite` stays an
+opt-in round trip for when the user asks for one. Register defaults to neutral
+international English, with `nz`, `uk` and `us` notes in `SKILL.md`.
+
+To keep your own voice anchors out of any repository, put profile files in
+`~/.config/not-a-bot/profiles/<name>.md` (same names as the bundled
+`profiles/*.md`); the agent reads that directory first and a file there
+replaces the bundled profile of the same name.
+
 ## Which channel for which job
 
 | Need | Command |
 | --- | --- |
 | The agent translates while answering | `not-a-bot translate "…" -t <lang> --format json` |
-| Humanise AI-sounding prose | `not-a-bot rewrite "…" --from <lang> --preset standard --preserve @code --format json` |
+| Audit a draft for AI tells and dropped facts | `nab lint draft.txt --source source.txt` |
+| Humanise AI-sounding prose by round trip | `not-a-bot rewrite "…" --from <lang> --preset standard --preserve @code --format json` |
 | A script or CI job needs a translation | same CLI, parse `text` |
 | Bulk work | `not-a-bot batch --file jobs.ndjson` |
 | Capability discovery | `not-a-bot providers`, `not-a-bot languages`, `not-a-bot health` |

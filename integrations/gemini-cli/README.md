@@ -7,7 +7,7 @@ cross-runtime skills.
 
 ```bash
 mkdir -p ~/.agents/skills/not-a-bot
-cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/SKILL.md
+cp -r integrations/skill/not-a-bot/. ~/.agents/skills/not-a-bot/
 ```
 
 ## Instructions
