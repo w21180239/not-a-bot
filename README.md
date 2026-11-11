@@ -32,6 +32,7 @@ not-a-bot continues translatex 0.3.0 under a new name.
 - [Features](#features)
 - [Install](#install)
 - [Quick start](#quick-start)
+- [Lint a draft](#lint-a-draft)
 - [Supported harnesses](#supported-harnesses)
 - [Round trip: how it works](#round-trip-how-it-works)
 - [Provider matrix](#provider-matrix)
@@ -249,6 +250,14 @@ Failures carry a machine-readable reason:
   },
   "requestId": ""
 }
+```
+
+## Lint a draft
+
+`lint` checks a draft offline (no network, no model) for AI vocabulary, stock phrases, staged contrasts, US spellings and em dashes. With `--source` it also lists the names, numbers, paths and IDs the draft dropped or added.
+
+```bash
+not-a-bot lint draft.md --source original.md --format text --strict   # exit 1 on any tell or missing fact
 ```
 
 ## Supported harnesses
@@ -478,6 +487,7 @@ Resolution: `credentials.toml` labels are tried in file order, a `NOT_A_BOT_<PRO
 | --- | --- |
 | `translate [TEXT]` | One request; reads stdin when text is omitted |
 | `rewrite [TEXT]` | Out through one or more hops and back; humanizes AI-sounding text (`--chain`, `--preset`, `--depth`, `--pivot`, `--scorer`, `--best-of`, `--target-score`) |
+| `lint DRAFT` | Offline AI-tell check; `--source FILE` adds the fact diff, `--strict` exits 1 on any hit |
 | `batch` | NDJSON in, NDJSON out, order preserved |
 | `providers` | Capability and configuration state per provider |
 | `languages` | Canonical codes, or one provider's advertised set |

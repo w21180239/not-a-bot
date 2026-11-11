@@ -60,6 +60,32 @@ not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:
 
 中转语言等于源语言时会自动换成另一侧，因此 `--from en --pivot en` 实际是 `en -> zh -> en`，不会变成空操作。
 
+## `lint`
+
+```bash
+not-a-bot lint draft.md
+not-a-bot lint draft.md --source original.md --format json
+cat draft.md | not-a-bot lint - --source original.md --strict
+```
+
+离线检查 AI 味和丢失的事实：不联网、不调模型、不读配置和凭据。命中只是提示你去看一眼，所以除非加 `--strict`，退出码恒为 `0`。
+
+| 参数 | 默认 | 说明 |
+| --- | --- | --- |
+| `DRAFT` | 必填 | 草稿文件，`-` 表示 stdin |
+| `--source FILE` | — | 原文；启用事实比对 |
+| `--strict` | 关 | 有任何 tell 或任何 `missingFromDraft` 条目时退出 `1`（CI、pre-commit） |
+
+tell 带 `kind`：`vocab`（词及其平实替换）、短语族（`deep saying`、`run-up`、`arguing with no one`、`dramatic closer`、`about the document`、`chatbot residue`、`meta wrapper`、`knowledge-limit`）、`staged-contrast`、`us-spelling`、`bold-label-bullet`、`horizontal-rule`、`repeated-openings`（行号 0）、`punctuation`（破折号、带空格的 en dash、带空格的 `--`、弯双引号），加 `--source` 时还有 `introduced-script`。事实比对覆盖代码片段、URL、路径、工单号、`@提及`、数字和人名：`missingFromDraft` 是原文有而草稿没有的 `kind:value`，`newInDraft` 反过来（人名不算新增）。数字改写成单词（`3` 变 `three`）算丢失。
+
+`--format json`（全局默认）输出 `LintResponse`：
+
+```json
+{"tells":[{"kind":"vocab","line":1,"match":"delve","hint":"look at / dig into"}],"missingFromDraft":["number:5"],"newInDraft":[]}
+```
+
+`--format text` 输出与 humanizer `lint.py` 相同的行：每个 tell 一行 `N: kind: detail`，随后是 `missing-from-draft:`、`new-in-draft:` 行、`-- source ...` 汇总（词召回、长度比）和 `-- N words, ... N hits` 页脚。草稿或原文文件不存在时返回 `INVALID_INPUT`（退出 `1`）。
+
 ## `batch`
 
 ```bash
@@ -119,7 +145,7 @@ not-a-bot init --path ~/.config/not-a-bot/config.toml
 not-a-bot completions bash
 ```
 
-`schema` 输出 draft 2020-12 定义：`TranslateRequest`、`TranslateResponse`、`ErrorResponse`、`ProviderInfo`、`HealthRecord`、`AttemptRecord`、`RewriteRequest`、`RewriteResponse`。
+`schema` 输出 draft 2020-12 定义：`TranslateRequest`、`TranslateResponse`、`ErrorResponse`、`ProviderInfo`、`HealthRecord`、`AttemptRecord`、`RewriteRequest`、`RewriteResponse`、`LintResponse`。
 
 `manifest` 输出 `{interface: "cli", commands: [{name, command, description, inputSchema?}], skill, install}`，Agent 不必解析 `--help` 就能发现操作。
 

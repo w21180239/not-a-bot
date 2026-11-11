@@ -8,6 +8,8 @@ pub mod facts;
 pub mod http;
 pub mod keys;
 pub mod lang;
+pub mod lint;
+mod lint_data;
 pub mod preserve;
 pub mod repair;
 pub mod scoring;

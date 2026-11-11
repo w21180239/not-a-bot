@@ -17,6 +17,7 @@ not-a-bot batch --file jobs.ndjson --parallel 4
 not-a-bot providers --format json
 not-a-bot languages --provider google --format json
 not-a-bot health --format json
+not-a-bot lint draft.md --source original.md --format json --strict
 not-a-bot schema --format json
 ```
 
@@ -80,7 +81,7 @@ All field names are camelCase. Unknown fields are rejected with `INVALID_INPUT`,
 not-a-bot schema --format json
 ```
 
-Draft 2020-12 definitions for `TranslateRequest`, `TranslateResponse`, `ErrorResponse`, `ProviderInfo`, `HealthRecord`, `AttemptRecord`.
+Draft 2020-12 definitions for `TranslateRequest`, `TranslateResponse`, `ErrorResponse`, `ProviderInfo`, `HealthRecord`, `AttemptRecord`, `RewriteRequest`, `RewriteResponse`, `LintResponse`.
 
 ## Error handling
 
