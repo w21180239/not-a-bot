@@ -33,6 +33,7 @@ not-a-bot continues translatex 0.3.0 under a new name.
 - [Install](#install)
 - [Quick start](#quick-start)
 - [Lint a draft](#lint-a-draft)
+- [Agent skill](#agent-skill)
 - [Supported harnesses](#supported-harnesses)
 - [Round trip: how it works](#round-trip-how-it-works)
 - [Provider matrix](#provider-matrix)
@@ -260,6 +261,16 @@ Failures carry a machine-readable reason:
 not-a-bot lint draft.md --source original.md --format text --strict   # exit 1 on any tell or missing fact
 ```
 
+## Agent skill
+
+The `not-a-bot` skill teaches a coding agent to write like a person in the first place, then audit the result. It carries the writing method (every fact kept, answer first, no staged contrasts), six audience profiles, an AI-tell reference and the CLI commands. The agent drafts by the method, runs `nab lint draft.txt --source source.txt` offline to catch dropped or invented facts, and calls `nab rewrite` only when you ask for a round-trip rewrite. Register defaults to neutral international English, with `nz`, `uk` and `us` notes.
+
+```bash
+mkdir -p ~/.claude/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.claude/skills/not-a-bot/
+```
+
+Put your own profile files in `~/.config/not-a-bot/profiles/<name>.md` to override a bundled profile. Install paths for every harness: [integrations/README.md](./integrations/README.md). The skill's benchmark harness is in [benches/skill-evals](./benches/skill-evals/README.md).
+
 ## Supported harnesses
 
 The integration is the command plus one document that tells the agent when to
@@ -311,9 +322,9 @@ an instructions block where it keeps project instructions. No server, no protoco
 
 ```bash
 # Skill harnesses
-mkdir -p .claude/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md .claude/skills/not-a-bot/
-mkdir -p ~/.config/opencode/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.config/opencode/skills/not-a-bot/
-mkdir -p ~/.agents/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/   # Codex, Gemini CLI
+mkdir -p .claude/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. .claude/skills/not-a-bot/
+mkdir -p ~/.config/opencode/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.config/opencode/skills/not-a-bot/
+mkdir -p ~/.agents/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.agents/skills/not-a-bot/   # Codex, Gemini CLI
 
 # Everything else reads the same block under its own filename
 cat integrations/guidance/AGENTS.md >> AGENTS.md

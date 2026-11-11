@@ -7,7 +7,7 @@ OpenCode reads `AGENTS.md` from the repository and skills from
 
 ```bash
 mkdir -p ~/.config/opencode/skills/not-a-bot
-cp integrations/skill/not-a-bot/SKILL.md ~/.config/opencode/skills/not-a-bot/SKILL.md
+cp -r integrations/skill/not-a-bot/. ~/.config/opencode/skills/not-a-bot/
 ```
 
 The skill is loaded when its description matches the task, so it costs nothing

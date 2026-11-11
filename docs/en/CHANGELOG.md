@@ -20,6 +20,10 @@ not-a-bot continues translatex 0.3.0 under a new name. Nothing else changed in b
 - Provider metadata keys use the `not-a-bot.` prefix (`not-a-bot.style`, `not-a-bot.history`, `not-a-bot.original`), and the HTTP User-Agent is `not-a-bot/<version>`.
 - The `translatex` integration skill is now `not-a-bot`.
 
+### Added
+
+- Added: not-a-bot agent skill that merges a writing method (fact invariants, audience profiles, AI-tell patterns, optional synthetic-anchor voice profiles overridable from `~/.config/not-a-bot/profiles/`) with the CLI guide, and the skill-eval and detector benches under `benches/skill-evals` and `benches/detector`.
+
 ### Removed
 
 - The Russian README and `docs/ru`.

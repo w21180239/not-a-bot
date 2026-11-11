@@ -1,6 +1,6 @@
 {
   "name": "not-a-bot",
-  "description": "Translate text and rewrite machine-flavoured prose through a pivot language with the not-a-bot CLI.",
+  "description": "Write, audit and rewrite prose so it reads like a person wrote it, and translate text, with the not-a-bot CLI.",
   "version": "0.1.0",
   "author": {
     "name": "w21180239"

@@ -7,7 +7,7 @@
     {
       "name": "not-a-bot",
       "source": "./integrations/claude-code/plugin",
-      "description": "Translate text and rewrite machine-flavoured prose through a pivot language with the not-a-bot CLI."
+      "description": "Write, audit and rewrite prose so it reads like a person wrote it, and translate text, with the not-a-bot CLI."
     }
   ]
 }

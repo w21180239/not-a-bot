@@ -20,6 +20,10 @@ not-a-bot 以新名字延续 translatex 0.3.0。除默认预设外，行为不�
 - Provider 元数据键改用 `not-a-bot.` 前缀（`not-a-bot.style`、`not-a-bot.history`、`not-a-bot.original`），HTTP User-Agent 为 `not-a-bot/<version>`。
 - 集成 skill `translatex` 改名为 `not-a-bot`。
 
+### 新增
+
+- 新增：not-a-bot agent skill，把写作方法（事实不变量、受众 profile、AI 腔对照表，可由 `~/.config/not-a-bot/profiles/` 覆盖的 profile）与 CLI 使用指南合并为一份；评测工具和检测器放在 `benches/skill-evals` 与 `benches/detector`。
+
 ### 移除
 
 - 俄文 README 和 `docs/ru`。

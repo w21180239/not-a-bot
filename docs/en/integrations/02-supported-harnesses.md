@@ -71,14 +71,14 @@ come from a `not-a-bot` checkout.
 
 | Harness | Channel | Write to | Command |
 | --- | --- | --- | --- |
-| Claude Code | Skill | `.claude/skills/not-a-bot/SKILL.md` | `mkdir -p .claude/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md .claude/skills/not-a-bot/` |
+| Claude Code | Skill | `.claude/skills/not-a-bot/SKILL.md` | `mkdir -p .claude/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. .claude/skills/not-a-bot/` |
 | Claude Code | Skill (personal) | `~/.claude/skills/not-a-bot/SKILL.md` | same, under `$HOME` |
 | Claude Code | Plugin | installed by the CLI | `/plugin marketplace add w21180239/not-a-bot` then `/plugin install not-a-bot@not-a-bot` |
-| Codex CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.agents/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/` |
+| Codex CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.agents/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.agents/skills/not-a-bot/` |
 | Codex CLI | Instructions | `AGENTS.md`, `~/.codex/AGENTS.md` | `cat integrations/guidance/AGENTS.md >> AGENTS.md` |
 | Gemini CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` | shared with Codex |
 | Gemini CLI | Instructions | `GEMINI.md` | `cat integrations/guidance/AGENTS.md >> GEMINI.md` |
-| OpenCode | Skill | `~/.config/opencode/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.config/opencode/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.config/opencode/skills/not-a-bot/` |
+| OpenCode | Skill | `~/.config/opencode/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.config/opencode/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.config/opencode/skills/not-a-bot/` |
 | OpenCode | Instructions | `AGENTS.md` | `cat integrations/guidance/AGENTS.md >> AGENTS.md` |
 | Cursor | Rule | `.cursor/rules/not-a-bot.mdc` | `mkdir -p .cursor/rules && cp integrations/cursor/not-a-bot.mdc .cursor/rules/` |
 | Cline | Rule | `.clinerules/not-a-bot.md` | `mkdir -p .clinerules && cat integrations/guidance/AGENTS.md > .clinerules/not-a-bot.md` |

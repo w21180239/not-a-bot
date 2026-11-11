@@ -7,7 +7,7 @@ either or both; the binary is the same.
 
 ```bash
 mkdir -p ~/.agents/skills/not-a-bot
-cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/SKILL.md
+cp -r integrations/skill/not-a-bot/. ~/.agents/skills/not-a-bot/
 ```
 
 `~/.agents/skills/` is the cross-runtime alias Codex, Gemini CLI and Copilot CLI
