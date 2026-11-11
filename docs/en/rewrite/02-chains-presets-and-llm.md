@@ -42,8 +42,8 @@ Precedence, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, then
 | Preset | Hops (English source) | Needs a subscription | Typical latency |
 | --- | --- | --- | --- |
 | `light` | zh, ja, en: two machine-translation hops out | no | about 1 s |
-| `standard` | LLM to zh, LLM back to en, then a fact-only repair hop (`<llm>:fix`); the first two hops "translate and rewrite like a person" | yes | 8 to 14 s plus one repair call |
-| `strong` | LLM to zh, LLM back to en; no repair hop | yes | 8 to 14 s |
+| `standard` | LLM to zh, LLM back to en, then a fact-only repair hop (`<llm>:fix`); the first two hops "translate and rewrite like a person" | yes | about 70 s on opencode (three LLM calls) |
+| `strong` | LLM to zh, LLM back to en; no repair hop | yes | about 30 s on opencode |
 
 The humanize hops delete sentences that only express feelings, pledges or
 pleasantries. `standard` then repairs hard facts only: names, places, products,

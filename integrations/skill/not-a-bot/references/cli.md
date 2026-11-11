@@ -31,8 +31,8 @@ A round trip through another language that rewrites the sentences on the way. Th
 
 | Goal | Preset | Cost |
 | --- | --- | --- |
-| Humanise AI-sounding prose (default) | `--preset standard` | One LLM hop out, one back, then a fact-only repair hop on the user's Claude or OpenCode subscription, 8 to 14 s plus one call |
-| Maximum rewriting | `--preset strong` | LLM out and back, no repair hop; lowest detector score, may drop a fact (listed in `missingFacts`), 8 to 14 s |
+| Humanise AI-sounding prose (default) | `--preset standard` | One LLM hop out, one back, then a fact-only repair hop on the user's Claude or OpenCode subscription, about 70 s on opencode |
+| Maximum rewriting | `--preset strong` | LLM out and back, no repair hop; lowest detector score, may drop a fact (listed in `missingFacts`), about 30 s |
 | Speed, or no subscription | `--preset light` | Free, about 1 s; changes words, keeps sentence structure |
 
 `claude-cli` and `opencode-cli` run the local CLI, need no API key and never join the automatic chain; `rewrite_llm` (default `opencode-cli`) picks the engine for `standard` and `strong`. Measured on 10 texts, one run: `light` left 5 of 10 structural tells and lost 5 facts; `standard` left 0 and lost 0; `strong` left 0 or 1 and lost 1. Humanize hops delete sentences that only express feelings, pledges or pleasantries; the repair hop restores hard facts only (names, numbers, dates, IDs, code, negations) and never those sentences. `standard` and `strong` need an LLM `rewrite_llm`, else `INVALID_INPUT`. No preset makes text undetectable by AI detectors; do not promise that.

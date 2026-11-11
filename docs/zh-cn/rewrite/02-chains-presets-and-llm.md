@@ -38,8 +38,8 @@ not-a-bot rewrite "<text>" --from en --chain "opencode-cli:zh,google:ja,edge:en"
 | 预设 | 跳（英文原文） | 需要订阅 | 典型延迟 |
 | --- | --- | --- | --- |
 | `light` | zh、ja、en：出去两跳机器翻译 | 否 | 约 1 秒 |
-| `standard` | LLM 译到 zh，LLM 再回 en，最后一次只修事实的修复跳（`<llm>:fix`）；前两跳"像人一样翻译并改写" | 是 | 8 到 14 秒，另加一次修复调用 |
-| `strong` | LLM 到 zh，LLM 再回 en；没有修复跳 | 是 | 8 到 14 秒 |
+| `standard` | LLM 译到 zh，LLM 再回 en，最后一次只修事实的修复跳（`<llm>:fix`）；前两跳"像人一样翻译并改写" | 是 | opencode 上约 70 秒（三次 LLM 调用） |
+| `strong` | LLM 到 zh，LLM 再回 en；没有修复跳 | 是 | opencode 上约 30 秒 |
 
 人性化跳会删掉只表达感受、承诺或客套的句子。`standard` 随后只修硬事实：名字、地点、产品、数字、日期、金额、币种、ID、版本、路径、代码片段、否定和限定词。修复跳会拿到事实检查列出的缺失片段，并且从不恢复被删的感受或承诺句。`strong` 不带修复跳：改写最远，检测器分数最低，但可能丢一条事实，`missingFacts` 一定会报告。`standard` 和 `strong` 需要 LLM 引擎：`rewrite_llm` 不是 LLM 引擎时返回 `INVALID_INPUT`。
 
