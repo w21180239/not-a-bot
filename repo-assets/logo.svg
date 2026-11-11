@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="not-a-bot logo">
+  <title>not-a-bot</title>
+  <path d="M28 12h72c11 0 20 9 20 20v48c0 11-9 20-20 20H58L34 118c-2 1.7-5 .4-5-2.1V100h-1C17 100 8 91 8 80V32c0-11 9-20 20-20z" fill="#4F46E5"/>
+  <g fill="#FFFFFF">
+    <rect x="28" y="34" width="62" height="8" rx="4"/>
+    <rect x="28" y="52" width="72" height="8" rx="4"/>
+    <rect x="28" y="70" width="34" height="8" rx="4"/>
+  </g>
+  <rect x="68" y="64" width="7" height="20" rx="2" fill="#FBBF24"/>
+</svg>
