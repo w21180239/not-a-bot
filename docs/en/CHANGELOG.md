@@ -2,7 +2,7 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-11-11
 
 not-a-bot continues translatex 0.3.0 under a new name. Nothing else changed in behaviour except the default preset.
 
