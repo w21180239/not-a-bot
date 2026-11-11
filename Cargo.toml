@@ -1,6 +1,6 @@
 [package]
 name = "translatex"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.89"
 description = "Free translation CLI for AI agents: no API key, no signup, no config. 26 providers raced in parallel, structured JSON, key rotation, de-AI rewriting."

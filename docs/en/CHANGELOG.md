@@ -8,9 +8,22 @@ Documentation history. Application changes are recorded here as well while the p
 
 - `roundtrip --scorer "<command>"` (config `roundtrip_scorer`): an external detector gets each result on stdin and prints a score from 0 to 1 (higher = more AI-like) as its last stdout line. Run without a shell, bounded by `--timeout-ms`; a failing scorer adds a warning and leaves the run unscored.
 - `roundtrip --best-of 1-5`: runs the chain N times and keeps the run with no missing facts (else the fewest), then the lowest score. Above 1 it needs a scorer.
-- `roundtrip --target-score 0-1`: after the requested chain, tries each preset of `roundtrip_ladder` (default `llm,lynote-fix`) until the best run scores at or below the target, else returns the best run with a `target score not met` warning.
+- `roundtrip --target-score 0-1`: after the requested chain, tries each preset of `roundtrip_ladder` (default `standard,strong`) until the best run scores at or below the target, else returns the best run with a `target score not met` warning.
 - Response fields `score`, `scorer` (program name only) and `candidates` (per run: `presetOrChain`, `score`, `missingFacts` count). Request fields `scorer`, `bestOf`, `targetScore`.
-- `benches/roundtrip-depth/measure.py --scorer CMD` adds "detector src" and "detector out" columns, and configurations `llm-best3` and `llm-target`.
+- `benches/roundtrip-depth/measure.py --scorer CMD` adds "detector src" and "detector out" columns, and configurations `standard-best3` and `standard-target`.
+
+### Changed (breaking)
+
+- Roundtrip presets are named by strength: `mt` is now `light` (two machine-translation hops, the default), `llm` is now `standard` (LLM out and back), and the preset that ended in a repair hop is now `strong` (LLM hops into zh and ja, machine-translation hops through fi and back, then a repair hop). Old names are rejected with `INVALID_INPUT` listing `light, standard, strong`; no aliases are kept.
+- Config `roundtrip_preset` defaults to `light` and `roundtrip_ladder` to `["standard", "strong"]`. Update any config or `TRANSLATEX_ROUNDTRIP_PRESET` that holds an old name.
+
+### Removed
+
+- The three-hop machine-translation preset `mt-deep` and the preset that ran the strong chain without its repair hop. In the benchmark a third machine-translation hop lost more facts than two, and the chain without the repair hop lost 3 to 5 facts against 1. `--depth 1-3` and `--chain` still build such chains by hand.
+
+### Changed
+
+- `benches/roundtrip-depth/measure.py` names configurations after the new presets (`light-d1`, `light`, `standard-claude`, `standard-opencode`, `strong-claude`, `strong-opencode`) and gains `--langs` (default `en`) to filter corpus rows. Rows already in `results.jsonl` under old names stay readable and are not migrated.
 
 ## 0.2.0 — 2026-11-11
 

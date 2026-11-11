@@ -55,7 +55,7 @@ pub struct RoundtripRequest {
     /// Machine-translation hops before returning: 1-3 (zh, ja, fi; en, ja, fi for Chinese).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depth: Option<u8>,
-    /// Built-in chain: `mt`, `mt-deep`, `llm`, `lynote`, `lynote-fix`.
+    /// Built-in chain: `light`, `standard`, `strong`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preset: Option<String>,
     /// Provider for hops without an engine.

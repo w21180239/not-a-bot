@@ -1,6 +1,6 @@
 {
   "name": "translatex",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Humanize AI-generated text and translate from the command line: LLM round trips on your Claude or OpenCode subscription with a fact check, plus 28 translation engines (14 free, no API key). JSON output, one binary.",
   "license": "MIT OR Apache-2.0",
   "author": "w21180239",
@@ -44,11 +44,11 @@
     "README.md"
   ],
   "optionalDependencies": {
-    "translatex-darwin-arm64": "0.2.0",
-    "translatex-darwin-x64": "0.2.0",
-    "translatex-linux-arm64": "0.2.0",
-    "translatex-linux-x64": "0.2.0",
-    "translatex-windows-x64": "0.2.0"
+    "translatex-darwin-arm64": "0.3.0",
+    "translatex-darwin-x64": "0.3.0",
+    "translatex-linux-arm64": "0.3.0",
+    "translatex-linux-x64": "0.3.0",
+    "translatex-windows-x64": "0.3.0"
   },
   "engines": {
     "node": ">=18"

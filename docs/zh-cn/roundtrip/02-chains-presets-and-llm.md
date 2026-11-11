@@ -31,24 +31,22 @@ translatex roundtrip "<text>" --from en --chain "opencode-cli:zh,google:ja,edge:
 
 中文原文用 en 代替 zh：depth 3 为 en、ja、fi，再回到中文。
 
-优先级，先匹配者生效：`--chain`、`--preset`、`--depth`、`--pivot`，最后是配置里的 `roundtrip_preset`（默认 `mt`）。
+优先级，先匹配者生效：`--chain`、`--preset`、`--depth`、`--pivot`，最后是配置里的 `roundtrip_preset`（默认 `light`）。
 
 ## 预设
 
 | 预设 | 跳（英文原文） | 需要订阅 | 典型延迟 |
 | --- | --- | --- | --- |
-| `mt`（默认） | zh、ja、en：出去两跳机器翻译 | 否 | 约 1 秒 |
-| `mt-deep` | zh、ja、fi、en：出去三跳 | 否 | 约 1 秒 |
-| `llm` | LLM 译到 zh，LLM 再回 en；两跳都"像人一样翻译并改写" | 是 | 8 到 14 秒 |
-| `lynote` | LLM 到 zh，LLM 到 ja（带上一步作为历史），google 到 fi，edge 回 en | 是 | 约 20 秒 |
-| `lynote-fix` | `lynote` 加最后一次修复跳 | 是 | 约 25 秒 |
+| `light`（默认） | zh、ja、en：出去两跳机器翻译 | 否 | 约 1 秒 |
+| `standard` | LLM 译到 zh，LLM 再回 en；两跳都"像人一样翻译并改写" | 是 | 8 到 14 秒 |
+| `strong` | LLM 到 zh，LLM 到 ja（带上一步作为历史），google 到 fi，edge 回 en，最后一次修复跳 | 是 | 约 25 秒 |
 
-`lynote` 沿用 [lynote-ai/humanize-text](https://github.com/lynote-ai/humanize-text) 公开的顺序。该项目明确说没有任何方法能让文本稳定地检测不出，translatex 同样不做这个承诺。目标是读起来像人写的文字，同时事实不丢。
+`strong` 用 LLM 跳把文本送进相距较远的语言，再加机器翻译跳，最后用修复跳补回改写时丢掉的事实。没有任何方法能让文本稳定地检测不出，translatex 也不做这个承诺。目标是读起来像人写的文字，事实保持不变。`--depth 1-3` 和 `--chain` 可以手动搭出其他链。其他预设名会返回 `INVALID_INPUT`，并列出 `light, standard, strong`。
 
 默认值写在 `config.toml`：
 
 ```toml
-roundtrip_preset = "llm"       # 默认：mt
+roundtrip_preset = "standard"  # 默认：light
 roundtrip_llm = "claude-cli"   # 默认：opencode-cli
 ```
 
@@ -86,7 +84,7 @@ bin = "opencode"
 
 ## 修复跳
 
-`<llm>:fix`（如 `opencode-cli:fix`，或 `lynote-fix` 的最后一跳）让文本留在当前语言，只请 LLM 返回一个 JSON 小编辑列表，而不是一份新文本：
+`<llm>:fix`（如 `opencode-cli:fix`，或 `strong` 的最后一跳）让文本留在当前语言，只请 LLM 返回一个 JSON 小编辑列表，而不是一份新文本：
 
 ```json
 [{"from": "Aloha's team", "to": "Aroha's team", "why": "name respelled"}]
@@ -110,7 +108,7 @@ translatex 只应用精确且很小的编辑：
 
 跳过的原因包括 `from not found`、`from not unique`、`no change`、`to too long for from` 和 `copies the original back`。
 
-在下面的语料上，修复跳把 `lynote` 的事实丢失从 3 到 5 个降到 1 个，并保留了大部分改写。
+在下面的语料上，修复跳把没有它的同一条链的事实丢失从 3 到 5 个降到 1 个，并保留了大部分改写。
 
 ## 事实检查
 
@@ -136,20 +134,20 @@ LLM 跳从不回退：换一个模型会改变结果，所以失败时直接返�
 LLM 跳每次输出都不一样，所以再跑一次可能读起来不同。配上打分器后，translatex 按检测器分数在多次运行之间挑选，但有一条硬规则：保住全部事实的运行永远胜过丢了事实的运行，分数再低也不行。它用来做 benchmark 和调 preset；本地检测器每次调用都要加载模型，放在实时请求里太慢太重。
 
 ```bash
-translatex roundtrip "<text>" --from en --preset llm --best-of 3 --scorer "python score.py" --format json
+translatex roundtrip "<text>" --from en --preset standard --best-of 3 --scorer "python score.py" --format json
 translatex roundtrip "<text>" --from en --target-score 0.4 --scorer "python score.py" --format json
 ```
 
 - `--scorer "<command>"`（配置项 `roundtrip_scorer`）：translatex 把每个结果写进该命令的 stdin，从 stdout 最后一个非空行读一个 0 到 1 的分数（越高越像 AI）。命令按词切分（引号成组，反斜杠保持原样），不经过 shell；`PATH` 上的程序按 CLI provider 的同一套规则解析，包括 `.cmd` 包装脚本。每次调用的时限是 `--timeout-ms`，但不少于 120 秒，因为本地检测器每次调用都要加载模型。
 - 打分器失败、超时，或输出的不是 [0, 1] 内的数字时，加一条 `scorer: run <n> (<preset>) unscored: <reason>` 警告，这次运行记为未打分。所有运行都没有分数时，结果与不配打分器相同。
 - `--best-of N`（1-5，默认 1）把规划好的链独立跑 N 次。挑选顺序：先看没有丢事实的（都丢了就看丢得最少的），再看分数最低的，未打分的排在已打分的后面。N 大于 1 时必须配打分器，否则返回 `INVALID_INPUT`。
-- `--target-score X`（0-1，需要打分器）：先跑请求的链（带上 `--best-of`），再依次跑 `roundtrip_ladder`（默认 `["llm", "lynote-fix"]`）里还没试过的预设。只要目前最好的运行分数不高于 X 就停下；全部试完仍未达到，就返回总体最好的运行，并加一条 `target score not met` 警告。
+- `--target-score X`（0-1，需要打分器）：先跑请求的链（带上 `--best-of`），再依次跑 `roundtrip_ladder`（默认 `["standard", "strong"]`）里还没试过的预设。只要目前最好的运行分数不高于 X 就停下；全部试完仍未达到，就返回总体最好的运行，并加一条 `target score not met` 警告。
 
 响应新增 `score`（选中运行的分数，没有可用打分器时为 `null`）、`scorer`（程序名，不含参数），运行多于一次时还有 `candidates`：每次运行一条 `{presetOrChain, score, missingFacts}`，其中 `missingFacts` 是个数。只返回选中运行的文本和各跳。
 
 ```toml
 roundtrip_scorer = "python score.py"
-roundtrip_ladder = ["llm", "lynote-fix"]
+roundtrip_ladder = ["standard", "strong"]
 ```
 
 分数只是某一个检测器对某一段文本的测量结果。汇报时注明检测器名称；换一个检测器结论可能不同，分数低也不代表文本无法被检测出来。
@@ -158,10 +156,10 @@ roundtrip_ladder = ["llm", "lynote-fix"]
 
 | 场景 | 选择 |
 | --- | --- |
-| 把 AI 味的文字改得像人写的，事实不丢 | `--preset llm` |
-| 改写力度最大，少量事实可以交给修复跳补 | `--preset lynote-fix` |
-| 没有订阅，或者要快 | `mt`（默认） |
-| 机器翻译，再多改写一点 | `mt-deep`；事实丢失涨得比改写快 |
+| 把 AI 味的文字改得像人写的，事实不丢 | `--preset standard` |
+| 改写力度最大，少量事实可以交给修复跳补 | `--preset strong` |
+| 没有订阅，或者要快 | `--preset light`（默认） |
+| 机器翻译，再多改写一点 | `--depth 3`；事实丢失涨得比改写快 |
 | 带代码或 URL 的文本 | 任何预设都加 `--preserve @code --preserve @url` |
 | 合同、法律、读者要核对的数字 | 不要往返 |
 

@@ -5,7 +5,7 @@ Runs each corpus text through every configuration with `translatex roundtrip` an
 results.jsonl and summary.md to --out. With --scorer, also scores source and output with
 that detector command (text on stdin, score 0-1 on the last stdout line).
 
-Usage: python benches/roundtrip-depth/measure.py [--bin PATH] [--out DIR] [--configs mt,llm]
+Usage: python benches/roundtrip-depth/measure.py [--bin PATH] [--out DIR] [--configs light,standard-opencode] [--langs en]
        [--sleep 0.4] [--scorer CMD] [--target 0.5]
 """
 import argparse, json, os, re, shutil, subprocess, sys, time
@@ -15,21 +15,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 # name -> extra roundtrip arguments; {scorer} and {target} come from the flags
 CONFIGS = {
-    "mt-d1": ["--depth", "1"],
-    "mt": ["--preset", "mt"],  # default: 2 MT hops
-    "mt-deep": ["--preset", "mt-deep"],
-    "mt-deep-mixed": ["--chain", "google:{piv},edge:ja,google:fi,edge:{src}"],
-    "llm-claude": ["--chain", "claude-cli:{piv},claude-cli:{src}"],
-    "llm-opencode": ["--chain", "opencode-cli:{piv},opencode-cli:{src}"],
-    "lynote-claude": ["--chain", "claude-cli:{piv},claude-cli:ja,google:fi,edge:{src}"],
-    "lynote-opencode": ["--chain", "opencode-cli:{piv},opencode-cli:ja,google:fi,edge:{src}"],
-    "mt-fix-claude": ["--chain", "{piv},{src},claude-cli:fix"],
-    "lynote-fix-claude": ["--chain", "claude-cli:{piv},claude-cli:ja,google:fi,edge:{src},claude-cli:fix"],
-    "lynote-fix-opencode": ["--chain", "opencode-cli:{piv},opencode-cli:ja,google:fi,edge:{src},opencode-cli:fix"],
-    "mt-then-llm-claude": ["--chain", "edge:{piv},google:ja,claude-cli:{src}"],
-    "mt-then-llm-opencode": ["--chain", "edge:{piv},google:ja,opencode-cli:{src}"],
-    "llm-best3": ["--preset", "llm", "--best-of", "3", "--scorer", "{scorer}"],
-    "llm-target": ["--preset", "llm", "--target-score", "{target}", "--scorer", "{scorer}"],
+    "light-d1": ["--depth", "1"],
+    "light": ["--preset", "light"],  # default: 2 MT hops
+    "standard-claude": ["--chain", "claude-cli:{piv},claude-cli:{src}"],
+    "standard-opencode": ["--chain", "opencode-cli:{piv},opencode-cli:{src}"],
+    "strong-claude": ["--chain", "claude-cli:{piv},claude-cli:ja,google:fi,edge:{src},claude-cli:fix"],
+    "strong-opencode": ["--chain", "opencode-cli:{piv},opencode-cli:ja,google:fi,edge:{src},opencode-cli:fix"],
+    "light-fix-claude": ["--chain", "{piv},{src},claude-cli:fix"],
+    "light-then-llm-claude": ["--chain", "edge:{piv},google:ja,claude-cli:{src}"],
+    "light-then-llm-opencode": ["--chain", "edge:{piv},google:ja,opencode-cli:{src}"],
+    "standard-best3": ["--preset", "standard", "--best-of", "3", "--scorer", "{scorer}"],
+    "standard-target": ["--preset", "standard", "--target-score", "{target}", "--scorer", "{scorer}"],
 }
 PRESERVE = "@code"  # named pattern: survives Windows .cmd shims
 STOP = set("a an the of to in on for and or is are was were be been it its it's this that with as at by from "
@@ -134,10 +130,11 @@ def main():
     ap.add_argument("--bin", default=shutil.which("translatex") or "translatex")
     ap.add_argument("--out", default=os.path.join(HERE, "out"))
     ap.add_argument("--configs", default=None, help="default: all; scorer configs only with --scorer")
+    ap.add_argument("--langs", default="en", help="comma-separated corpus languages to run and summarise")
     ap.add_argument("--sleep", type=float, default=0.4)
     ap.add_argument("--timeout", type=int, default=600)
     ap.add_argument("--scorer", default=None, help="detector command: text on stdin, score 0-1 on the last line")
-    ap.add_argument("--target", type=float, default=0.5, help="--target-score for llm-target")
+    ap.add_argument("--target", type=float, default=0.5, help="--target-score for standard-target")
     a = ap.parse_args()
     if a.configs:
         names = a.configs.split(",")
@@ -149,6 +146,10 @@ def main():
     fill = {"{scorer}": a.scorer or "", "{target}": str(a.target)}
     os.makedirs(a.out, exist_ok=True)
     cases = [json.loads(l) for l in open(os.path.join(HERE, "corpus.jsonl"), encoding="utf-8") if l.strip()]
+    langs = [x.strip() for x in a.langs.split(",") if x.strip()]
+    cases = [c for c in cases if c["lang"] in langs]
+    if not cases:
+        sys.exit(f"--langs {a.langs}: no corpus text in these languages")
     by_id = {c["id"]: c for c in cases}
     src_scores = {}
 
@@ -187,12 +188,14 @@ def main():
                 f.flush()
                 time.sleep(a.sleep)
                 print(f"{name} {c['id']} {'ERR ' + str(res.get('error')) if 'error' in res else 'ok'}", file=sys.stderr)
-    L = ["| config | ok | overlap (lower = more rewrite) | length change | missing facts (guard) | stock phrases kept"
+    shown = [r for r in rows if r["lang"] in langs]  # resumed rows may hold other languages
+    L = [f"Languages: {', '.join(langs)} ({len(cases)} texts per configuration)", "",
+         "| config | ok | overlap (lower = more rewrite) | length change | missing facts (guard) | stock phrases kept"
          " | detector src | detector out | latency |",
          "|---|---|---|---|---|---|---|---|---|"]
     for name in names:
-        g = [r for r in rows if r["config"] == name and "text" in r]
-        n = len([r for r in rows if r["config"] == name])
+        g = [r for r in shown if r["config"] == name and "text" in r]
+        n = len([r for r in shown if r["config"] == name])
         if not g:
             L.append(f"| {name} | 0/{n} | | | | | | | |")
             continue

@@ -49,9 +49,9 @@ pub struct Settings {
     /// Default pivot for `roundtrip` when the request says `auto`.
     pub roundtrip_pivot: Option<String>,
     /// Default `roundtrip` preset when the request names no chain, preset,
-    /// depth or pivot (`mt`, `mt-deep`, `llm`, `lynote`).
+    /// depth or pivot (`light`, `standard`, `strong`).
     pub roundtrip_preset: Option<String>,
-    /// Engine behind the LLM hops of the `llm` and `lynote` presets.
+    /// Engine behind the LLM hops of the `standard` and `strong` presets.
     pub roundtrip_llm: Option<String>,
     /// Detector command for roundtrip candidates (see `RoundtripRequest::scorer`).
     pub roundtrip_scorer: Option<String>,
@@ -156,7 +156,7 @@ impl Settings {
             .as_deref()
             .map(|p| p.trim().to_lowercase())
             .filter(|p| !p.is_empty())
-            .unwrap_or_else(|| "mt".to_string())
+            .unwrap_or_else(|| "light".to_string())
     }
 
     /// Engine for preset LLM hops.
@@ -181,7 +181,7 @@ impl Settings {
     pub fn roundtrip_ladder(&self) -> Vec<String> {
         self.roundtrip_ladder
             .clone()
-            .unwrap_or_else(|| vec!["llm".into(), "lynote-fix".into()])
+            .unwrap_or_else(|| vec!["standard".into(), "strong".into()])
             .into_iter()
             .map(|p| p.trim().to_lowercase())
             .filter(|p| !p.is_empty())
@@ -226,10 +226,10 @@ pub const CONFIG_TEMPLATE: &str = r#"# translatex config
 # retries = 2
 # race_width = 3   # provider attempts in flight; 1 is strictly sequential
 # roundtrip_pivot = "zh"   # "auto" picks zh for non-Chinese text, en for Chinese
-# roundtrip_preset = "mt"  # mt (2 MT hops) | mt-deep (3) | llm | lynote | lynote-fix
+# roundtrip_preset = "light"  # light (2 MT hops) | standard (LLM out and back) | strong
 # roundtrip_llm = "opencode-cli"   # engine for preset LLM hops: opencode-cli | claude-cli
 # roundtrip_scorer = "python score.py"   # detector: text on stdin, score 0-1 on the last stdout line
-# roundtrip_ladder = ["llm", "lynote-fix"]   # presets tried when --target-score is not met
+# roundtrip_ladder = ["standard", "strong"]   # presets tried when --target-score is not met
 # log = "warn"
 
 # [provider.googlecloud]

@@ -132,7 +132,7 @@ pub enum Command {
         #[arg(long, value_parser = clap::value_parser!(u8).range(1..=3))]
         depth: Option<u8>,
 
-        /// Built-in chain: mt (2 MT hops), mt-deep (3), llm, lynote, lynote-fix.
+        /// Built-in chain: light (2 MT hops), standard (LLM out and back), strong (LLM hops, MT hops, repair).
         #[arg(long)]
         preset: Option<String>,
 

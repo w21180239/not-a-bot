@@ -49,7 +49,7 @@ One provider is registered but never selected automatically:
 | Provider | Why | How to use it |
 | --- | --- | --- |
 | `reverso` | Cloudflare rejects this client's TLS fingerprint, so the attempt fails at the handshake every time | `--provider reverso`, `--fallback reverso`, or listing it in `chain` |
-| `claude-cli`, `opencode-cli` | Slow, and each call spends subscription quota | Name them: a `roundtrip` hop (`claude-cli:zh`), a preset (`llm`, `lynote`), `--provider`, `--fallback` or `chain` |
+| `claude-cli`, `opencode-cli` | Slow, and each call spends subscription quota | Name them: a `roundtrip` hop (`claude-cli:zh`), a preset (`standard`, `strong`), `--provider`, `--fallback` or `chain` |
 
 `DEFAULT_EXCLUDED` in `src/providers/mod.rs` is the skip list. The registry never appends those providers by priority; naming one anywhere — pinned, fallback or configured chain — still attempts it, and `translatex providers` still lists it.
 

@@ -27,8 +27,8 @@ translatex --version        # missing? npm install -g translatex, or cargo insta
 | The user wants | Run |
 | --- | --- |
 | Text in another language | `translatex translate "<text>" -t <lang> --format json` |
-| The same language, humanised (AI-sounding prose rewritten to read like a person) | `translatex roundtrip "<text>" --from <lang> --preset llm --preserve @code --format json` |
-| The same language, quickly and with no subscription | `translatex roundtrip "<text>" --from <lang> --format json` (default `mt`) |
+| The same language, humanised (AI-sounding prose rewritten to read like a person) | `translatex roundtrip "<text>" --from <lang> --preset standard --preserve @code --format json` |
+| The same language, quickly and with no subscription | `translatex roundtrip "<text>" --from <lang> --format json` (default `light`) |
 | Many strings | `translatex batch --file jobs.ndjson --format json` |
 | To know what can serve a pair | `translatex providers --format json` |
 | To know whether anything is broken | `translatex health --format json` |
@@ -42,8 +42,8 @@ happened. A round trip also returns `chain`, `hops`, `missingFacts` and
 | Task | Do |
 | --- | --- |
 | Translate into language L | `translate -t L` |
-| Humanise text that is already in L | `roundtrip --from L --preset llm` |
-| Translate into L **and** humanise it | `translate -t L` first, then `roundtrip --from L --preset llm` on the result |
+| Humanise text that is already in L | `roundtrip --from L --preset standard` |
+| Translate into L **and** humanise it | `translate -t L` first, then `roundtrip --from L --preset standard` on the result |
 
 `roundtrip` returns text in the language it started from, so it can only humanise
 the target language once the text is already in it.
@@ -55,7 +55,7 @@ for that only when the user names translatex or asks for a round trip, and then:
 
 1. Run the humanizer skill first. It restructures the text and audits every fact
    against the source.
-2. Round-trip its output with a preset from the table below (`--preset llm` by
+2. Round-trip its output with a preset from the table below (`--preset standard` by
    default).
 3. Hand the result back to the humanizer audit: compare it with the original
    source (its `lint.py --source` where available) and look for structural tells
@@ -67,23 +67,23 @@ Without a humanizer skill, use the round trip on its own as described here.
 
 | Goal | Preset | Cost |
 | --- | --- | --- |
-| Humanise AI-sounding prose (default choice) | `--preset llm` | One LLM hop out and one back on the user's Claude or OpenCode subscription, 8 to 14 s |
-| Maximum rewriting | `--preset lynote-fix` | About 25 s; LLM hops, machine-translation hops, then a repair hop |
-| Speed, or no subscription | `mt` (default), `mt-deep` | Free, about 1 s; changes words, keeps sentence structure |
+| Humanise AI-sounding prose (default choice) | `--preset standard` | One LLM hop out and one back on the user's Claude or OpenCode subscription, 8 to 14 s |
+| Maximum rewriting | `--preset strong` | About 25 s; LLM hops, machine-translation hops, then a repair hop |
+| Speed, or no subscription | `--preset light` (default) | Free, about 1 s; changes words, keeps sentence structure |
 
 `claude-cli` and `opencode-cli` run the local CLI, need no API key and never join
 the automatic chain; `roundtrip_llm` (default `opencode-cli`) picks the engine for
-`llm` and `lynote`. Measured on 10 texts, one run: `mt` left 5 of 10 structural
-tells and lost 5 facts; `llm` left 0 and lost 0; `lynote-fix` left 0 or 1 and
+`standard` and `strong`. Measured on 10 texts, one run: `light` left 5 of 10 structural
+tells and lost 5 facts; `standard` left 0 and lost 0; `strong` left 0 or 1 and
 lost 1. No preset makes text undetectable by AI detectors; do not promise that.
 
 ## The boundary: wording versus content
 
-The machine-translation presets (`mt`, `mt-deep`, `--depth`, `--pivot`) rewrite
+The machine-translation chains (`light`, `--depth`, `--pivot`) rewrite
 wording and keep the sentences. An opener like "In today's fast-paced digital
 landscape", a hedge like "it's important to note", and a scaffold like "not just
-X but Y" survive them in every language. The LLM presets (`llm`, `lynote`,
-`lynote-fix`) rebuild the sentences and remove most of these.
+X but Y" survive them in every language. The LLM presets (`standard`,
+`strong`) rebuild the sentences and remove most of these.
 
 When the user asks for that filler to be gone:
 
@@ -116,24 +116,24 @@ did not see.
    (names, numbers, IDs, URLs and code spans of the source that are absent from
    the result) and `warnings` (`fact check:`, `preserve:`, engine fallback), and
    tell the user about every entry. If `missingFacts` is not empty, restore the
-   token by hand or re-run with `--preset lynote-fix`, whose repair hop restores
+   token by hand or re-run with `--preset strong`, whose repair hop restores
    lost facts. Add `--verbose` only when debugging a failure.
 
 ## Round trip options
 
-- `--preset mt|mt-deep|llm|lynote|lynote-fix`, `--depth 1-3` (machine translation only), `--chain "<[engine:]lang,...>"`, `--pivot <lang>`. First match wins in that order, then the configured `roundtrip_preset` (default `mt`, two machine-translation hops).
+- `--preset light|standard|strong`, `--depth 1-3` (machine translation only), `--chain "<[engine:]lang,...>"`, `--pivot <lang>`. First match wins in that order, then the configured `roundtrip_preset` (default `light`, two machine-translation hops).
 - Default pivot: Chinese for non-Chinese text, English for Chinese text.
 - `--pivot ja` rewrites as strongly and keeps more grammar; the better choice
   for technical English that must stay precise.
-- A third machine-translation hop (`mt-deep`) loses more facts than it gains in
-  rewriting; prefer `llm` over it.
+- A third machine-translation hop (`--depth 3`) loses more facts than it gains in
+  rewriting; prefer `standard` over it.
 - Scoring is for benchmarking and tuning presets, not for live requests: a
   local detector loads a model on every call. Pass these flags only when the
   user asks for a scored run. `--scorer "<command>"` (or config
   `roundtrip_scorer`) scores each result with a detector the user supplies: text on stdin, a 0-1 score (higher = more
   AI-like) on the last stdout line. `--best-of 1-5` keeps the run with no
   missing facts, then the lowest score; `--target-score 0-1` climbs
-  `roundtrip_ladder` (default `llm,lynote-fix`) until the score is at or below
+  `roundtrip_ladder` (default `standard,strong`) until the score is at or below
   the target. Both need a scorer. Read `score`, `scorer` and `candidates`, and
   report the score with the detector's name; a `target score not met` or
   `scorer: ... unscored` warning goes to the user too.
@@ -167,7 +167,7 @@ Retry only when `retryable` is `true`.
 | --- | --- |
 | "It's one short sentence, faster to translate myself" | The tool answers in ~300 ms and the user gets a provider they can audit. |
 | "I'll paraphrase to remove the AI tone" | Deleting filler *before* translating is editing; inventing the translation is not. Do the first, never the second. |
-| "Roundtrip will remove the AI opener" | Machine-translation presets keep the sentences. Use `--preset llm`, or delete the opener and report that you did. |
+| "Roundtrip will remove the AI opener" | Machine-translation presets keep the sentences. Use `--preset standard`, or delete the opener and report that you did. |
 | "`missingFacts` is empty, so the text is safe" | It is a heuristic. For numbers and names the user will check, do not round-trip. |
 | "The text now passes AI detectors" | A `score` is one detector's measurement of one text; other detectors can disagree. Report the score per detector, say the text reads more like a person wrote it, and stop there. |
 | "The user didn't ask for a command" | They asked for a translation. The command is how this workspace produces one. |

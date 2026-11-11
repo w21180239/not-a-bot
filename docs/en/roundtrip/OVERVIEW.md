@@ -16,18 +16,20 @@ cannot reuse the original phrasing, so translating back produces new wording.
 With machine-translation hops that rewrite is a side effect. With LLM hops it is
 the instruction: each hop translates and rewrites the way a person would. The
 result reads less like generated text, with names, numbers and code checked
-against the source.
+against the source. The main use is English copy: AI-sounding English goes out
+through Chinese and back, and the `standard` and `strong` presets are tuned and
+measured on it. Chinese text works with the same presets.
 
 ## What each kind of hop does
 
 | Hop | Changes | Keeps | Cost |
 | --- | --- | --- | --- |
-| Machine translation (default `mt`) | Words | Sentence structure, so "not just X, it's Y" survives | Free, about 1 s |
-| LLM (`llm`, `lynote`) | Words and sentence structure; removes the structural tells | Facts, checked by the fact guard | Your Claude or OpenCode subscription, 8 to 28 s |
+| Machine translation (default `light`) | Words | Sentence structure, so "not just X, it's Y" survives | Free, about 1 s |
+| LLM (`standard`, `strong`) | Words and sentence structure; removes the structural tells | Facts, checked by the fact guard | Your Claude or OpenCode subscription, 8 to 28 s |
 | Repair (`<llm>:fix`) | A few exact edits that restore lost facts or meaning | The rewrite | One more LLM call |
 
-Measured on 10 texts, one run: the default `mt` left 5 of 10 tells and lost 5
-facts; `llm` left 0 tells and lost 0 facts. Details and the full table:
+Measured on 10 texts, one run: the default `light` left 5 of 10 tells and lost 5
+facts; `standard` left 0 tells and lost 0 facts. Details and the full table:
 [01-pivot-choice.md](01-pivot-choice.md#choosing-the-depth).
 
 The goal is prose that reads like a person wrote it, with the facts intact.
@@ -65,21 +67,21 @@ so the intermediates can be audited.
 
 ```bash
 translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
-translatex roundtrip "…" --from en --preset llm              # LLM out and back (needs claude-cli or opencode-cli)
-translatex roundtrip "…" --from en --preset lynote-fix       # strongest rewrite, plus a repair hop
+translatex roundtrip "…" --from en --preset standard              # LLM out and back (needs claude-cli or opencode-cli)
+translatex roundtrip "…" --from en --preset strong       # strongest rewrite, plus a repair hop
 translatex roundtrip "…" --from en --depth 3                 # zh -> ja -> fi -> en, machine translation only
 translatex roundtrip "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
 translatex roundtrip --from en --pivot ja < draft.md         # alias: translatex polish
-translatex roundtrip "Run \`make test\`" --from en --preset llm --preserve @code
+translatex roundtrip "Run \`make test\`" --from en --preset standard --preserve @code
 ```
 
 Hop selection, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, then
-the configured `roundtrip_preset` (default `mt`).
+the configured `roundtrip_preset` (default `light`).
 
 | Flag | Meaning |
 | --- | --- |
 | `--chain "<[engine:]lang,...>"` | Explicit hops; a final hop back to the source is appended when missing |
-| `--preset <name>` | `mt` (default), `mt-deep`, `llm`, `lynote`, `lynote-fix` |
+| `--preset <name>` | `light` (default), `standard`, `strong` |
 | `--depth 1-3` | Machine translation only, through zh, ja, fi (Chinese sources: en, ja, fi) |
 | `--pivot <lang>` | One bridge language, or `auto` |
 | `--preserve <pattern>` | Regex, or the named patterns `@code` and `@url` |
@@ -121,7 +123,7 @@ described in [02-chains-presets-and-llm.md](02-chains-presets-and-llm.md).
 ## Pivot selection
 
 `pivot: "auto"` uses Chinese for non-Chinese input and English for Chinese
-input, and is the first hop of the default `mt` preset.
+input, and is the first hop of the default `light` preset.
 [01-pivot-choice.md](01-pivot-choice.md) has the measurements behind that
 choice and the cases where Japanese is better.
 
@@ -130,7 +132,7 @@ Override per request with `--pivot` / `"pivot"`, or for every request with
 
 ## Cost
 
-One round trip costs one provider call per hop: three for the default `mt`
+One round trip costs one provider call per hop: three for the default `light`
 (more for Chinese input detected under `auto`, see
 [01-pivot-choice.md](01-pivot-choice.md#the-auto-pivot-retry)). Latency is
 roughly the sum of the hops, not the maximum. LLM hops take seconds each and

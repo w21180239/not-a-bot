@@ -64,7 +64,7 @@ returns almost the input. They are the wrong tool for this job.
 | Anything non-Chinese | `zh` | Rewrites as much as Japanese, and is served by every provider including the Chinese-anchored ones |
 | Chinese (`zh`, `zh-TW`, `yue`) | `en` | The mirror of the same rule |
 
-`auto` implements exactly that table. It is the first hop of the default `mt`
+`auto` implements exactly that table. It is the first hop of the default `light`
 preset and the only hop of `--pivot`; `--depth` adds ja and fi after it.
 
 **Japanese is the documented alternative.** It rewrites slightly more and keeps
@@ -118,29 +118,28 @@ Method, per text and configuration:
 - **Latency**: mean wall clock for the whole chain.
 
 ```bash
-python benches/roundtrip-depth/measure.py --bin target/release/translatex.exe --out out --configs mt,llm-opencode
+python benches/roundtrip-depth/measure.py --bin target/release/translatex.exe --out out --configs light,standard-opencode
 ```
 
 Results (run on 2026-11-11; 10 texts, one run per configuration):
 
 | Configuration | Overlap | Tells left (of 10) | Facts missing | Latency |
 | --- | --- | --- | --- | --- |
-| mt, 1 hop (old default) | 0.556 | 7 | 5 | 0.5 s |
-| mt, 2 hops (new default) | 0.520 | 5 | 5 | 0.9 s |
-| mt-deep, 3 hops | 0.480 | 6 | 8 | 1.1 s |
-| llm via opencode-cli (DeepSeek) | 0.446 | 0 | 0 | 14 s |
-| llm via claude-cli (Haiku) | 0.535 | 0 | 0 | 8 s |
-| lynote via claude-cli / opencode-cli | 0.292 / 0.307 | 1 / 0 | 5 / 3 | 19 / 21 s |
-| lynote-fix via claude-cli / opencode-cli | 0.369 / 0.396 | 0 / 1 | 1 / 1 | 24 / 28 s |
+| light, 1 hop (`--depth 1`, 0.1.x default) | 0.556 | 7 | 5 | 0.5 s |
+| light, 2 hops (0.3 default) | 0.520 | 5 | 5 | 0.9 s |
+| 3 machine-translation hops (`--depth 3`) | 0.480 | 6 | 8 | 1.1 s |
+| standard via opencode-cli (DeepSeek) | 0.446 | 0 | 0 | 14 s |
+| standard via claude-cli (Haiku) | 0.535 | 0 | 0 | 8 s |
+| strong via claude-cli / opencode-cli | 0.369 / 0.396 | 0 / 1 | 1 / 1 | 24 / 28 s |
 
 What the numbers say:
 
 - Machine translation changes words and keeps sentence structure, so "not just X, it's Y" survives every depth.
 - Even one machine-translation hop respells names (Aroha became Aloha, Tom became Tomi) and expands codes (NZD became "New Zealand dollars").
-- A third machine-translation hop costs more facts (8 against 5) than it gains in rewriting (overlap 0.480 against 0.520). The default moved from one hop to two; three is opt-in.
+- A third machine-translation hop costs more facts (8 against 5) than it gains in rewriting (overlap 0.480 against 0.520). The default moved from one hop to two; three hops stay available as `--depth 3`.
 - LLM hops remove the structural tells and kept every fact on this corpus.
-- Machine-translation hops placed after an LLM hop can bring a foil back: Finnish "ei ainoastaan ... vaan myös" returned as "not only ... but also". That is why `lynote` still leaves one tell in some runs.
-- The repair hop cut the fact loss of `lynote` from 3 to 5 facts to 1 and kept most of its rewrite (overlap 0.369 and 0.396 against 0.292 and 0.307).
+- Machine-translation hops placed after an LLM hop can bring a foil back: Finnish "ei ainoastaan ... vaan myös" returned as "not only ... but also". That is why the same chain without a repair hop still left one tell in some runs.
+- The repair hop cut the fact loss of that chain from 3 to 5 facts to 1 and kept most of its rewrite (overlap 0.369 and 0.396 against 0.292 and 0.307 without it). That chain with the repair hop is `strong`.
 
 Caveats: ten texts and one run per configuration is a small sample; the tell
 list and the fact guard are heuristics; overlap rewards change, not quality;

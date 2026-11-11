@@ -6,7 +6,7 @@ use crate::core::error::{Error, Result};
 use crate::core::lang::{alternate_pivot, default_pivot, is_chinese, is_known, normalize};
 use crate::core::types::RoundtripRequest;
 
-pub const PRESETS: &[&str] = &["mt", "mt-deep", "llm", "lynote", "lynote-fix"];
+pub const PRESETS: &[&str] = &["light", "standard", "strong"];
 
 /// Hop target: a language, back to the (possibly still undetected) source, or
 /// a repair pass that stays in the current language.
@@ -201,11 +201,6 @@ fn expand_preset(
 ) -> Result<Plan> {
     let name = name.trim().to_lowercase();
     let llm = settings.roundtrip_llm();
-    if let Some(base) = name.strip_suffix("-fix").filter(|b| *b == "lynote") {
-        let mut plan = expand_preset(base, source, settings, is_llm)?;
-        plan.hops.push(parse_hop(&format!("{llm}:fix"), is_llm)?);
-        return Ok(plan);
-    }
     let hop = |engine: &str, to: Target| HopSpec {
         engine: Some(engine.to_string()),
         to,
@@ -213,14 +208,14 @@ fn expand_preset(
     let lang = |code: &str| Target::Lang(code.to_string());
     let out = if is_chinese(source) { "en" } else { "zh" };
     let hops = match name.as_str() {
-        "mt" => return expand_depth(2, source, settings),
-        "mt-deep" => return expand_depth(3, source, settings),
-        "llm" => vec![hop(&llm, lang(out)), hop(&llm, Target::Source)],
-        "lynote" => vec![
+        "light" => return expand_depth(2, source, settings),
+        "standard" => vec![hop(&llm, lang(out)), hop(&llm, Target::Source)],
+        "strong" => vec![
             hop(&llm, lang(out)),
             hop(&llm, lang("ja")),
             hop("google", lang("fi")),
             hop("edge", Target::Source),
+            parse_hop(&format!("{llm}:fix"), is_llm)?,
         ],
         other => {
             return Err(Error::InvalidInput(format!(
@@ -296,15 +291,10 @@ mod tests {
     }
 
     #[test]
-    fn fix_presets_append_a_repair_pass() {
+    fn strong_preset_ends_with_a_repair_pass() {
         let mut r = req();
         let s = Settings::default();
-        r.preset = Some("mt-fix".into());
-        assert_eq!(
-            plan(&r, &s, "en", &llm).unwrap_err().code(),
-            "INVALID_INPUT"
-        );
-        r.preset = Some("lynote-fix".into());
+        r.preset = Some("strong".into());
         let p = plan(&r, &s, "zh", &llm).unwrap();
         assert_eq!(langs(&p), vec!["en", "ja", "fi", "SRC", "FIX"]);
         assert_eq!(
@@ -325,13 +315,27 @@ mod tests {
             plan(&r, &s, "en", &llm).unwrap_err().code(),
             "INVALID_INPUT"
         );
-        r.preset = Some("llm-fix".into());
-        assert_eq!(
-            plan(&r, &Settings::default(), "en", &llm)
-                .unwrap_err()
-                .code(),
-            "INVALID_INPUT"
-        );
+    }
+
+    #[test]
+    fn old_preset_names_are_rejected() {
+        let s = Settings::default();
+        for old in ["mt", "mt-deep", "llm", "mt-fix", "llm-fix"] {
+            let mut r = req();
+            r.preset = Some(old.into());
+            let err = plan(&r, &s, "en", &llm).unwrap_err();
+            assert_eq!(err.code(), "INVALID_INPUT", "{old}");
+            assert!(err.to_string().contains("light, standard, strong"), "{old}");
+        }
+    }
+
+    #[test]
+    fn default_preset_is_light() {
+        let s = Settings::default();
+        assert_eq!(s.roundtrip_preset(), "light");
+        assert_eq!(s.roundtrip_ladder(), vec!["standard", "strong"]);
+        let p = plan(&req(), &s, "en", &llm).unwrap();
+        assert_eq!(langs(&p), vec!["zh", "ja", "SRC"]);
     }
 
     fn req() -> RoundtripRequest {
@@ -430,17 +434,13 @@ mod tests {
     fn presets_expand_for_both_families() {
         let mut r = req();
         let s = Settings::default();
-        r.preset = Some("lynote".into());
+        r.preset = Some("strong".into());
         let p = plan(&r, &s, "en", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["zh", "ja", "fi", "SRC"]);
-        assert_eq!(
-            engines(&p),
-            vec!["opencode-cli", "opencode-cli", "google", "edge"]
-        );
+        assert_eq!(langs(&p), vec!["zh", "ja", "fi", "SRC", "FIX"]);
         let p = plan(&r, &s, "zh", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["en", "ja", "fi", "SRC"]);
+        assert_eq!(langs(&p), vec!["en", "ja", "fi", "SRC", "FIX"]);
 
-        r.preset = Some("llm".into());
+        r.preset = Some("standard".into());
         let s = Settings {
             roundtrip_llm: Some("opencode-cli".into()),
             ..Settings::default()
@@ -450,9 +450,7 @@ mod tests {
         assert_eq!(engines(&p), vec!["opencode-cli", "opencode-cli"]);
         assert_eq!(langs(&plan(&r, &s, "zh", &llm).unwrap()), vec!["en", "SRC"]);
 
-        r.preset = Some("mt-deep".into());
-        assert_eq!(plan(&r, &s, "en", &llm).unwrap().hops.len(), 4);
-        r.preset = Some("mt".into());
+        r.preset = Some("light".into());
         assert_eq!(
             langs(&plan(&r, &s, "en", &llm).unwrap()),
             vec!["zh", "ja", "SRC"]
@@ -461,20 +459,18 @@ mod tests {
         r.preset = Some("bogus".into());
         let err = plan(&r, &s, "en", &llm).unwrap_err();
         assert_eq!(err.code(), "INVALID_INPUT");
-        assert!(err
-            .to_string()
-            .contains("mt, mt-deep, llm, lynote, lynote-fix"));
+        assert!(err.to_string().contains("light, standard, strong"));
     }
 
     #[test]
     fn precedence_is_chain_preset_depth_pivot_setting() {
         let s = Settings {
-            roundtrip_preset: Some("lynote".into()),
+            roundtrip_preset: Some("strong".into()),
             ..Settings::default()
         };
         let mut r = req();
         r.chain = vec!["ko".into()];
-        r.preset = Some("llm".into());
+        r.preset = Some("standard".into());
         r.depth = Some(2);
         r.pivot = "ja".into();
         assert_eq!(langs(&plan(&r, &s, "en", &llm).unwrap()), vec!["ko", "SRC"]);
