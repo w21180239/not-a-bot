@@ -53,6 +53,10 @@ pub struct Settings {
     pub roundtrip_preset: Option<String>,
     /// Engine behind the LLM hops of the `llm` and `lynote` presets.
     pub roundtrip_llm: Option<String>,
+    /// Detector command for roundtrip candidates (see `RoundtripRequest::scorer`).
+    pub roundtrip_scorer: Option<String>,
+    /// Presets tried in order when `--target-score` is not met.
+    pub roundtrip_ladder: Option<Vec<String>>,
     pub log: Option<String>,
     /// provider -> extra knobs (base_url, model, instance, ...).
     pub provider: BTreeMap<String, ProviderSettings>,
@@ -164,6 +168,26 @@ impl Settings {
             .unwrap_or_else(|| "opencode-cli".to_string())
     }
 
+    /// Configured scorer command; blank means none.
+    pub fn roundtrip_scorer(&self) -> Option<String> {
+        self.roundtrip_scorer
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    }
+
+    /// Escalation presets for `--target-score`, in order.
+    pub fn roundtrip_ladder(&self) -> Vec<String> {
+        self.roundtrip_ladder
+            .clone()
+            .unwrap_or_else(|| vec!["llm".into(), "lynote-fix".into()])
+            .into_iter()
+            .map(|p| p.trim().to_lowercase())
+            .filter(|p| !p.is_empty())
+            .collect()
+    }
+
     pub fn provider(&self, name: &str) -> ProviderSettings {
         self.provider.get(name).cloned().unwrap_or_default()
     }
@@ -204,6 +228,8 @@ pub const CONFIG_TEMPLATE: &str = r#"# translatex config
 # roundtrip_pivot = "zh"   # "auto" picks zh for non-Chinese text, en for Chinese
 # roundtrip_preset = "mt"  # mt (2 MT hops) | mt-deep (3) | llm | lynote | lynote-fix
 # roundtrip_llm = "opencode-cli"   # engine for preset LLM hops: opencode-cli | claude-cli
+# roundtrip_scorer = "python score.py"   # detector: text on stdin, score 0-1 on the last stdout line
+# roundtrip_ladder = ["llm", "lynote-fix"]   # presets tried when --target-score is not met
 # log = "warn"
 
 # [provider.googlecloud]

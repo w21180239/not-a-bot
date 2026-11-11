@@ -158,7 +158,9 @@ user wants prose that reads less like a model wrote it. The result is in the
 source language; the response carries `chain` (languages visited), `hops`
 (per-hop `from`, `to`, `provider`, `text`, `latencyMs`, and `edits` on a repair
 hop), `provider` (final hop), `missingFacts`, `warnings`, `latencyMs`,
-`requestId` and `chars`.
+`requestId`, `chars`, `score` (`null` without a usable scorer), `scorer` and, when
+more than one run happened, `candidates` (`presetOrChain`, `score`,
+`missingFacts` count).
 
 - Hop selection, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, configured `roundtrip_preset` (default `mt`).
 - `--chain "claude-cli:zh,google:fi,edge:en"`: hops `[engine:]lang`; no engine races the fallback chain; a named MT engine is preferred, and a retryable failure (`RATE_LIMITED`, `TIMEOUT`, `NETWORK_ERROR`, `QUOTA_EXHAUSTED`) hands the hop to the automatic chain, avoiding the previous hop's provider, with a `hop <n>: <engine> failed (<code>), served by <other>` warning; named LLM engines never fall back; a hop back to the source is appended when needed. `engine:fix` (LLM engines only) stays in the current language and repairs meaning against the original.
@@ -168,6 +170,7 @@ hop), `provider` (final hop), `missingFacts`, `warnings`, `latencyMs`,
 - LLM hops rewrite in humanize style; later LLM hops also get the previous LLM hop as history and the original text.
 - Machine hops change words but keep sentence shapes ("not just X, it's Y" survives) and respell names (Aroha -> Aloha). Read `missingFacts` (also a `fact check:` warning) and `warnings`, and report them; names are checked as whole words in Latin-script text, and a name that doubles as a common sentence-starting word can slip through.
 - LLM presets rebuild the sentences and remove the structural tells; `lynote-fix` rewrites most. Use `--preserve @code` and `--preserve @url` for code and links. No preset is a claim about AI detectors.
+- `--scorer "<command>"` (config `roundtrip_scorer`), for benchmarks and tuning rather than live requests: a detector reads each result on stdin and prints a 0-1 score (higher = more AI-like) on its last stdout line; no shell; a failure adds a `scorer: ... unscored` warning. `--best-of 1-5` keeps the run with no missing facts (else the fewest), then the lowest score. `--target-score 0-1` then climbs `roundtrip_ladder` (default `llm,lynote-fix`) and warns `target score not met` when no rung reaches it. Both need a scorer, else `INVALID_INPUT`. A score is one detector's measurement; report it per detector.
 - `--pivot ja` rewrites as strongly and keeps more grammar; use it for technical English.
 - Never round-trip legal text, API reference, configuration or numbers the reader will check; the fact guard is a heuristic.
 

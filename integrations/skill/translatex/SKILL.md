@@ -127,6 +127,16 @@ did not see.
   for technical English that must stay precise.
 - A third machine-translation hop (`mt-deep`) loses more facts than it gains in
   rewriting; prefer `llm` over it.
+- Scoring is for benchmarking and tuning presets, not for live requests: a
+  local detector loads a model on every call. Pass these flags only when the
+  user asks for a scored run. `--scorer "<command>"` (or config
+  `roundtrip_scorer`) scores each result with a detector the user supplies: text on stdin, a 0-1 score (higher = more
+  AI-like) on the last stdout line. `--best-of 1-5` keeps the run with no
+  missing facts, then the lowest score; `--target-score 0-1` climbs
+  `roundtrip_ladder` (default `llm,lynote-fix`) until the score is at or below
+  the target. Both need a scorer. Read `score`, `scorer` and `candidates`, and
+  report the score with the detector's name; a `target score not met` or
+  `scorer: ... unscored` warning goes to the user too.
 - **Never round-trip** legal text, contracts, API reference, configuration,
   error messages, or numbers and names the user will check: every hop
   paraphrases by design. The fact guard lists what went missing; it does not
@@ -159,7 +169,7 @@ Retry only when `retryable` is `true`.
 | "I'll paraphrase to remove the AI tone" | Deleting filler *before* translating is editing; inventing the translation is not. Do the first, never the second. |
 | "Roundtrip will remove the AI opener" | Machine-translation presets keep the sentences. Use `--preset llm`, or delete the opener and report that you did. |
 | "`missingFacts` is empty, so the text is safe" | It is a heuristic. For numbers and names the user will check, do not round-trip. |
-| "The text now passes AI detectors" | Nothing here measures or promises that. Say the text reads more like a person wrote it, and stop there. |
+| "The text now passes AI detectors" | A `score` is one detector's measurement of one text; other detectors can disagree. Report the score per detector, say the text reads more like a person wrote it, and stop there. |
 | "The user didn't ask for a command" | They asked for a translation. The command is how this workspace produces one. |
 
 ## Red flags

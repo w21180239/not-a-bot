@@ -2,6 +2,16 @@
 
 文档修订历史。1.0 之前，应用变更也记录在此。
 
+## 未发布
+
+### 新增
+
+- `roundtrip --scorer "<command>"`（配置项 `roundtrip_scorer`）：外部检测器从 stdin 读取每个结果，在 stdout 最后一行输出 0 到 1 的分数（越高越像 AI）。不经过 shell，受 `--timeout-ms` 限制；打分器失败时加一条警告，该次运行记为未打分。
+- `roundtrip --best-of 1-5`：把链跑 N 次，先选没有丢事实的（都丢了就选丢得最少的），再选分数最低的。N 大于 1 时需要打分器。
+- `roundtrip --target-score 0-1`：先跑请求的链，再依次尝试 `roundtrip_ladder`（默认 `llm,lynote-fix`）里的预设，直到最好的运行分数不高于目标；否则返回最好的运行，并加一条 `target score not met` 警告。
+- 响应字段 `score`、`scorer`（只有程序名）和 `candidates`（每次运行一条：`presetOrChain`、`score`、`missingFacts` 个数）。请求字段 `scorer`、`bestOf`、`targetScore`。
+- `benches/roundtrip-depth/measure.py --scorer CMD` 增加 "detector src" 和 "detector out" 两列，以及 `llm-best3`、`llm-target` 两个配置。
+
 ## 0.2.0 — 2026-11-11
 
 ### 新增

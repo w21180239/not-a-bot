@@ -15,6 +15,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
+/// Minimum time a scorer call gets, whatever the request timeout.
+const SCORER_TIMEOUT_FLOOR_MS: u64 = 120_000;
+
 pub struct Engine {
     registry: Arc<Registry>,
     creds: CredentialStore,
@@ -287,14 +290,51 @@ impl Engine {
         Err(ChainFailure { error, attempts })
     }
 
-    /// Round trip: source -> hop -> ... -> source.
+    /// Round trip with the request's scoring options: the scorer command
+    /// comes from the request, else the configured `roundtrip_scorer`.
+    pub async fn roundtrip(&self, req: &RoundtripRequest) -> Result<RoundtripOutcome> {
+        use crate::core::scoring::{CommandScorer, Scorer};
+        let command = req
+            .scorer
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .or_else(|| self.settings.roundtrip_scorer());
+        // Local detectors load a model per call (10+ s on CPU), so the scorer
+        // gets the same kind of floor as the local agent CLIs.
+        let timeout_ms = req
+            .timeout_ms
+            .unwrap_or_else(|| self.settings.timeout().as_millis() as u64)
+            .max(SCORER_TIMEOUT_FLOOR_MS);
+        let scorer = command
+            .map(|c| CommandScorer::parse(&c, timeout_ms))
+            .transpose()?;
+        self.roundtrip_scored(req, scorer.as_ref().map(|s| s as &dyn Scorer))
+            .await
+    }
+
+    /// Round trip scored by `scorer`: `bestOf` runs per rung, facts first,
+    /// then lowest score; `targetScore` climbs the configured ladder.
+    pub async fn roundtrip_scored(
+        &self,
+        req: &RoundtripRequest,
+        scorer: Option<&dyn crate::core::scoring::Scorer>,
+    ) -> Result<RoundtripOutcome> {
+        crate::core::scoring::search(req, &self.settings, scorer, |r| async move {
+            self.roundtrip_once(&r).await
+        })
+        .await
+    }
+
+    /// One run of the planned chain: source -> hop -> ... -> source.
     ///
     /// Each hop forces the text through a different syntax, so translating
     /// back cannot reuse the original phrasing. Machine hops rewrite words but
     /// keep sentence shapes; LLM hops (humanize style) rewrite the shapes too,
     /// and a later LLM hop sees the previous one as history so it does not
     /// undo it. The output is checked for facts the input had and lost.
-    pub async fn roundtrip(&self, req: &RoundtripRequest) -> Result<RoundtripOutcome> {
+    async fn roundtrip_once(&self, req: &RoundtripRequest) -> Result<RoundtripOutcome> {
         use crate::core::chain::{plan, resolve_source, Target};
         use crate::providers::cli_llm::{HISTORY_KEY, ORIGINAL_KEY, ORIGINAL_LANG_KEY, STYLE_KEY};
 
@@ -504,6 +544,9 @@ impl Engine {
                 request_id,
                 chars: Some(req.text.chars().count()),
                 warnings,
+                score: None,
+                scorer: None,
+                candidates: Vec::new(),
             },
             attempts,
         })
@@ -1413,6 +1456,9 @@ mod tests {
             timeout_ms: None,
             idempotency_key: Some("rt-1".into()),
             metadata: Default::default(),
+            scorer: None,
+            best_of: None,
+            target_score: None,
         }
     }
 

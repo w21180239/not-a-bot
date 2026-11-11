@@ -2,6 +2,16 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## Unreleased
+
+### Added
+
+- `roundtrip --scorer "<command>"` (config `roundtrip_scorer`): an external detector gets each result on stdin and prints a score from 0 to 1 (higher = more AI-like) as its last stdout line. Run without a shell, bounded by `--timeout-ms`; a failing scorer adds a warning and leaves the run unscored.
+- `roundtrip --best-of 1-5`: runs the chain N times and keeps the run with no missing facts (else the fewest), then the lowest score. Above 1 it needs a scorer.
+- `roundtrip --target-score 0-1`: after the requested chain, tries each preset of `roundtrip_ladder` (default `llm,lynote-fix`) until the best run scores at or below the target, else returns the best run with a `target score not met` warning.
+- Response fields `score`, `scorer` (program name only) and `candidates` (per run: `presetOrChain`, `score`, `missingFacts` count). Request fields `scorer`, `bestOf`, `targetScore`.
+- `benches/roundtrip-depth/measure.py --scorer CMD` adds "detector src" and "detector out" columns, and configurations `llm-best3` and `llm-target`.
+
 ## 0.2.0 — 2026-11-11
 
 ### Added

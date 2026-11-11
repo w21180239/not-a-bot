@@ -335,6 +335,7 @@ translatex roundtrip "<text>" --from en --preset llm --preserve @code --format j
 translatex roundtrip "<text>" --from en --depth 3                    # zh, ja, fi, back; machine translation only
 translatex roundtrip "<text>" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
 translatex roundtrip --from en --pivot ja < draft.md                 # alias: translatex polish
+translatex roundtrip "<text>" --from en --preset llm --best-of 3 --scorer "python score.py" --format json
 ```
 
 - **Choosing hops.** First match wins: `--chain "<[engine:]lang,...>"`, `--preset <name>`, `--depth 1-3`, `--pivot <lang>`, then `roundtrip_preset` in the config (default `mt`). A final hop back to the source is appended when a chain lacks one.
@@ -344,10 +345,13 @@ translatex roundtrip --from en --pivot ja < draft.md                 # alias: tr
 - **Fact guard.** `missingFacts` lists the names, numbers, IDs, code spans and URLs of the source that the result lacks (numbers compared by digits, names as whole words), and a `fact check:` warning is added. A name that doubles as a common sentence-starting word can slip through.
 - **Preferred engines.** A named machine-translation engine is preferred, not pinned. On a retryable error (rate limit, timeout, network, quota) the hop falls back to another engine, avoiding the neighbouring hops' engines, with a warning. LLM hops never fall back.
 - **Placeholders.** Machine-translation hops mask protected spans. LLM hops get the spans as-is, listed in the prompt, and a dropped span adds a warning.
+- **Detector score.** Meant for benchmarking and tuning presets, not every request: a local detector loads a model per call. `--scorer "<command>"` (config `roundtrip_scorer`) runs a detector of your choice on each result: the text goes to its stdin and it prints a score from 0 to 1 (higher = more AI-like) as the last line of stdout. The command is split into words and run without a shell. A scorer that fails or times out (`--timeout-ms`) adds a warning and leaves that result unscored. The score is a measurement from that one detector; another detector can disagree.
+- **Best of N.** `--best-of 1-5` runs the chain N times and keeps the run that lost no facts (else the fewest), then the lowest score. Above 1 it needs a scorer.
+- **Target score.** `--target-score 0-1` tries the requested chain first, then each preset of `roundtrip_ladder` (default `llm,lynote-fix`) not yet tried, and stops at the first result at or below the target. Otherwise it returns the best result with a `target score not met` warning. Facts still outrank score at every step.
 
 Use `--preserve @code` and `--preserve @url` rather than a regex such as `` `[^`]*` ``: on Windows the npm `.cmd` shim runs through cmd.exe, which strips `^` when Python or Node spawns translatex without a shell.
 
-Response fields: `text`, `detectedSource`, `chain` (languages visited), `hops` (`from`, `to`, `provider`, `text`, `latencyMs`, and `edits` for a repair hop), `provider` (final hop), `missingFacts`, `warnings`, `latencyMs`, `requestId`, `chars`.
+Response fields: `text`, `detectedSource`, `chain` (languages visited), `hops` (`from`, `to`, `provider`, `text`, `latencyMs`, and `edits` for a repair hop), `provider` (final hop), `missingFacts`, `warnings`, `latencyMs`, `requestId`, `chars`, `score` (`null` without a usable scorer), `scorer` (program name) and, when more than one run happened, `candidates` (`presetOrChain`, `score`, `missingFacts` as a count; only the selected text is returned).
 
 Never round-trip legal text, API reference, configuration or numbers the reader will check; every hop paraphrases, and the fact guard is a heuristic. Chains, presets and the edit contract: [docs/en/roundtrip/02-chains-presets-and-llm.md](./docs/en/roundtrip/02-chains-presets-and-llm.md). Measurements and method: [docs/en/roundtrip/01-pivot-choice.md](./docs/en/roundtrip/01-pivot-choice.md).
 
@@ -432,6 +436,8 @@ race_width = 3
 roundtrip_pivot = "auto"
 roundtrip_preset = "mt"          # mt, mt-deep, llm, lynote, lynote-fix
 roundtrip_llm = "opencode-cli"   # or "claude-cli"; engine for the llm and lynote presets
+# roundtrip_scorer = "python score.py"    # detector for --best-of and --target-score
+# roundtrip_ladder = ["llm", "lynote-fix"] # presets tried until --target-score is met
 log = "warn"
 
 [provider.libretranslate]
@@ -472,7 +478,7 @@ Resolution: `credentials.toml` labels are tried in file order, a `TRANSLATEX_<PR
 | Command | Purpose |
 | --- | --- |
 | `translate [TEXT]` | One request; reads stdin when text is omitted |
-| `roundtrip [TEXT]` | Out through one or more hops and back; humanizes AI-sounding text (`--chain`, `--preset`, `--depth`, `--pivot`) |
+| `roundtrip [TEXT]` | Out through one or more hops and back; humanizes AI-sounding text (`--chain`, `--preset`, `--depth`, `--pivot`, `--scorer`, `--best-of`, `--target-score`) |
 | `batch` | NDJSON in, NDJSON out, order preserved |
 | `providers` | Capability and configuration state per provider |
 | `languages` | Canonical codes, or one provider's advertised set |
