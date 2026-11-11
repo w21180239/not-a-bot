@@ -2,7 +2,7 @@
 //!
 //! Flags vocabulary, phrase, structure, spelling and punctuation tells in a
 //! draft. With a source text it also lists the fact tokens (code spans, URLs,
-//! paths, ticket IDs, mentions, numbers, names) the draft dropped or added.
+//! paths, ticket IDs, mentions, versions, numbers, names) the draft dropped or added.
 //! Hits are prompts to look, not errors: no network, no model.
 
 use super::lint_data::{PHRASES, STAGED, VOCAB};
@@ -157,6 +157,8 @@ static FACT_CODE: Lazy<Regex> = Lazy::new(|| rx(r"`[^`\n]+`"));
 static FACT_URL: Lazy<Regex> = Lazy::new(|| rx(r"https?://\S+[^\s.,;:)]"));
 static FACT_TICKET: Lazy<Regex> = Lazy::new(|| rx(r"\b[A-Z][A-Z0-9]{1,9}-\d+\b"));
 static FACT_MENTION: Lazy<Regex> = Lazy::new(|| rx(r"@[\w.-]+"));
+static FACT_VERSION: Lazy<Regex> =
+    Lazy::new(|| rx(r"(?i)\b(?:v\d+(?:\.\d+)*|\d+(?:\.\d+){2,})(?:-[a-z0-9]+(?:\.[a-z0-9]+)*)?\b"));
 static FACT_NUMBER: Lazy<Regex> =
     Lazy::new(|| rx(r"(?i)\b\d[\d,.:]*(?:%|am|pm|ms|s|k|m|gb|mb)?\b"));
 static PATH_DIR: Lazy<Regex> = Lazy::new(|| rx(r"(?:[\w.-]+/)+[\w.-]+"));
@@ -462,13 +464,16 @@ fn fact_tokens(text: &str) -> Vec<(&'static str, String)> {
     let mut found: Vec<(&'static str, String)> = Vec::new();
     let mut seen: HashSet<(&'static str, String)> = HashSet::new();
     let mut rest = text.to_string();
-    for kind in ["code", "url", "path", "ticket", "mention", "number"] {
+    for kind in [
+        "code", "url", "path", "ticket", "mention", "version", "number",
+    ] {
         let spans = match kind {
             "code" => regex_spans(&FACT_CODE, &rest),
             "url" => regex_spans(&FACT_URL, &rest),
             "path" => path_spans(&rest),
             "ticket" => regex_spans(&FACT_TICKET, &rest),
             "mention" => regex_spans(&FACT_MENTION, &rest),
+            "version" => regex_spans(&FACT_VERSION, &rest),
             _ => regex_spans(&FACT_NUMBER, &rest),
         };
         for &(s, e) in &spans {
@@ -748,6 +753,36 @@ mod tests {
         assert!(n.contains(&"number:99".to_string()));
         assert!(!n.iter().any(|t| t.starts_with("name:")));
         assert!(r.response.missing_from_draft.is_empty());
+    }
+
+    #[test]
+    fn version_is_one_token_and_not_split_into_numbers() {
+        let toks = fact_tokens("deploy v2.4.0 on 12 may, then 1.2.3-rc.1 and v10.");
+        assert_eq!(
+            toks,
+            [
+                ("version", "v2.4.0".to_string()),
+                ("version", "1.2.3-rc.1".to_string()),
+                ("version", "v10".to_string()),
+                ("number", "12".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn version_missing_and_kept() {
+        let src = "Deploy v2.4.0 on 12 March to prod.";
+        let r = lint("Deploy on March 12 to prod.", Some(src));
+        assert_eq!(r.response.missing_from_draft, ["version:v2.4.0"]);
+        let r = lint("Ship v2.4.0 on 12 March.", Some(src));
+        assert!(r.response.missing_from_draft.is_empty());
+    }
+
+    #[test]
+    fn plain_numbers_are_not_versions() {
+        let toks = fact_tokens("12 items, 1,284.50 total, 98%, $4,800, 3.14.");
+        assert!(toks.iter().all(|(k, _)| *k == "number"), "{toks:?}");
+        assert_eq!(toks.len(), 5);
     }
 
     #[test]
