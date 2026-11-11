@@ -6,7 +6,7 @@ use crate::core::error::{Error, Result};
 use crate::core::lang::{alternate_pivot, default_pivot, is_chinese, is_known, normalize};
 use crate::core::types::RewriteRequest;
 
-pub const PRESETS: &[&str] = &["light", "standard", "strong"];
+pub const PRESETS: &[&str] = &["light", "standard"];
 
 /// Hop target: a language, back to the (possibly still undetected) source, or
 /// a repair pass that stays in the current language.
@@ -34,7 +34,7 @@ pub struct Plan {
     /// it is dropped when the chain already ends in the detected source.
     pub appended_back: bool,
     /// LLM hops after the first also repair meaning against the original inline.
-    /// Off for `strong`, whose rewrite hops run free and rely on the final fix hop.
+    /// Off for `standard`, whose return hop rewrites freely and relies on the final fix hop.
     pub inline_repair: bool,
 }
 
@@ -220,12 +220,14 @@ fn expand_preset(
         )));
     }
     let hops = match name.as_str() {
-        "light" => {
-            let mut plan = expand_depth(2, source, settings)?;
-            plan.hops.push(fix);
-            return Ok(plan);
-        }
-        "standard" | "strong" => vec![hop(&llm, lang(out)), hop(&llm, Target::Source), fix],
+        // Free machine translation out, repaired in place; one LLM rewrite back; final repair.
+        "light" => vec![
+            hop("google", lang(out)),
+            fix.clone(),
+            hop(&llm, Target::Source),
+            fix,
+        ],
+        "standard" => vec![hop(&llm, lang(out)), hop(&llm, Target::Source), fix],
         other => {
             return Err(Error::InvalidInput(format!(
                 "unknown rewrite preset {other:?}; valid: {}",
@@ -237,7 +239,7 @@ fn expand_preset(
         hops,
         guessed: source == "auto",
         appended_back: false,
-        inline_repair: name != "strong",
+        inline_repair: name != "standard",
     })
 }
 
@@ -301,10 +303,10 @@ mod tests {
     }
 
     #[test]
-    fn strong_preset_rewrites_free_then_repairs() {
+    fn standard_preset_rewrites_free_then_repairs() {
         let mut r = req();
         let s = Settings::default();
-        r.preset = Some("strong".into());
+        r.preset = Some("standard".into());
         let p = plan(&r, &s, "zh", &llm).unwrap();
         assert_eq!(langs(&p), vec!["en", "SRC", "FIX"]);
         assert_eq!(engines(&p), vec!["opencode-cli"; 3]);
@@ -313,7 +315,7 @@ mod tests {
             rewrite_llm: Some("google".into()),
             ..Settings::default()
         };
-        for preset in ["light", "standard", "strong"] {
+        for preset in ["light", "standard"] {
             r.preset = Some(preset.into());
             assert_eq!(
                 plan(&r, &s, "en", &llm).unwrap_err().code(),
@@ -325,12 +327,12 @@ mod tests {
     #[test]
     fn old_preset_names_are_rejected() {
         let s = Settings::default();
-        for old in ["mt", "mt-deep", "llm", "mt-fix", "llm-fix"] {
+        for old in ["mt", "mt-deep", "llm", "mt-fix", "llm-fix", "strong"] {
             let mut r = req();
             r.preset = Some(old.into());
             let err = plan(&r, &s, "en", &llm).unwrap_err();
             assert_eq!(err.code(), "INVALID_INPUT", "{old}");
-            assert!(err.to_string().contains("light, standard, strong"), "{old}");
+            assert!(err.to_string().contains("valid: light, standard"), "{old}");
         }
     }
 
@@ -338,7 +340,7 @@ mod tests {
     fn default_preset_is_standard() {
         let s = Settings::default();
         assert_eq!(s.rewrite_preset(), "standard");
-        assert_eq!(s.rewrite_ladder(), vec!["standard", "strong"]);
+        assert_eq!(s.rewrite_ladder(), vec!["light", "standard"]);
         let p = plan(&req(), &s, "en", &llm).unwrap();
         assert_eq!(langs(&p), vec!["zh", "SRC", "FIX"]);
     }
@@ -438,13 +440,6 @@ mod tests {
     #[test]
     fn presets_expand_for_both_families() {
         let mut r = req();
-        let s = Settings::default();
-        r.preset = Some("strong".into());
-        let p = plan(&r, &s, "en", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["zh", "SRC", "FIX"]);
-        let p = plan(&r, &s, "zh", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["en", "SRC", "FIX"]);
-
         r.preset = Some("standard".into());
         let s = Settings {
             rewrite_llm: Some("opencode-cli".into()),
@@ -456,7 +451,7 @@ mod tests {
             engines(&p),
             vec!["opencode-cli", "opencode-cli", "opencode-cli"]
         );
-        assert!(p.inline_repair);
+        assert!(!p.inline_repair);
         assert_eq!(
             langs(&plan(&r, &s, "zh", &llm).unwrap()),
             vec!["en", "SRC", "FIX"]
@@ -464,20 +459,30 @@ mod tests {
 
         r.preset = Some("light".into());
         let p = plan(&r, &s, "en", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["zh", "ja", "SRC", "FIX"]);
-        assert_eq!(p.hops[3].engine.as_deref(), Some("opencode-cli"));
-        assert!(p.hops[..3].iter().all(|h| h.engine.is_none()));
+        assert_eq!(langs(&p), vec!["zh", "FIX", "SRC", "FIX"]);
+        assert_eq!(
+            engines(&p),
+            vec!["google", "opencode-cli", "opencode-cli", "opencode-cli"]
+        );
+        assert!(
+            p.inline_repair,
+            "the LLM return hop repairs against the original"
+        );
+        assert_eq!(
+            langs(&plan(&r, &s, "zh", &llm).unwrap()),
+            vec!["en", "FIX", "SRC", "FIX"]
+        );
 
         r.preset = Some("bogus".into());
         let err = plan(&r, &s, "en", &llm).unwrap_err();
         assert_eq!(err.code(), "INVALID_INPUT");
-        assert!(err.to_string().contains("light, standard, strong"));
+        assert!(err.to_string().contains("valid: light, standard"));
     }
 
     #[test]
     fn precedence_is_chain_preset_depth_pivot_setting() {
         let s = Settings {
-            rewrite_preset: Some("strong".into()),
+            rewrite_preset: Some("light".into()),
             ..Settings::default()
         };
         let mut r = req();
@@ -499,10 +504,10 @@ mod tests {
         r.depth = None;
         assert_eq!(langs(&plan(&r, &s, "en", &llm).unwrap()), vec!["ja", "SRC"]);
         r.pivot = "auto".into();
-        // Falls through to the configured preset, strong.
+        // Falls through to the configured preset, light.
         assert_eq!(
             langs(&plan(&r, &s, "en", &llm).unwrap()),
-            vec!["zh", "SRC", "FIX"]
+            vec!["zh", "FIX", "SRC", "FIX"]
         );
     }
 
@@ -517,11 +522,10 @@ mod tests {
         let p = plan(&r, &s, "auto", &llm).unwrap();
         assert_eq!(langs(&p), vec!["ja", "SRC"]);
         assert!(!p.guessed, "a configured pivot is not a guess");
-        // The light preset (depth 2) still leads with the configured pivot.
-        r.depth = None;
-        r.preset = Some("light".into());
+        // Depth 2 still leads with the configured pivot.
+        r.depth = Some(2);
         let p = plan(&r, &s, "en", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["ja", "zh", "SRC", "FIX"]);
+        assert_eq!(langs(&p), vec!["ja", "zh", "SRC"]);
     }
 
     #[test]

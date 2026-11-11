@@ -406,7 +406,7 @@ impl Engine {
                     if fix { "fix" } else { "humanize" }.into(),
                 );
                 // The first hop's input is the original already. Without inline repair
-                // (strong), only the fix hop sees it.
+                // (standard), only the fix hop sees it.
                 if !hops.is_empty() && (fix || plan.inline_repair) {
                     metadata.insert(ORIGINAL_KEY.into(), req.text.clone().into());
                     metadata.insert(ORIGINAL_LANG_KEY.into(), detected.clone().into());
@@ -1877,13 +1877,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn strong_rewrite_hops_run_free_and_only_the_fix_sees_the_original() {
+    async fn standard_return_hop_runs_free_and_only_the_fix_sees_the_original() {
         let home = dir();
         let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
         let mut reg = Registry::new();
         reg.register(Arc::new(MetaRecorder {
             name: "llm-a",
             kind: ProviderKind::Llm,
+            calls: calls.clone(),
+        }));
+        reg.register(Arc::new(MetaRecorder {
+            name: "google",
+            kind: ProviderKind::Web,
             calls: calls.clone(),
         }));
         let settings = Settings {
@@ -1896,7 +1901,12 @@ mod tests {
             Some(home.path().to_path_buf()),
             settings,
         );
-        for (preset, back_sees_original) in [("strong", false), ("standard", true)] {
+        // (preset, style per hop, index of the LLM return hop, does it see the original)
+        let cases = [
+            ("standard", vec!["humanize", "humanize", "fix"], 1, false),
+            ("light", vec!["", "fix", "humanize", "fix"], 2, true),
+        ];
+        for (preset, styles, back, back_sees_original) in cases {
             calls.lock().unwrap().clear();
             let mut req = rewrite_req("en", "auto");
             req.text = "Ask Aroha".into();
@@ -1904,17 +1914,22 @@ mod tests {
             engine.rewrite(&req).await.expect("rewrite");
 
             let calls = calls.lock().unwrap().clone();
-            let styles: Vec<_> = calls
+            let got: Vec<_> = calls
                 .iter()
-                .map(|c| c.1["not-a-bot.style"].clone())
+                .map(|c| {
+                    c.1.get("not-a-bot.style")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                })
                 .collect();
-            assert_eq!(styles, vec!["humanize", "humanize", "fix"], "{preset}");
+            assert_eq!(got, styles, "{preset}");
             assert_eq!(
-                calls[1].1.contains_key("not-a-bot.original"),
+                calls[back].1.contains_key("not-a-bot.original"),
                 back_sees_original,
                 "{preset}"
             );
-            assert_eq!(calls[2].1["not-a-bot.original"], "Ask Aroha", "{preset}");
+            let last = calls.last().unwrap();
+            assert_eq!(last.1["not-a-bot.original"], "Ask Aroha", "{preset}");
         }
     }
 
