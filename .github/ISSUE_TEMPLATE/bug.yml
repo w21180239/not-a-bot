@@ -1,0 +1,39 @@
+name: Bug or lost fact
+description: A crash, wrong output, a rewrite that dropped a fact, or a lint false positive
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `nab --version`
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: nab rewrite --preset standard draft.txt
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Input text
+      description: Paste the text, or a synthetic stand-in that reproduces it. Do not paste private or customer content.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: What came back
+      description: The JSON response or error, and what you expected instead.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS and install method
+      placeholder: Windows 11, npm

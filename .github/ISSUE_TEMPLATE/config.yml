@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/w21180239/not-a-bot/discussions
+    about: Usage questions, before/after examples and general discussion
+  - name: Security vulnerability
+    url: https://github.com/w21180239/not-a-bot/security/advisories/new
+    about: Report privately, not in a public issue
