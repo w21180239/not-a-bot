@@ -13,7 +13,7 @@ start and no protocol to negotiate.
 | Channel | Command | Notes |
 | --- | --- | --- |
 | npm | `npm install -g not-a-bot` | Pulls the per-platform binary package; no install script runs |
-| Cargo | `cargo install not-a-bot --locked` | Builds from source; any platform with Rust 1.89+ |
+| Cargo | `cargo install --git https://github.com/w21180239/not-a-bot --locked` | Builds from source; any platform with Rust 1.89+ |
 | Release archive | [Releases](https://github.com/w21180239/not-a-bot/releases/latest) | `not-a-bot-<target>.tar.gz` with the binary at the root |
 
 The npm package is a shim. The binary lives in a per-platform package

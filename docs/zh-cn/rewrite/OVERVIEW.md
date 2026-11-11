@@ -17,8 +17,8 @@
 | 跳 | 改变 | 保留 | 成本 |
 | --- | --- | --- | --- |
 | 机器翻译（`light`） | 用词 | 句子结构，"not just X, it's Y" 之类句式会留下 | 免费，约 1 秒 |
-| LLM（`standard`、`strong`） | 用词和句子结构，去掉结构性的 AI 腔 | 事实，由事实检查核对 | 用你自己的 Claude 或 OpenCode 订阅，8 到 28 秒 |
-| 修复（`<llm>:fix`） | 少量精确编辑，补回丢掉的事实或语义 | 改写结果 | 多一次 LLM 调用 |
+| LLM（`standard`、`strong`） | 用词和句子结构，去掉结构性的 AI 腔 | 事实，由事实检查核对 | 用你自己的 Claude 或 OpenCode 订阅，每跳几秒 |
+| 修复（`<llm>:fix`，`standard` 的最后一跳） | 少量精确编辑，补回丢掉的硬事实（名字、数字、日期、ID、代码、否定）；不恢复被删的感受和承诺句 | 改写结果 | 多一次 LLM 调用 |
 
 实测 10 段文本、各跑一次：`light` 还剩 5 段带 AI 腔句式、丢了 5 个事实；`standard` 剩 0 段、丢 0 个事实。完整表格见 [01-pivot-choice.md](01-pivot-choice.md#选择跳数)。
 
@@ -52,8 +52,8 @@ not-a-bot rewrite "<中文文本>" --from zh --format json   # 再对中文做�
 
 ```bash
 not-a-bot rewrite "In today's fast-paced landscape, …" --from en --format json
-not-a-bot rewrite "…" --from en --preset standard              # LLM 出去再回来（需要 claude-cli 或 opencode-cli）
-not-a-bot rewrite "…" --from en --preset strong       # 改写最强，外加一次修复
+not-a-bot rewrite "…" --from en --preset standard              # LLM 出去再回来，再做事实修复（需要 claude-cli 或 opencode-cli）
+not-a-bot rewrite "…" --from en --preset strong       # LLM 出去再回来，不修复：改写最远，可能丢事实
 not-a-bot rewrite "…" --from en --depth 3                 # zh -> ja -> fi -> en，只用机器翻译
 not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
 not-a-bot rewrite --from en --pivot ja < draft.md         # 别名：not-a-bot polish

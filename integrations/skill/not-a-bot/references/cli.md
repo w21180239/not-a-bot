@@ -1,6 +1,6 @@
 # CLI reference for the not-a-bot skill
 
-`nab` is the short name of `not-a-bot`; both behave the same. Every answer is JSON with a `text` field and a typed error unless `--format text` is given. Confirm the binary once with `nab --version` (missing: `npm install -g not-a-bot`, or `cargo install not-a-bot`).
+`nab` is the short name of `not-a-bot`; both behave the same. Every answer is JSON with a `text` field and a typed error unless `--format text` is given. Confirm the binary once with `nab --version` (missing: `npm install -g not-a-bot`, or `cargo install --git https://github.com/w21180239/not-a-bot`).
 
 ## Operations
 
@@ -31,11 +31,11 @@ A round trip through another language that rewrites the sentences on the way. Th
 
 | Goal | Preset | Cost |
 | --- | --- | --- |
-| Humanise AI-sounding prose (default) | `--preset standard` | One LLM hop out and one back on the user's Claude or OpenCode subscription, 8 to 14 s |
-| Maximum rewriting | `--preset strong` | About 25 s; LLM hops, machine-translation hops, then a repair hop |
+| Humanise AI-sounding prose (default) | `--preset standard` | One LLM hop out, one back, then a fact-only repair hop on the user's Claude or OpenCode subscription, 8 to 14 s plus one call |
+| Maximum rewriting | `--preset strong` | LLM out and back, no repair hop; lowest detector score, may drop a fact (listed in `missingFacts`), 8 to 14 s |
 | Speed, or no subscription | `--preset light` | Free, about 1 s; changes words, keeps sentence structure |
 
-`claude-cli` and `opencode-cli` run the local CLI, need no API key and never join the automatic chain; `rewrite_llm` (default `opencode-cli`) picks the engine for `standard` and `strong`. Measured on 10 texts, one run: `light` left 5 of 10 structural tells and lost 5 facts; `standard` left 0 and lost 0; `strong` left 0 or 1 and lost 1. No preset makes text undetectable by AI detectors; do not promise that.
+`claude-cli` and `opencode-cli` run the local CLI, need no API key and never join the automatic chain; `rewrite_llm` (default `opencode-cli`) picks the engine for `standard` and `strong`. Measured on 10 texts, one run: `light` left 5 of 10 structural tells and lost 5 facts; `standard` left 0 and lost 0; `strong` left 0 or 1 and lost 1. Humanize hops delete sentences that only express feelings, pledges or pleasantries; the repair hop restores hard facts only (names, numbers, dates, IDs, code, negations) and never those sentences. `standard` and `strong` need an LLM `rewrite_llm`, else `INVALID_INPUT`. No preset makes text undetectable by AI detectors; do not promise that.
 
 Other options: `--depth 1-3` (machine translation only; a third hop loses more facts than it gains), `--chain "<[engine:]lang,...>"`, `--pivot <lang>` (default: Chinese for non-Chinese text, English for Chinese text; `--pivot ja` keeps more grammar, better for precise technical English). First match wins in the order preset, depth, chain, pivot.
 
@@ -43,7 +43,7 @@ Scoring is for tuning presets, not live requests, because a local detector loads
 
 ### After a round trip
 
-1. Report every `missingFacts` and `warnings` entry (`fact check:`, `preserve:`, engine fallback) to the user. If `missingFacts` is not empty, restore the token by hand or re-run with `--preset strong`.
+1. Report every `missingFacts` and `warnings` entry (`fact check:`, `preserve:`, engine fallback) to the user. If `missingFacts` is not empty, restore the token by hand (`strong` has no repair hop and drops more facts than `standard`).
 2. Re-run `nab lint --source` against the original source and check the structural tells in `patterns.md` again; machine-translation hops can bring staged contrasts back.
 3. Never round-trip legal text, contracts, API reference, configuration, error messages, or numbers and names the reader will check line by line. The fact guard lists what went missing; it does not make such text safe, and it checks names only in Latin-script text.
 

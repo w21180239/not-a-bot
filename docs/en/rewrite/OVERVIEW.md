@@ -25,8 +25,8 @@ measured on it. Chinese text works with the same presets.
 | Hop | Changes | Keeps | Cost |
 | --- | --- | --- | --- |
 | Machine translation (`light`) | Words | Sentence structure, so "not just X, it's Y" survives | Free, about 1 s |
-| LLM (`standard`, `strong`) | Words and sentence structure; removes the structural tells | Facts, checked by the fact guard | Your Claude or OpenCode subscription, 8 to 28 s |
-| Repair (`<llm>:fix`) | A few exact edits that restore lost facts or meaning | The rewrite | One more LLM call |
+| LLM (`standard`, `strong`) | Words and sentence structure; removes the structural tells | Facts, checked by the fact guard | Your Claude or OpenCode subscription, several seconds per hop |
+| Repair (`<llm>:fix`, last hop of `standard`) | A few exact edits that restore lost hard facts (names, numbers, dates, IDs, code, negations); never cut feeling or pledge sentences | The rewrite | One more LLM call |
 
 Measured on 10 texts, one run: `light` left 5 of 10 tells and lost 5
 facts; `standard` left 0 tells and lost 0 facts. Details and the full table:
@@ -67,8 +67,8 @@ so the intermediates can be audited.
 
 ```bash
 not-a-bot rewrite "In today's fast-paced landscape, …" --from en --format json
-not-a-bot rewrite "…" --from en --preset standard              # LLM out and back (needs claude-cli or opencode-cli)
-not-a-bot rewrite "…" --from en --preset strong       # strongest rewrite, plus a repair hop
+not-a-bot rewrite "…" --from en --preset standard              # LLM out and back, then a fact repair (needs claude-cli or opencode-cli)
+not-a-bot rewrite "…" --from en --preset strong       # LLM out and back, no repair: rewrites furthest, may drop a fact
 not-a-bot rewrite "…" --from en --depth 3                 # zh -> ja -> fi -> en, machine translation only
 not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
 not-a-bot rewrite --from en --pivot ja < draft.md         # alias: not-a-bot polish

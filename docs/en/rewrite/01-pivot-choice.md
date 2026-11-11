@@ -139,7 +139,7 @@ What the numbers say:
 - A third machine-translation hop costs more facts (8 against 5) than it gains in rewriting (overlap 0.480 against 0.520). The default moved from one hop to two; three hops stay available as `--depth 3`.
 - LLM hops remove the structural tells and kept every fact on this corpus.
 - Machine-translation hops placed after an LLM hop can bring a foil back: Finnish "ei ainoastaan ... vaan myös" returned as "not only ... but also". That is why the same chain without a repair hop still left one tell in some runs.
-- The repair hop cut the fact loss of that chain from 3 to 5 facts to 1 and kept most of its rewrite (overlap 0.369 and 0.396 against 0.292 and 0.307 without it). That chain with the repair hop is `strong`.
+- The repair hop cut the fact loss of that chain from 3 to 5 facts to 1 and kept most of its rewrite (overlap 0.369 and 0.396 against 0.292 and 0.307 without it). That chain with the repair hop was the earlier `strong`; the current `standard` ends with a fact-only repair hop instead.
 
 Caveats: ten texts and one run per configuration is a small sample; the tell
 list and the fact guard are heuristics; overlap rewards change, not quality;

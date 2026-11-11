@@ -44,8 +44,8 @@ not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:
 | `TEXT` | stdin | 待往返的文本 |
 | `-s, --from` | `auto` | 源语言 |
 | `--pivot` | `auto` | 中转语言 |
-| `--chain` | — | 逗号分隔的跳 `[engine:]lang`；末尾没回到源语言时自动补一跳；`<llm>:fix` 为修复跳 |
-| `--preset` | 配置 `rewrite_preset`（`standard`） | `light`、`standard`、`strong` |
+| `--chain` | — | 逗号分隔的跳 `[engine:]lang`；末尾没回到源语言时自动补一跳；`<llm>:fix` 为只修事实的修复跳 |
+| `--preset` | 配置 `rewrite_preset`（`standard`） | `light`（两跳机器翻译）、`standard`（LLM 出去再回来，再做事实修复）、`strong`（LLM 出去再回来，不修复，可能丢事实）；后两者要求 `rewrite_llm` 是 LLM 引擎，否则 `INVALID_INPUT` |
 | `--depth` | — | 1-3 跳机器翻译，依次经 zh、ja、fi（中文原文为 en、ja、fi） |
 | `-p, --provider` | `auto` | 两跳都用指定 Provider |
 | `--fallback` | 空 | 指定 Provider 之后尝试的列表 |

@@ -38,10 +38,14 @@ not-a-bot rewrite "<text>" --from en --chain "opencode-cli:zh,google:ja,edge:en"
 | 预设 | 跳（英文原文） | 需要订阅 | 典型延迟 |
 | --- | --- | --- | --- |
 | `light` | zh、ja、en：出去两跳机器翻译 | 否 | 约 1 秒 |
-| `standard` | LLM 译到 zh，LLM 再回 en；两跳都"像人一样翻译并改写" | 是 | 8 到 14 秒 |
-| `strong` | LLM 到 zh，LLM 到 ja（带上一步作为历史），google 到 fi，edge 回 en，最后一次修复跳 | 是 | 约 25 秒 |
+| `standard` | LLM 译到 zh，LLM 再回 en，最后一次只修事实的修复跳（`<llm>:fix`）；前两跳"像人一样翻译并改写" | 是 | 8 到 14 秒，另加一次修复调用 |
+| `strong` | LLM 到 zh，LLM 再回 en；没有修复跳 | 是 | 8 到 14 秒 |
 
-`strong` 用 LLM 跳把文本送进相距较远的语言，再加机器翻译跳，最后用修复跳补回改写时丢掉的事实。没有任何方法能让文本稳定地检测不出，not-a-bot 也不做这个承诺。目标是读起来像人写的文字，事实保持不变。`--depth 1-3` 和 `--chain` 可以手动搭出其他链。其他预设名会返回 `INVALID_INPUT`，并列出 `light, standard, strong`。
+人性化跳会删掉只表达感受、承诺或客套的句子。`standard` 随后只修硬事实：名字、地点、产品、数字、日期、金额、币种、ID、版本、路径、代码片段、否定和限定词。修复跳会拿到事实检查列出的缺失片段，并且从不恢复被删的感受或承诺句。`strong` 不带修复跳：改写最远，检测器分数最低，但可能丢一条事实，`missingFacts` 一定会报告。`standard` 和 `strong` 需要 LLM 引擎：`rewrite_llm` 不是 LLM 引擎时返回 `INVALID_INPUT`。
+
+没有任何方法能让文本稳定地检测不出，not-a-bot 也不做这个承诺。目标是读起来像人写的文字，事实保持不变。`--depth 1-3` 和 `--chain` 可以手动搭出其他链。其他预设名会返回 `INVALID_INPUT`，并列出 `light, standard, strong`。
+
+真实二进制实测（30 段英文、desklib 检测器、每段 2 到 3 次采样，`benches/prompt-lab`）：早先的提示词平均 `p_ai` 0.579，平均 2.3 段丢事实片段；`standard` 0.387 / 1.3；`strong` 0.367 / 2.0。
 
 默认值写在 `config.toml`：
 
@@ -76,7 +80,7 @@ bin = "opencode"
 ## LLM 跳收到什么
 
 - 这一跳的指令：翻译，并像人一样改写。
-- 往返里还会收到原文。这一跳先用最小的改动修复前面机器翻译跳丢掉的语义，再做改写。
+- 往返里还会收到原文。这一跳先用最小的改动补回前面机器翻译跳丢掉的硬事实，再做改写。
 - 后面的 LLM 跳还会收到上一个 LLM 跳的结果作为历史。
 - 受保护片段原样传入。LLM 跳不使用占位符：提示词里列出要保留的片段，翻译完由 not-a-bot 检查输出。片段丢了会加一条 `preserve: <provider> dropped <span>` 警告。机器翻译跳仍然用占位符遮蔽。
 
@@ -84,7 +88,7 @@ bin = "opencode"
 
 ## 修复跳
 
-`<llm>:fix`（如 `opencode-cli:fix`，或 `strong` 的最后一跳）让文本留在当前语言，只请 LLM 返回一个 JSON 小编辑列表，而不是一份新文本：
+`<llm>:fix`（如 `opencode-cli:fix`，或 `standard` 的最后一跳）让文本留在当前语言，只请 LLM 返回一个 JSON 小编辑列表，而不是一份新文本。它对照原文只修事实：名字、地点、产品、数字、日期、金额、币种、ID、版本、路径、代码片段、否定和限定词；会拿到事实检查列出的缺失片段；从不恢复被人性化跳删掉的、只表达感受、承诺或客套的句子，其中的事实并入最近保留的句子：
 
 ```json
 [{"from": "Aloha's team", "to": "Aroha's team", "why": "name respelled"}]
@@ -108,7 +112,7 @@ not-a-bot 只应用精确且很小的编辑：
 
 跳过的原因包括 `from not found`、`from not unique`、`no change`、`to too long for from` 和 `copies the original back`。
 
-在下面的语料上，修复跳把没有它的同一条链的事实丢失从 3 到 5 个降到 1 个，并保留了大部分改写。
+在下面的语料上，修复跳减少了没有它的同一条链的事实丢失，并保留了大部分改写。
 
 ## 事实检查
 
@@ -157,7 +161,7 @@ rewrite_ladder = ["standard", "strong"]
 | 场景 | 选择 |
 | --- | --- |
 | 把 AI 味的文字改得像人写的，事实不丢 | `--preset standard` |
-| 改写力度最大，少量事实可以交给修复跳补 | `--preset strong` |
+| 改写力度最大，可能丢一条事实（见 `missingFacts`） | `--preset strong` |
 | 没有订阅，或者要快 | `--preset light`（默认） |
 | 机器翻译，再多改写一点 | `--depth 3`；事实丢失涨得比改写快 |
 | 带代码或 URL 的文本 | 任何预设都加 `--preserve @code --preserve @url` |

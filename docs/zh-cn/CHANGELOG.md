@@ -13,12 +13,15 @@ not-a-bot 以新名字延续 translatex 0.3.0。除默认预设外，行为不�
 ### 变更
 
 - 二进制名为 `not-a-bot`，另有行为一致的短别名 `nab`。crate 为 `not-a-bot`（库名 `not_a_bot`），npm 包为 `not-a-bot`（平台包 `not-a-bot-<os>-<arch>`），两个 npm bin 共用同一个启动器。
-- 子命令 `roundtrip` 改为 `rewrite`，默认预设改为 `standard`（LLM 出去再回来）；`light` 仍可用 `--preset light` 选择。schema 类型 `RoundtripRequest`、`RoundtripResponse` 改为 `RewriteRequest`、`RewriteResponse`。
+- 子命令 `roundtrip` 改为 `rewrite`，默认预设改为 `standard`（LLM 出去再回来，再做事实修复）；`light` 仍可用 `--preset light` 选择。schema 类型 `RoundtripRequest`、`RoundtripResponse` 改为 `RewriteRequest`、`RewriteResponse`。
 - 配置项 `roundtrip_preset`、`roundtrip_pivot`、`roundtrip_llm`、`roundtrip_scorer`、`roundtrip_ladder` 改为 `rewrite_*`。
 - 环境变量前缀由 `TRANSLATEX_` 改为 `NOT_A_BOT_`（如 `NOT_A_BOT_REWRITE_PRESET`、`NOT_A_BOT_CONFIG`、`NOT_A_BOT_HOME`）。
 - 配置和缓存目录改为 `~/.config/not-a-bot`。旧名字、旧变量和旧目录不再读取。
 - Provider 元数据键改用 `not-a-bot.` 前缀（`not-a-bot.style`、`not-a-bot.history`、`not-a-bot.original`），HTTP User-Agent 为 `not-a-bot/<version>`。
 - 集成 skill `translatex` 改名为 `not-a-bot`。
+- 预设：`standard`（默认）为 LLM 出去、LLM 回来，再加一次只修事实的修复跳（`<llm>:fix`）；`strong` 为 LLM 出去再回来、不带修复（改写最远、检测器分数最低，可能丢事实，一定列在 `missingFacts`）；`light` 不变。`standard`、`strong` 遇到非 LLM 的 `rewrite_llm` 返回 `INVALID_INPUT`。人性化跳会删掉只表达感受、承诺或客套的句子。
+- 修复跳（`engine:fix`）改为对照原文只修硬事实（名字、地点、产品、数字、日期、金额、币种、ID、版本、路径、代码片段、否定、限定词），会拿到事实检查列出的缺失片段，且从不恢复被删的感受或承诺句。此前修复的是语义。
+- 从源码安装用 `cargo install --git https://github.com/w21180239/not-a-bot`；该 crate 没有发布到 crates.io。
 
 ### 新增
 
