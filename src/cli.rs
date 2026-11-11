@@ -27,7 +27,8 @@ use std::sync::Arc;
       not-a-bot keys deepl --json\n  \n\
       not-a-bot health\n  \
       not-a-bot schema\n  \
-      not-a-bot rewrite \"In today's landscape, …\" --from en\n\n\
+      not-a-bot rewrite \"In today's landscape, …\" --from en\n  \
+      not-a-bot lint draft.md --source original.md --strict\n\n\
 EXIT CODES\n  \
   0 success  1 request error  2 config error  3 chain exhausted  4 network error"
 )]
@@ -209,6 +210,20 @@ pub enum Command {
     /// Probe every configured provider.
     Health,
 
+    /// Lint a draft for AI tells; with --source, diff facts against the original.
+    Lint {
+        /// Draft file, or `-` for stdin.
+        draft: String,
+
+        /// Original text; reports fact tokens the draft dropped or added.
+        #[arg(long, value_name = "FILE")]
+        source: Option<String>,
+
+        /// Exit 1 when there is any tell or any fact missing from the draft.
+        #[arg(long)]
+        strict: bool,
+    },
+
     /// Print the JSON Schema for the request and response types.
     Schema,
 
@@ -251,8 +266,12 @@ pub fn exit_code(err: &Error) -> i32 {
 pub async fn main() -> i32 {
     let cli = Cli::parse();
     init_tracing(cli.log.as_deref());
-    match dispatch(&cli).await {
-        Ok(()) => exit::OK,
+    let outcome = match &cli.command {
+        Command::Lint { .. } => cmd_lint(&cli).map_err(Failure::from),
+        _ => dispatch(&cli).await.map(|()| exit::OK),
+    };
+    match outcome {
+        Ok(code) => code,
         Err(failure) => {
             emit_error(&cli, &failure.error, failure.attempts);
             exit_code(&failure.error)
@@ -452,6 +471,47 @@ impl Ctx {
         );
         Ok(Self { engine, registry })
     }
+}
+
+/// `nab lint`: offline, so no config or credentials are loaded.
+fn cmd_lint(cli: &Cli) -> Result<i32> {
+    use std::io::Read;
+
+    let Command::Lint {
+        draft,
+        source,
+        strict,
+    } = &cli.command
+    else {
+        unreachable!()
+    };
+    let draft_text = if draft == "-" {
+        let mut buf = String::new();
+        std::io::stdin()
+            .read_to_string(&mut buf)
+            .map_err(|e| Error::InvalidInput(format!("read stdin: {e}")))?;
+        buf
+    } else {
+        std::fs::read_to_string(draft).map_err(|e| Error::InvalidInput(format!("{draft}: {e}")))?
+    };
+    let source_text = source
+        .as_ref()
+        .map(|p| std::fs::read_to_string(p).map_err(|e| Error::InvalidInput(format!("{p}: {e}"))))
+        .transpose()?;
+    let report = crate::core::lint::lint(&draft_text, source_text.as_deref());
+    match cli.format {
+        Format::Json => {
+            let value = serde_json::to_value(&report.response)
+                .map_err(|e| Error::Internal(e.to_string()))?;
+            emit_json(cli, &value)?;
+        }
+        Format::Text => print!("{}", report.render_text()),
+    }
+    Ok(if *strict && report.is_dirty() {
+        exit::REQUEST
+    } else {
+        exit::OK
+    })
 }
 
 fn read_stdin_text() -> Result<String> {
@@ -900,6 +960,11 @@ pub fn schema_document() -> Result<serde_json::Value> {
             serde_json::to_value(schema_for!(crate::core::types::RewriteResponse))
                 .map_err(|e| Error::Internal(e.to_string()))?,
         ),
+        (
+            "LintResponse",
+            serde_json::to_value(schema_for!(crate::core::lint::LintResponse))
+                .map_err(|e| Error::Internal(e.to_string()))?,
+        ),
     ] {
         defs.insert(name.to_string(), value);
     }
@@ -932,6 +997,7 @@ fn schema_types() -> &'static [&'static str] {
         "AttemptRecord",
         "RewriteRequest",
         "RewriteResponse",
+        "LintResponse",
     ]
 }
 
@@ -960,6 +1026,11 @@ pub fn manifest_document() -> Result<serde_json::Value> {
                 "command": "not-a-bot rewrite --json '{request}' --format json",
                 "description": "Translate through a chain of languages (machine translation or a local LLM CLI) and back into the source language, which rewrites the phrasing and strips machine-flavoured cadence. Reports missingFacts for names, numbers and IDs the output lost.",
                 "inputSchema": rewrite_schema
+            },
+            {
+                "name": "lint",
+                "command": "not-a-bot lint <draft|-> [--source FILE] --format json",
+                "description": "Offline check of a draft for AI tells (vocabulary, phrases, structure, spelling, punctuation). With --source it lists the names, numbers, paths and IDs the draft dropped (missingFromDraft) or added (newInDraft). Exit 0 unless --strict finds a tell or a missing fact."
             },
             {
                 "name": "providers",

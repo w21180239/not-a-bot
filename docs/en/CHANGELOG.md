@@ -6,6 +6,10 @@ Documentation history. Application changes are recorded here as well while the p
 
 not-a-bot continues translatex 0.3.0 under a new name. Nothing else changed in behaviour except the default preset.
 
+### Added
+
+- `lint` subcommand (`nab lint DRAFT [--source FILE] [--strict]`): offline check for AI tells (vocabulary, phrases, structure, spelling, punctuation) and, with `--source`, the facts a draft dropped or added. Ports the humanizer `lint.py`; JSON output is the new `LintResponse` schema type.
+
 ### Changed
 
 - The binary is `not-a-bot`, with `nab` as a short alias that behaves the same. The crate is `not-a-bot` (library `not_a_bot`) and the npm package is `not-a-bot` (platform packages `not-a-bot-<os>-<arch>`); both npm bins run the same launcher.

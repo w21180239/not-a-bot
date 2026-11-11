@@ -32,6 +32,7 @@ not-a-bot 以新名字延续 translatex 0.3.0。
 - [能力](#能力)
 - [安装](#安装)
 - [快速开始](#快速开始)
+- [检查草稿](#检查草稿)
 - [支持的 harness](#支持的-harness)
 - [往返改写：原理](#往返改写原理)
 - [Provider 一览](#provider-一览)
@@ -249,6 +250,14 @@ not-a-bot rewrite "In today's fast-paced landscape, it's important to note that 
   },
   "requestId": ""
 }
+```
+
+## 检查草稿
+
+`lint` 离线（不联网、不调模型）检查草稿里的 AI 词汇、套话、对比句式、美式拼写和破折号。加 `--source` 时还会列出草稿丢失或新增的人名、数字、路径和 ID。
+
+```bash
+not-a-bot lint draft.md --source original.md --format text --strict   # 有任何 tell 或缺失事实就退出 1
 ```
 
 ## 支持的 harness
@@ -469,6 +478,7 @@ api_key = "..."
 | --- | --- |
 | `translate [TEXT]` | 单条翻译；省略文本时读 stdin |
 | `rewrite [TEXT]` | 经一跳或多跳往返，人性化改写 AI 味文字（`--chain`、`--preset`、`--depth`、`--pivot`） |
+| `lint DRAFT` | 离线检查 AI 味；`--source FILE` 加事实比对，`--strict` 有命中即退出 1 |
 | `batch` | NDJSON 进、NDJSON 出，顺序保持不变 |
 | `providers` | 各 Provider 的能力与配置状态 |
 | `languages` | 规范语言码，或某个 Provider 声明的集合 |

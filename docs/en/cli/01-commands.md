@@ -70,6 +70,32 @@ alternative for technical English. See
 A pivot equal to the source language is replaced with the other half of the
 pair, so `--from en --pivot en` becomes `en -> zh -> en` instead of a no-op.
 
+## `lint`
+
+```bash
+not-a-bot lint draft.md
+not-a-bot lint draft.md --source original.md --format json
+cat draft.md | not-a-bot lint - --source original.md --strict
+```
+
+Offline check for AI tells and dropped facts: no network, no model, no config or credentials. Hits are prompts to look, so the exit code is `0` unless `--strict` is set.
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `DRAFT` | required | Draft file, or `-` for stdin |
+| `--source FILE` | — | Original text; adds the fact diff |
+| `--strict` | off | Exit `1` when there is any tell or any `missingFromDraft` entry (CI, pre-commit) |
+
+Tells carry a `kind`: `vocab` (word with its plain replacement), a phrase family (`deep saying`, `run-up`, `arguing with no one`, `dramatic closer`, `about the document`, `chatbot residue`, `meta wrapper`, `knowledge-limit`), `staged-contrast`, `us-spelling`, `bold-label-bullet`, `horizontal-rule`, `repeated-openings` (line 0), `punctuation` (em dash, spaced en dash, spaced `--`, curly double quotes) and, with `--source`, `introduced-script`. The fact diff compares code spans, URLs, paths, ticket IDs, `@mentions`, numbers and names: `missingFromDraft` holds `kind:value` tokens in the source but not the draft, `newInDraft` the reverse (names are not reported as new). A number written as a word (`3` to `three`) counts as missing.
+
+`--format json` (the global default) prints `LintResponse`:
+
+```json
+{"tells":[{"kind":"vocab","line":1,"match":"delve","hint":"look at / dig into"}],"missingFromDraft":["number:5"],"newInDraft":[]}
+```
+
+`--format text` prints the lines of the humanizer `lint.py`: `N: kind: detail` per tell, then `missing-from-draft:` and `new-in-draft:` lines, a `-- source ...` summary (word recall, length ratio) and a `-- N words, ... N hits` footer. A missing draft or source file returns `INVALID_INPUT` (exit `1`).
+
 ## `batch`
 
 ```bash
@@ -129,7 +155,7 @@ not-a-bot init --path ~/.config/not-a-bot/config.toml
 not-a-bot completions bash
 ```
 
-`schema` emits draft 2020-12 definitions for `TranslateRequest`, `TranslateResponse`, `ErrorResponse`, `ProviderInfo`, `HealthRecord`, `AttemptRecord`, `RewriteRequest` and `RewriteResponse`.
+`schema` emits draft 2020-12 definitions for `TranslateRequest`, `TranslateResponse`, `ErrorResponse`, `ProviderInfo`, `HealthRecord`, `AttemptRecord`, `RewriteRequest`, `RewriteResponse` and `LintResponse`.
 
 `manifest` emits `{interface: "cli", commands: [{name, command, description, inputSchema?}], skill, install}`, so an agent can discover the operations without parsing `--help`.
 

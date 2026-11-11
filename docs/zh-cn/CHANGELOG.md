@@ -6,6 +6,10 @@
 
 not-a-bot 以新名字延续 translatex 0.3.0。除默认预设外，行为不变。
 
+### 新增
+
+- `lint` 子命令（`nab lint DRAFT [--source FILE] [--strict]`）：离线检查 AI 味（词汇、短语、结构、拼写、标点），加 `--source` 时比对草稿丢失或新增的事实。移植自 humanizer 的 `lint.py`；JSON 输出对应新增的 schema 类型 `LintResponse`。
+
 ### 变更
 
 - 二进制名为 `not-a-bot`，另有行为一致的短别名 `nab`。crate 为 `not-a-bot`（库名 `not_a_bot`），npm 包为 `not-a-bot`（平台包 `not-a-bot-<os>-<arch>`），两个 npm bin 共用同一个启动器。

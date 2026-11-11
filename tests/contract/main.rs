@@ -11,7 +11,7 @@ use not_a_bot::providers::KNOWN_PROVIDERS;
 use not_a_bot::{Error, Registry};
 use std::collections::BTreeMap;
 
-const WIRE_TYPES: [&str; 8] = [
+const WIRE_TYPES: [&str; 9] = [
     "TranslateRequest",
     "TranslateResponse",
     "ErrorResponse",
@@ -20,6 +20,7 @@ const WIRE_TYPES: [&str; 8] = [
     "AttemptRecord",
     "RewriteRequest",
     "RewriteResponse",
+    "LintResponse",
 ];
 
 fn default_registry() -> Registry {
@@ -255,7 +256,14 @@ fn manifest_describes_the_cli_surface() {
     names.sort_unstable();
     assert_eq!(
         names,
-        vec!["health", "languages", "providers", "rewrite", "translate"]
+        vec![
+            "health",
+            "languages",
+            "lint",
+            "providers",
+            "rewrite",
+            "translate"
+        ]
     );
 
     for command in manifest["commands"].as_array().expect("commands array") {
