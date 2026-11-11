@@ -2,3 +2,4 @@ cache/
 results-smoke/
 results/*.jsonl
 __pycache__/
+results-screen/*.jsonl
