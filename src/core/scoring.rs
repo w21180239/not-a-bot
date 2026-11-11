@@ -397,9 +397,13 @@ mod tests {
     #[tokio::test]
     async fn best_of_picks_the_lowest_score_and_lists_candidates() {
         let calls = Calls::default();
-        let mut r = req("llm");
+        let mut r = req("standard");
         r.best_of = Some(3);
-        let s = scorer(&[("llm#1", 0.7), ("llm#2", 0.2), ("llm#3", 0.5)]);
+        let s = scorer(&[
+            ("standard#1", 0.7),
+            ("standard#2", 0.2),
+            ("standard#3", 0.5),
+        ]);
         let out = search(
             &r,
             &Settings::default(),
@@ -409,39 +413,42 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(calls.lock().unwrap().len(), 3);
-        assert_eq!(out.response.text, "llm#2");
+        assert_eq!(out.response.text, "standard#2");
         assert_eq!(out.response.score, Some(0.2));
         assert_eq!(out.response.scorer.as_deref(), Some("fake"));
         let scores: Vec<_> = out.response.candidates.iter().map(|c| c.score).collect();
         assert_eq!(scores, vec![Some(0.7), Some(0.2), Some(0.5)]);
         assert!(
-            !out.response.warnings.iter().any(|w| w.contains("llm#1")),
+            !out.response
+                .warnings
+                .iter()
+                .any(|w| w.contains("standard#1")),
             "warnings of unselected runs are dropped"
         );
     }
 
     #[tokio::test]
     async fn a_run_keeping_its_facts_beats_a_lower_score() {
-        let mut r = req("llm");
+        let mut r = req("standard");
         r.best_of = Some(2);
-        let s = scorer(&[("llm#1", 0.1), ("llm#2", 0.8)]);
+        let s = scorer(&[("standard#1", 0.1), ("standard#2", 0.8)]);
         let out = search(
             &r,
             &Settings::default(),
             Some(&s),
-            runner(Calls::default(), &[("llm#1", 1)]),
+            runner(Calls::default(), &[("standard#1", 1)]),
         )
         .await
         .unwrap();
-        assert_eq!(out.response.text, "llm#2");
+        assert_eq!(out.response.text, "standard#2");
         assert_eq!(out.response.candidates[0].missing_facts, 1);
     }
 
     #[tokio::test]
     async fn scorer_failure_leaves_the_run_unscored_with_a_warning() {
-        let mut r = req("llm");
+        let mut r = req("standard");
         r.best_of = Some(2);
-        let s = scorer(&[("llm#2", 0.6)]);
+        let s = scorer(&[("standard#2", 0.6)]);
         let out = search(
             &r,
             &Settings::default(),
@@ -450,19 +457,19 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(out.response.text, "llm#2", "scored beats unscored");
+        assert_eq!(out.response.text, "standard#2", "scored beats unscored");
         assert_eq!(out.response.candidates[0].score, None);
         assert!(out
             .response
             .warnings
             .iter()
-            .any(|w| w.contains("run 1 (llm) unscored: boom")));
+            .any(|w| w.contains("run 1 (standard) unscored: boom")));
     }
 
     #[tokio::test]
     async fn all_unscored_behaves_as_without_scorer() {
         let calls = Calls::default();
-        let mut r = req("mt");
+        let mut r = req("light");
         r.best_of = Some(2);
         r.target_score = Some(0.3);
         let out = search(
@@ -473,9 +480,13 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(out.response.text, "mt#1");
+        assert_eq!(out.response.text, "light#1");
         assert_eq!(out.response.score, None);
-        assert_eq!(*calls.lock().unwrap(), vec!["mt", "mt"], "no ladder climb");
+        assert_eq!(
+            *calls.lock().unwrap(),
+            vec!["light", "light"],
+            "no ladder climb"
+        );
         assert!(out
             .response
             .warnings
@@ -486,9 +497,9 @@ mod tests {
     #[tokio::test]
     async fn ladder_stops_at_the_first_rung_meeting_the_target() {
         let calls = Calls::default();
-        let mut r = req("mt");
+        let mut r = req("light");
         r.target_score = Some(0.5);
-        let s = scorer(&[("mt#1", 0.9), ("llm#1", 0.3), ("lynote-fix#1", 0.1)]);
+        let s = scorer(&[("light#1", 0.9), ("standard#1", 0.3), ("strong#1", 0.1)]);
         let out = search(
             &r,
             &Settings::default(),
@@ -497,8 +508,8 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(*calls.lock().unwrap(), vec!["mt", "llm"]);
-        assert_eq!(out.response.text, "llm#1");
+        assert_eq!(*calls.lock().unwrap(), vec!["light", "standard"]);
+        assert_eq!(out.response.text, "standard#1");
         assert_eq!(out.response.candidates.len(), 2);
         assert!(!out.response.warnings.iter().any(|w| w.contains("target")));
     }
@@ -506,9 +517,9 @@ mod tests {
     #[tokio::test]
     async fn ladder_exhausts_and_returns_the_best_overall() {
         let calls = Calls::default();
-        let mut r = req("mt");
+        let mut r = req("light");
         r.target_score = Some(0.2);
-        let s = scorer(&[("mt#1", 0.9), ("llm#1", 0.4), ("lynote-fix#1", 0.6)]);
+        let s = scorer(&[("light#1", 0.9), ("standard#1", 0.4), ("strong#1", 0.6)]);
         let out = search(
             &r,
             &Settings::default(),
@@ -517,8 +528,8 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(*calls.lock().unwrap(), vec!["mt", "llm", "lynote-fix"]);
-        assert_eq!(out.response.text, "llm#1");
+        assert_eq!(*calls.lock().unwrap(), vec!["light", "standard", "strong"]);
+        assert_eq!(out.response.text, "standard#1");
         assert!(out
             .response
             .warnings
@@ -529,17 +540,17 @@ mod tests {
     #[tokio::test]
     async fn ladder_skips_the_rung_already_tried() {
         let calls = Calls::default();
-        let mut r = req("llm");
+        let mut r = req("standard");
         r.target_score = Some(0.1);
         let settings = Settings {
-            roundtrip_ladder: Some(vec!["LLM".into(), "lynote-fix".into()]),
+            roundtrip_ladder: Some(vec!["STANDARD".into(), "strong".into()]),
             ..Default::default()
         };
-        let s = scorer(&[("llm#1", 0.5), ("lynote-fix#1", 0.4)]);
+        let s = scorer(&[("standard#1", 0.5), ("strong#1", 0.4)]);
         search(&r, &settings, Some(&s), runner(calls.clone(), &[]))
             .await
             .unwrap();
-        assert_eq!(*calls.lock().unwrap(), vec!["llm", "lynote-fix"]);
+        assert_eq!(*calls.lock().unwrap(), vec!["standard", "strong"]);
     }
 
     #[tokio::test]
@@ -553,7 +564,7 @@ mod tests {
             (None, Some(1.5), true),
         ];
         for (best_of, target, with_scorer) in cases {
-            let mut r = req("mt");
+            let mut r = req("light");
             r.best_of = best_of;
             r.target_score = target;
             let sc: Option<&dyn Scorer> = with_scorer.then_some(&s as &dyn Scorer);
@@ -568,7 +579,7 @@ mod tests {
     async fn without_a_scorer_one_run_passes_through() {
         let calls = Calls::default();
         let out = search(
-            &req("mt"),
+            &req("light"),
             &Settings::default(),
             None,
             runner(calls.clone(), &[]),
@@ -585,13 +596,13 @@ mod tests {
     fn labels_follow_planning_precedence() {
         let s = Settings::default();
         let mut r: RoundtripRequest = serde_json::from_str(r#"{"text":"hi"}"#).unwrap();
-        assert_eq!(label(&r, &s), "mt");
+        assert_eq!(label(&r, &s), "light");
         r.pivot = "ja".into();
         assert_eq!(label(&r, &s), "pivot-ja");
         r.depth = Some(3);
         assert_eq!(label(&r, &s), "depth-3");
-        r.preset = Some("LLM".into());
-        assert_eq!(label(&r, &s), "llm");
+        r.preset = Some("STANDARD".into());
+        assert_eq!(label(&r, &s), "standard");
         r.chain = vec!["google:fi".into(), "edge:en".into()];
         assert_eq!(label(&r, &s), "google:fi,edge:en");
     }
