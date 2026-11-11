@@ -133,7 +133,7 @@ pub enum Command {
         #[arg(long, value_parser = clap::value_parser!(u8).range(1..=3))]
         depth: Option<u8>,
 
-        /// Built-in chain (default standard): light (2 MT hops), standard (LLM out and back), strong (LLM hops, MT hops, repair).
+        /// Built-in chain (default standard), each ending in a minimal LLM meaning repair: light (2 MT hops), standard (LLM out and back), strong (LLM out and back, rewriting freely).
         #[arg(long)]
         preset: Option<String>,
 

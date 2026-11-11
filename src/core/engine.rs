@@ -405,8 +405,9 @@ impl Engine {
                     STYLE_KEY.into(),
                     if fix { "fix" } else { "humanize" }.into(),
                 );
-                // The first hop's input is the original already.
-                if !hops.is_empty() {
+                // The first hop's input is the original already. Without inline repair
+                // (strong), only the fix hop sees it.
+                if !hops.is_empty() && (fix || plan.inline_repair) {
                     metadata.insert(ORIGINAL_KEY.into(), req.text.clone().into());
                     metadata.insert(ORIGINAL_LANG_KEY.into(), detected.clone().into());
                 }
@@ -1514,7 +1515,10 @@ mod tests {
         );
 
         let out = engine
-            .rewrite(&rewrite_req("en", "auto"))
+            .rewrite(&crate::core::types::RewriteRequest {
+                depth: Some(2),
+                ..rewrite_req("en", "auto")
+            })
             .await
             .expect("rewrite");
 
@@ -1581,7 +1585,10 @@ mod tests {
         );
 
         let out = engine
-            .rewrite(&rewrite_req("zh", "auto"))
+            .rewrite(&crate::core::types::RewriteRequest {
+                depth: Some(2),
+                ..rewrite_req("zh", "auto")
+            })
             .await
             .expect("rewrite");
 
@@ -1609,7 +1616,10 @@ mod tests {
         );
 
         let out = engine
-            .rewrite(&rewrite_req("auto", "auto"))
+            .rewrite(&crate::core::types::RewriteRequest {
+                depth: Some(2),
+                ..rewrite_req("auto", "auto")
+            })
             .await
             .expect("rewrite");
 
@@ -1864,6 +1874,48 @@ mod tests {
         assert_eq!(out.response.hops[1].from, "zh");
         assert_eq!(out.response.text, "Ask Aroha>zh>ja>fi>en");
         assert!(out.response.missing_facts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn strong_rewrite_hops_run_free_and_only_the_fix_sees_the_original() {
+        let home = dir();
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut reg = Registry::new();
+        reg.register(Arc::new(MetaRecorder {
+            name: "llm-a",
+            kind: ProviderKind::Llm,
+            calls: calls.clone(),
+        }));
+        let settings = Settings {
+            rewrite_llm: Some("llm-a".into()),
+            ..test_settings()
+        };
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(home.path().to_path_buf()),
+            settings,
+        );
+        for (preset, back_sees_original) in [("strong", false), ("standard", true)] {
+            calls.lock().unwrap().clear();
+            let mut req = rewrite_req("en", "auto");
+            req.text = "Ask Aroha".into();
+            req.preset = Some(preset.into());
+            engine.rewrite(&req).await.expect("rewrite");
+
+            let calls = calls.lock().unwrap().clone();
+            let styles: Vec<_> = calls
+                .iter()
+                .map(|c| c.1["not-a-bot.style"].clone())
+                .collect();
+            assert_eq!(styles, vec!["humanize", "humanize", "fix"], "{preset}");
+            assert_eq!(
+                calls[1].1.contains_key("not-a-bot.original"),
+                back_sees_original,
+                "{preset}"
+            );
+            assert_eq!(calls[2].1["not-a-bot.original"], "Ask Aroha", "{preset}");
+        }
     }
 
     #[tokio::test]

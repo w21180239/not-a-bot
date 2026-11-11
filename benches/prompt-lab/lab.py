@@ -16,7 +16,7 @@ DETECT_PY = os.path.join(HERE, "..", "detector", ".venv", "Scripts", "python.exe
 DETECT = os.path.join(HERE, "..", "detector", "detect.py")
 DET_CACHE = os.path.join(HERE, "cache", "detector.jsonl")
 LABEL = {"en": "English (en)", "zh": "Chinese (Simplified) (zh)", "ja": "Japanese (ja)"}
-WORKERS = 4
+WORKERS = int(os.environ.get("LAB_WORKERS", "4"))
 TX_BIN = os.path.join(HERE, "..", "..", "target", "release", "not-a-bot.exe")  # build under test
 
 # ---- prompt pieces: copied verbatim from src/providers/cli_llm.rs build_prompt ----
@@ -124,6 +124,25 @@ VARIANTS = {
     "tx-standard": [{"chain": "opencode-cli:zh,opencode-cli:en", "model": "tx", "from": "en", "to": "en"}],
     "tx-standard-fix": [{"chain": "opencode-cli:zh,opencode-cli:en,opencode-cli:fix", "model": "tx", "from": "en",
                          "to": "en"}],
+    # Shipped presets as is (`--preset`); every one ends with the minimal meaning repair.
+    **{f"tx-{p}": [{"chain": f"preset={p}", "model": "tx", "from": "en", "to": "en"}] for p in ("light", "strong")},
+    "tx-preset-standard": [{"chain": "preset=standard", "model": "tx", "from": "en", "to": "en"}],
+    # LLM and machine translation mixed, each ending in the minimal meaning repair.
+    "tx-mix-old-strong": [{"chain": "opencode-cli:zh,opencode-cli:ja,google:fi,edge:en,opencode-cli:fix", "model": "tx",
+                           "from": "en", "to": "en"}],
+    "tx-mix-mt-out": [{"chain": "google:zh,opencode-cli:en,opencode-cli:fix", "model": "tx", "from": "en", "to": "en"}],
+    # Tier grid: every machine hop is followed by a fix against the original; LLM hops repair inline;
+    # the chain always ends in a fix (after a final machine hop, its fix is the final one).
+    **{name: [{"chain": chain, "model": "tx", "from": "en", "to": "en"}] for name, chain in {
+        "tx-light-d1-perhop": "zh,opencode-cli:fix,en,opencode-cli:fix",
+        "tx-light-perhop": "zh,opencode-cli:fix,ja,opencode-cli:fix,en,opencode-cli:fix",
+        "tx-light-llm-out": "opencode-cli:zh,google:en,opencode-cli:fix",
+        "tx-mt-out-perhop": "google:zh,opencode-cli:fix,opencode-cli:en,opencode-cli:fix",
+        "tx-llm3-fix": "opencode-cli:zh,opencode-cli:ja,opencode-cli:en,opencode-cli:fix",
+        "tx-llm-mt-llm-endfix": "opencode-cli:zh,google:ja,opencode-cli:en,opencode-cli:fix",
+        "tx-llm-mt-llm-perhop": "opencode-cli:zh,google:ja,opencode-cli:fix,opencode-cli:en,opencode-cli:fix",
+        "tx-mix-perhop": "opencode-cli:zh,opencode-cli:ja,google:fi,opencode-cli:fix,edge:en,opencode-cli:fix",
+    }.items()},
 }
 
 JUDGE = ("Compare an ORIGINAL text with a REWRITE of it. Reply with ONLY a JSON object, no prose, no code fence:\n"
@@ -135,6 +154,23 @@ JUDGE = ("Compare an ORIGINAL text with a REWRITE of it. Reply with ONLY a JSON 
          "added_facts: true if the rewrite states any fact, claim, name or number that is not in the original.\n\n"
          "ORIGINAL:\n<<<\n{original}\n>>>\nREWRITE:\n<<<\n{output}\n>>>\n")
 
+# The meaning gate. Cut pleasantries are intended, so they do not count; everything a reader could act on does.
+MEANING_MODEL = "sonnet"
+MEANING = ("You check whether a REWRITE keeps the substantive meaning of an ORIGINAL. The rewrite was told to change "
+           "wording and structure and to delete sentences that only express feelings, pledges or pleasantries "
+           "(thanks, excitement, pride, 'we remain committed', 'we look forward', sign-offs); those deletions and any "
+           "change of tone or style are NOT errors.\n"
+           "List every substantive meaning error: a missing, altered or invented name, number, date, amount, ID or "
+           "other fact; a flipped negation; a changed qualifier or level of certainty; a changed actor, cause, "
+           "condition or order; a dropped claim, request, instruction or warning the reader could act on; an "
+           "invented claim. Ignore harmless reformatting (3 March vs March 3, v2.4.0 vs version 2.4.0).\n"
+           "Reply with ONLY a JSON object, no prose, no code fence:\n"
+           '{{"errors": [{{"type": "fact|negation|certainty|actor|dropped|invented", "severity": "minor|major", '
+           '"detail": "<few words>"}}]}}\n'
+           "major = a reader would act differently or be misinformed; minor = a small nuance shift. "
+           "Output {{\"errors\": []}} when the meaning is kept.\n\n"
+           "ORIGINAL:\n<<<\n{original}\n>>>\nREWRITE:\n<<<\n{output}\n>>>\n")
+
 
 # ---- pipeline ----
 def tx_call(chain, text, rep):
@@ -145,7 +181,7 @@ def tx_call(chain, text, rep):
     if os.path.exists(path):
         return json.load(open(path, encoding="utf-8"))["output"]
     cmd = [TX_BIN, "rewrite", "--from", "en", "--preserve", "@code", "--format", "json", "--quiet",
-           "--timeout-ms", "600000", "--chain", chain]
+           "--timeout-ms", "600000"] + (["--preset", chain[7:]] if chain.startswith("preset=") else ["--chain", chain])
     for i in range(3):
         p = subprocess.run(cmd, input=text.encode("utf-8"), capture_output=True, timeout=1200)
         try:
@@ -196,6 +232,37 @@ def judge(original, output):
     except Exception as e:  # noqa: BLE001
         print(f"  judge fail: {str(e)[:100]}", file=sys.stderr)
         return None
+
+
+def meaning(original, output):
+    """Substantive meaning errors per MEANING, or None when the judge fails."""
+    try:
+        raw = llm.call(MEANING_MODEL, MEANING.format(original=original, output=output), clean=False)
+        errs = json.loads(re.search(r"\{.*\}", raw, re.S).group(0))["errors"]
+        return [{"type": str(e.get("type")), "severity": str(e.get("severity")), "detail": str(e.get("detail"))}
+                for e in errs]
+    except Exception as e:  # noqa: BLE001
+        print(f"  meaning fail: {str(e)[:100]}", file=sys.stderr)
+        return None
+
+
+def cmd_meaning(a):
+    """Add a `meaning` field (MEANING judge) to every row of the chosen result files, then re-summarise."""
+    names = a.variants.split(",") if a.variants else [f[:-6] for f in os.listdir(a.results) if f.endswith(".jsonl")]
+    files = [n2 for n in names for n2 in sorted(os.listdir(a.results))
+             if n2.endswith(".jsonl") and (n2[:-6] == n or n2[:-6].startswith(n + "@r"))]
+    for fn in files:
+        path = os.path.join(a.results, fn)
+        rows = [json.loads(l) for l in open(path, encoding="utf-8") if l.strip()]
+        todo = [r for r in rows if not r["error"] and r.get("meaning") is None]
+        with ThreadPoolExecutor(WORKERS) as ex:
+            for r, m in zip(todo, ex.map(lambda r: meaning(r["source"], r["output"]), todo)):
+                r["meaning"] = m
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            for r in rows:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        print(f"meaning: {fn} ({len(todo)} judged)", file=sys.stderr)
+    cmd_summary(a)
 
 
 def sha(t):
@@ -254,7 +321,8 @@ def cmd_run(a):
     texts = [r["text"] for r in corpus] + [v for v in finals.values() if v]
     p_ai = detect(texts)
     print("judging", file=sys.stderr)
-    jlist = [(k, v) for k, v in finals.items() if v]
+    # LAB_HAIKU_JUDGE=0 skips the 1-5 judge; the meaning gate (cmd_meaning) still runs.
+    jlist = [(k, v) for k, v in finals.items() if v] if os.environ.get("LAB_HAIKU_JUDGE", "1") != "0" else []
     src = {r["id"]: r for r in corpus}
     with ThreadPoolExecutor(WORKERS) as ex:
         judged = dict(zip([k for k, _ in jlist], ex.map(lambda kv: judge(src[kv[0][1]]["text"], kv[1]), jlist)))
@@ -275,11 +343,31 @@ def cmd_run(a):
                     "hop_models": [h.get("chain") or h["model"] + ":" + h["from"] + ">" + h["to"]
                                    for h in VARIANTS[base[n][0]]],
                 }, ensure_ascii=False) + "\n")
-    cmd_summary(a)
+    a.variants = ",".join(names)
+    # LAB_MEANING=0 defers the meaning gate (Claude quota) to a later `lab.py meaning` run.
+    (cmd_meaning if os.environ.get("LAB_MEANING", "1") != "0" else cmd_summary)(a)
 
 
 def mean(xs):
     return statistics.fmean(xs) if xs else float("nan")
+
+
+def no_major(r):
+    """Share of meaning-judged texts with no major meaning error, or None when unjudged."""
+    return mean([not any(e["severity"] == "major" for e in m) for m in r["mj"]]) if r["mj"] else None
+
+
+def meaning_cell(r):
+    v = no_major(r)
+    if v is None:
+        return "-"
+    minor = mean([sum(e["severity"] != "major" for e in m) for m in r["mj"]])
+    return f"{v:.0%}, {minor:.2f} minor/text ({len(r['mj'])})"
+
+
+def pooled_major(v):
+    xs = [no_major(r) for r in v if no_major(r) is not None]
+    return f"{mean(xs):.0%}" if xs else "-"
 
 
 def cmd_summary(a):
@@ -302,17 +390,18 @@ def cmd_summary(a):
             "len": mean([d["len_ratio"] for d in ok]),
             "sm": mean([j["same_meaning"] for j in js]), "rh": mean([j["reads_human"] for j in js]),
             "added": sum(j["added_facts"] for j in js), "judged": len(js),
+            "mj": [d["meaning"] for d in ok if d.get("meaning") is not None],
             "hops": ", ".join(data[0]["hop_models"]) if data else "", "data": ok})
     rows.sort(key=lambda r: r["mean"])
     L = ["# Prompt lab summary", "",
          "p_ai = desklib/ai-text-detector-v1.01 (higher = more AI-like). Facts: exact, case-sensitive token match. "
          "Judge: haiku, 1-5. `fact loss` = texts missing at least one fact token / texts.", "",
-         "| variant | n | mean p_ai | median | <0.5 | src mean | fact loss | token ret. | len ratio | same_meaning | reads_human | added_facts | err |",
-         "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+         "| variant | n | mean p_ai | median | <0.5 | src mean | fact loss | token ret. | len ratio | same_meaning | reads_human | added_facts | meaning: no major, minor/text (judged) | err |",
+         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         L.append(f"| {r['name']} | {r['n']} | {r['mean']:.3f} | {r['median']:.3f} | {r['lt05']:.0%} | {r['src_mean']:.3f} | "
                  f"{r['texts_lost']}/{r['n'] - r['err']} | {r['tok_ret']:.1%} | {r['len']:.2f} | {r['sm']:.2f} | "
-                 f"{r['rh']:.2f} | {r['added']}/{r['judged']} | {r['err']} |")
+                 f"{r['rh']:.2f} | {r['added']}/{r['judged']} | {meaning_cell(r)} | {r['err']} |")
     pooled = {}
     for r in rows:
         pooled.setdefault(r["name"].split("@")[0], []).append(r)
@@ -320,13 +409,14 @@ def cmd_summary(a):
     if multi:
         L += ["", "## Pooled over samples", "",
               "Mean over samples; range = min-max of the per-sample means.", "",
-              "| variant | samples | mean p_ai (range) | <0.5 | fact loss (range) | same_meaning | reads_human |",
-              "|---|---|---|---|---|---|---|"]
+              "| variant | samples | mean p_ai (range) | <0.5 | fact loss (range) | same_meaning | reads_human | no major err |",
+              "|---|---|---|---|---|---|---|---|"]
         for k, v in sorted(multi.items(), key=lambda kv: mean([r["mean"] for r in kv[1]])):
             ms, fl = [r["mean"] for r in v], [r["texts_lost"] for r in v]
             L.append(f"| {k} | {len(v)} | {mean(ms):.3f} ({min(ms):.3f}-{max(ms):.3f}) | "
                      f"{mean([r['lt05'] for r in v]):.0%} | {mean(fl):.1f} ({min(fl)}-{max(fl)}) / {v[0]['n']} | "
-                     f"{mean([r['sm'] for r in v]):.2f} | {mean([r['rh'] for r in v]):.2f} |")
+                     f"{mean([r['sm'] for r in v]):.2f} | {mean([r['rh'] for r in v]):.2f} | "
+                     f"{pooled_major(v)} |")
     L += ["", "## Hops", ""] + [f"- {r['name']}: {r['hops']}" for r in rows]
     L += ["", "## Fact losses", ""]
     for r in rows:
@@ -345,11 +435,13 @@ def main():
     r.add_argument("--variants", help="comma list; default all")
     r.add_argument("--limit", type=int, help="N texts spread evenly over the corpus (smoke)")
     r.add_argument("--rep", type=int, default=1, help="samples per variant; extra ones are <variant>@r<k>")
+    m = sub.add_parser("meaning", help="judge substantive meaning errors in stored results")
+    m.add_argument("--variants", help="comma list of base variants (samples included); default all")
     s = sub.add_parser("summary")
-    for p in (r, s):
+    for p in (r, m, s):
         p.add_argument("--results", default=os.path.join(HERE, "results"))
     a = ap.parse_args()
-    {"run": cmd_run, "summary": cmd_summary}[a.cmd](a)
+    {"run": cmd_run, "meaning": cmd_meaning, "summary": cmd_summary}[a.cmd](a)
 
 
 if __name__ == "__main__":
