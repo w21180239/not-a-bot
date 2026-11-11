@@ -30,6 +30,8 @@ python benches/roundtrip-depth/measure.py --bin target/release/translatex.exe --
 | `--timeout` | 600 | Per-call timeout in seconds |
 | `--scorer` | none | Detector command (text on stdin, score 0-1 on the last stdout line). Scores source and output of each row, adds "detector src" and "detector out" means to `summary.md`, fills rows resumed without scores, and is passed to `standard-best3` and `standard-target` |
 | `--target` | 0.5 | `--target-score` for `standard-target` |
+| `--batch-scorer` | none | Detector command that takes `--batch IN.jsonl --out OUT.jsonl` and adds `p_ai` to each row, such as `<venv python> wei-harness/humanizer/evals/detect.py`. Loads the model once after the runs and fills the detector columns in place of one `--scorer` call per text; `--scorer` is then only passed to `standard-best3` and `standard-target` |
+| `--parallel` | 1 | Texts run concurrently. 4 suits the LLM configurations; keep 1 for long `light` runs against the free endpoints |
 
 The `claude-*` and `opencode-*` configurations spend quota on your Claude subscription and your OpenCode plan. The `light` configurations are free.
 

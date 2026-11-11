@@ -4,6 +4,12 @@ Documentation history. Application changes are recorded here as well while the p
 
 ## Unreleased
 
+### Changed
+
+- LLM humanize hops delete sentences that only express feelings or pledges (thanks, excitement, pride, "we remain committed") and closing pleasantries, moving any name, place, number, date or amount in them into a kept sentence. On the 30-text English set in `benches/prompt-lab` this lowered the mean desklib score from 0.530 to 0.410 on the default opencode model.
+
+## 0.3.0 — 2026-11-11
+
 ### Added
 
 - `roundtrip --scorer "<command>"` (config `roundtrip_scorer`): an external detector gets each result on stdin and prints a score from 0 to 1 (higher = more AI-like) as its last stdout line. Run without a shell, bounded by `--timeout-ms`; a failing scorer adds a warning and leaves the run unscored.
