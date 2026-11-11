@@ -467,6 +467,22 @@ impl Engine {
                 }
                 (Err(err), _) => return Err(err),
             };
+            // An LLM sometimes answers a hop back to a Latin-script language in
+            // the pivot's script; retry once, then fail rather than pass it on.
+            let out = if llm_hop && !fix && cjk_for_latin_target(&to, &out.response.text) {
+                let again = self.translate(&hop_req).await?;
+                if cjk_for_latin_target(&to, &again.response.text) {
+                    return Err(Error::Upstream {
+                        provider: again.response.provider.clone(),
+                        status: 502,
+                        body: format!("hop {}: output is not in {to}", i + 1),
+                    });
+                }
+                warnings.push(format!("hop {}: output was not in {to}; retried", i + 1));
+                again
+            } else {
+                out
+            };
             let latency_ms = hop_started.elapsed().as_millis() as u64;
 
             if i == 0 && source == "auto" {
@@ -765,6 +781,21 @@ impl Engine {
         }
         run
     }
+}
+
+/// True when `text` is mostly Chinese, Japanese or Korean script although
+/// `target` is written in Latin script.
+fn cjk_for_latin_target(target: &str, text: &str) -> bool {
+    let base = target.split('-').next().unwrap_or(target);
+    let non_latin = [
+        "zh", "ja", "ko", "ru", "uk", "bg", "sr", "be", "mk", "kk", "el", "he", "ar", "fa", "hi",
+        "th",
+    ];
+    !non_latin.contains(&base)
+        && matches!(
+            crate::core::lang::detect_script(text),
+            Some("zh" | "ja" | "ko")
+        )
 }
 
 #[cfg(test)]
@@ -1688,6 +1719,90 @@ mod tests {
                 warnings: Vec::new(),
             })
         }
+    }
+
+    /// LLM that answers the first hop back to English in Chinese.
+    struct WrongScriptOnce {
+        en_calls: std::sync::Mutex<usize>,
+        always: bool,
+    }
+
+    #[async_trait]
+    impl Provider for WrongScriptOnce {
+        fn info(&self) -> ProviderInfo {
+            ProviderInfo {
+                name: "llm-w".into(),
+                display_name: "llm-w".into(),
+                kind: ProviderKind::Llm,
+                priority: 1,
+                needs_key: false,
+                max_chars: 5000,
+                auto_detect: true,
+                languages: vec!["*".into()],
+                free_tier: None,
+                configured: true,
+            }
+        }
+        async fn translate_once(&self, req: &TR, _cred: &Credential) -> R<TranslateResponse> {
+            let text = if req.target_lang == "en" {
+                let mut n = self.en_calls.lock().unwrap();
+                *n += 1;
+                if *n == 1 || self.always {
+                    "你好，世界，这是中文。".to_string()
+                } else {
+                    "hello again".to_string()
+                }
+            } else {
+                format!("{}>{}", req.text, req.target_lang)
+            };
+            Ok(TranslateResponse {
+                text,
+                detected_source: req.source_lang.clone(),
+                target_lang: req.target_lang.clone(),
+                provider: "llm-w".into(),
+                engine: "llm-w".into(),
+                latency_ms: 0,
+                request_id: String::new(),
+                chars: None,
+                warnings: Vec::new(),
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn hop_back_in_the_wrong_script_is_retried_then_rejected() {
+        for always in [false, true] {
+            let home = dir();
+            let mut reg = Registry::new();
+            reg.register(Arc::new(WrongScriptOnce {
+                en_calls: std::sync::Mutex::new(0),
+                always,
+            }));
+            let engine = Engine::new(
+                Arc::new(reg),
+                CredentialStore::default(),
+                Some(home.path().to_path_buf()),
+                test_settings(),
+            );
+            let mut req = rewrite_req("en", "auto");
+            req.chain = vec!["llm-w:zh".into(), "llm-w:en".into()];
+            let res = engine.rewrite(&req).await;
+            if always {
+                assert_eq!(res.unwrap_err().code(), "UPSTREAM_ERROR");
+            } else {
+                let out = res.expect("retried hop succeeds");
+                assert_eq!(out.response.text, "hello again");
+                assert!(out.response.warnings.iter().any(|w| w.contains("retried")));
+            }
+        }
+    }
+
+    #[test]
+    fn cjk_guard_only_fires_for_latin_targets() {
+        assert!(cjk_for_latin_target("en", "你好，世界，这是中文。"));
+        assert!(!cjk_for_latin_target("en", "hello world"));
+        assert!(!cjk_for_latin_target("zh", "你好，世界"));
+        assert!(!cjk_for_latin_target("ja", "こんにちは世界"));
     }
 
     #[tokio::test]
