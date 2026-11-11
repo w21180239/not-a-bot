@@ -131,6 +131,29 @@ hop 2: edge failed (RATE_LIMITED), served by google
 
 LLM 跳从不回退：换一个模型会改变结果，所以失败时直接返回错误。
 
+## 检测器打分、多次取优与目标分
+
+LLM 跳每次输出都不一样，所以再跑一次可能读起来不同。配上打分器后，translatex 按检测器分数在多次运行之间挑选，但有一条硬规则：保住全部事实的运行永远胜过丢了事实的运行，分数再低也不行。
+
+```bash
+translatex roundtrip "<text>" --from en --preset llm --best-of 3 --scorer "python score.py" --format json
+translatex roundtrip "<text>" --from en --target-score 0.4 --scorer "python score.py" --format json
+```
+
+- `--scorer "<command>"`（配置项 `roundtrip_scorer`）：translatex 把每个结果写进该命令的 stdin，从 stdout 最后一个非空行读一个 0 到 1 的分数（越高越像 AI）。命令按词切分（引号成组，反斜杠保持原样），不经过 shell；`PATH` 上的程序按 CLI provider 的同一套规则解析，包括 `.cmd` 包装脚本。每次调用的时限是 `--timeout-ms`。
+- 打分器失败、超时，或输出的不是 [0, 1] 内的数字时，加一条 `scorer: run <n> (<preset>) unscored: <reason>` 警告，这次运行记为未打分。所有运行都没有分数时，结果与不配打分器相同。
+- `--best-of N`（1-5，默认 1）把规划好的链独立跑 N 次。挑选顺序：先看没有丢事实的（都丢了就看丢得最少的），再看分数最低的，未打分的排在已打分的后面。N 大于 1 时必须配打分器，否则返回 `INVALID_INPUT`。
+- `--target-score X`（0-1，需要打分器）：先跑请求的链（带上 `--best-of`），再依次跑 `roundtrip_ladder`（默认 `["llm", "lynote-fix"]`）里还没试过的预设。只要目前最好的运行分数不高于 X 就停下；全部试完仍未达到，就返回总体最好的运行，并加一条 `target score not met` 警告。
+
+响应新增 `score`（选中运行的分数，没有可用打分器时为 `null`）、`scorer`（程序名，不含参数），运行多于一次时还有 `candidates`：每次运行一条 `{presetOrChain, score, missingFacts}`，其中 `missingFacts` 是个数。只返回选中运行的文本和各跳。
+
+```toml
+roundtrip_scorer = "python score.py"
+roundtrip_ladder = ["llm", "lynote-fix"]
+```
+
+分数只是某一个检测器对某一段文本的测量结果。汇报时注明检测器名称；换一个检测器结论可能不同，分数低也不代表文本无法被检测出来。
+
 ## 怎么选
 
 | 场景 | 选择 |

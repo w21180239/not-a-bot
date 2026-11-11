@@ -55,7 +55,7 @@ pub struct RoundtripRequest {
     /// Machine-translation hops before returning: 1-3 (zh, ja, fi; en, ja, fi for Chinese).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depth: Option<u8>,
-    /// Built-in chain: `mt`, `mt-deep`, `llm`, `lynote`.
+    /// Built-in chain: `mt`, `mt-deep`, `llm`, `lynote`, `lynote-fix`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preset: Option<String>,
     /// Provider for hops without an engine.
@@ -65,13 +65,37 @@ pub struct RoundtripRequest {
     pub fallback_chain: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub preserve: Vec<String>,
-    /// Per-hop timeout.
+    /// Per-hop timeout; also bounds each scorer call.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub idempotency_key: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub metadata: BTreeMap<String, serde_json::Value>,
+    /// Detector command: reads the candidate on stdin and prints a score in
+    /// [0,1] (higher = more AI-like) as its last line. Split into program and
+    /// args without a shell. Overrides the configured `roundtrip_scorer`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scorer: Option<String>,
+    /// Independent runs of the planned chain (1-5); above 1 needs a scorer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub best_of: Option<u8>,
+    /// Climb the preset ladder until the selected score is at or below this
+    /// (0-1). Needs a scorer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_score: Option<f64>,
+}
+
+/// One finished run of a round trip, as scored for selection.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Candidate {
+    /// Preset name or comma-joined chain that produced it.
+    pub preset_or_chain: String,
+    /// `null` when no scorer ran or the scorer failed.
+    pub score: Option<f64>,
+    /// Number of facts the candidate lost.
+    pub missing_facts: usize,
 }
 
 /// One translation step of a round trip.
@@ -137,6 +161,15 @@ pub struct RoundtripResponse {
     pub chars: Option<usize>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
+    /// Detector score of the returned text; `null` without a usable scorer.
+    #[serde(default)]
+    pub score: Option<f64>,
+    /// Scorer program name (no arguments) when one was configured.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scorer: Option<String>,
+    /// Every run, in order, when more than one ran. Texts are not included.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub candidates: Vec<Candidate>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

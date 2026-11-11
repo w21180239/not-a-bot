@@ -294,3 +294,61 @@ async fn probe_uses_the_liveness_endpoint() {
     provider.probe(&cred).await.expect("healthy");
     assert_eq!(mock.hits(), 1);
 }
+
+/// Passed only when this binary runs as a scorer; plain test runs return at once.
+const SCORER_SENTINEL: &str = "translatex-scorer-sentinel";
+
+/// Scorer stub: this test binary, filtered to this test, reads the candidate
+/// and prints a score, then exits before libtest prints its summary. Works on
+/// every platform without a shell.
+#[test]
+fn scorer_helper() {
+    use std::io::{Read, Write};
+    if !std::env::args().any(|a| a == SCORER_SENTINEL) {
+        return;
+    }
+    let mut input = String::new();
+    std::io::stdin().read_to_string(&mut input).unwrap();
+    let score = if input.trim().is_empty() { "1" } else { "0.25" };
+    let mut out = std::io::stdout();
+    writeln!(out, "\n{score}").unwrap();
+    out.flush().unwrap();
+    std::process::exit(0);
+}
+
+#[tokio::test]
+async fn best_of_scores_each_run_with_an_external_command() {
+    let server = MockServer::start();
+    let mock = server.mock(|when, then| {
+        when.method(POST).path("/translate");
+        then.status(200)
+            .header("content-type", "application/json")
+            .body(r#"{"translatedText":"Hello again","detectedSourceLanguage":"en"}"#);
+    });
+    let mut registry = Registry::new();
+    registry.register(Arc::new(LibreTranslate::new(Some(&server.base_url()))));
+
+    let exe = std::env::current_exe().unwrap();
+    let mut req: translatex::RoundtripRequest =
+        serde_json::from_str(r#"{"text":"Hello world","sourceLang":"en"}"#).unwrap();
+    req.chain = vec!["libretranslate:zh".into(), "libretranslate:en".into()];
+    req.best_of = Some(2);
+    req.timeout_ms = Some(30_000);
+    req.scorer = Some(format!(
+        "\"{}\" scorer_helper --exact --nocapture --test-threads=1 --skip {SCORER_SENTINEL}",
+        exe.display()
+    ));
+
+    let out = engine(registry, CredentialStore::default(), settings())
+        .roundtrip(&req)
+        .await
+        .expect("roundtrip");
+
+    let r = &out.response;
+    assert_eq!(r.score, Some(0.25), "warnings: {:?}", r.warnings);
+    let name = exe.file_name().unwrap().to_string_lossy().into_owned();
+    assert_eq!(r.scorer.as_deref(), Some(name.as_str()));
+    assert_eq!(r.candidates.len(), 2);
+    assert!(r.candidates.iter().all(|c| c.score == Some(0.25)));
+    assert_eq!(mock.hits(), 4, "two runs of two hops");
+}

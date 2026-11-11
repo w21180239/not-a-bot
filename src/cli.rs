@@ -156,6 +156,21 @@ pub enum Command {
         #[arg(long)]
         request_id: Option<String>,
 
+        /// Detector command: text on stdin, score 0-1 (higher = more AI-like) on
+        /// its last stdout line. Split into words, no shell.
+        #[arg(long)]
+        scorer: Option<String>,
+
+        /// Run the chain N times (1-5) and keep the run with the most facts,
+        /// then the lowest score. Needs a scorer above 1.
+        #[arg(long, value_parser = clap::value_parser!(u8).range(1..=5))]
+        best_of: Option<u8>,
+
+        /// Climb the preset ladder (roundtrip_ladder) until the score is at or
+        /// below this (0-1). Needs a scorer.
+        #[arg(long)]
+        target_score: Option<f64>,
+
         /// Full request as a JSON object; replaces the other flags.
         #[arg(long)]
         json: Option<String>,
@@ -529,6 +544,9 @@ async fn cmd_roundtrip(cli: &Cli, ctx: &Ctx) -> Result<()> {
         preserve,
         timeout_ms,
         request_id,
+        scorer,
+        best_of,
+        target_score,
         json,
     } = &cli.command
     else {
@@ -552,6 +570,9 @@ async fn cmd_roundtrip(cli: &Cli, ctx: &Ctx) -> Result<()> {
             timeout_ms: *timeout_ms,
             idempotency_key: request_id.clone(),
             metadata: Default::default(),
+            scorer: scorer.clone(),
+            best_of: *best_of,
+            target_score: *target_score,
         },
     };
 

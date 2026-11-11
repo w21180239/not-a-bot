@@ -156,6 +156,36 @@ hop 2: edge failed (RATE_LIMITED), served by google
 LLM hops never fall back: a different model would change the result, so a
 failure there is returned as the error.
 
+## Detector score, best of N and target score
+
+LLM hops vary between runs, so a second run can read differently. A scorer lets
+translatex pick between runs by a detector's score, under a hard rule: a run that
+keeps every fact always beats one that lost a fact, whatever the scores.
+
+```bash
+translatex roundtrip "<text>" --from en --preset llm --best-of 3 --scorer "python score.py" --format json
+translatex roundtrip "<text>" --from en --target-score 0.4 --scorer "python score.py" --format json
+```
+
+- `--scorer "<command>"` (config `roundtrip_scorer`): translatex writes each result to the command's stdin and reads a score from 0 to 1 (higher = more AI-like) from the last non-empty line of stdout. The command is split into words (quotes group, backslashes stay literal) and run without a shell; programs on `PATH` resolve the same way as the CLI providers, `.cmd` shims included. Each call has the `--timeout-ms` budget.
+- A scorer that fails, times out or prints something other than a number in [0, 1] adds a `scorer: run <n> (<preset>) unscored: <reason>` warning, and that run is unscored. When no run gets a score, the result is the same as without a scorer.
+- `--best-of N` (1-5, default 1) runs the planned chain N times. Selection: no missing facts first (else the fewest), then the lowest score, with unscored runs after scored ones. Above 1 it needs a scorer and fails with `INVALID_INPUT` otherwise.
+- `--target-score X` (0-1, needs a scorer) tries the requested chain first, with `--best-of`, then each preset of `roundtrip_ladder` (default `["llm", "lynote-fix"]`) not yet tried. It stops at the first rung where the best run so far scores at or below X; otherwise it returns the best run overall with a `target score not met` warning.
+
+The response adds `score` (the selected run's score, `null` without a usable
+scorer), `scorer` (program name, no arguments) and, when more than one run
+happened, `candidates`: one `{presetOrChain, score, missingFacts}` per run,
+`missingFacts` as a count. Only the selected run's text and hops are returned.
+
+```toml
+roundtrip_scorer = "python score.py"
+roundtrip_ladder = ["llm", "lynote-fix"]
+```
+
+A score is a measurement from one detector on one text. Report it with the
+detector's name; another detector can disagree, and a low score is no claim that
+the text is undetectable.
+
 ## When to use which
 
 | Situation | Choose |

@@ -10,6 +10,7 @@ pub mod keys;
 pub mod lang;
 pub mod preserve;
 pub mod repair;
+pub mod scoring;
 pub mod types;
 
 pub use config::{

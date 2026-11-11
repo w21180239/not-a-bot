@@ -24,9 +24,11 @@ python benches/roundtrip-depth/measure.py --bin target/release/translatex.exe --
 | --- | --- | --- |
 | `--bin` | `translatex` on `PATH` | Binary to test |
 | `--out` | `benches/roundtrip-depth/out` | Directory for `results.jsonl` (one record per text and configuration) and `summary.md` |
-| `--configs` | all | Comma-separated names from `CONFIGS` in `measure.py`: `mt-d1`, `mt` (the default, 2 hops), `mt-deep`, `mt-deep-mixed`, `llm-claude`, `llm-opencode`, `lynote-claude`, `lynote-opencode`, `mt-fix-claude`, `lynote-fix-claude`, `lynote-fix-opencode`, `mt-then-llm-claude`, `mt-then-llm-opencode` |
+| `--configs` | all | Comma-separated names from `CONFIGS` in `measure.py`: `mt-d1`, `mt` (the default, 2 hops), `mt-deep`, `mt-deep-mixed`, `llm-claude`, `llm-opencode`, `lynote-claude`, `lynote-opencode`, `mt-fix-claude`, `lynote-fix-claude`, `lynote-fix-opencode`, `mt-then-llm-claude`, `mt-then-llm-opencode`, and with `--scorer` also `llm-best3` (`--preset llm --best-of 3`) and `llm-target` (`--preset llm --target-score`) |
 | `--sleep` | 0.4 | Seconds between calls, to stay polite to the free endpoints |
 | `--timeout` | 600 | Per-call timeout in seconds |
+| `--scorer` | none | Detector command (text on stdin, score 0-1 on the last stdout line). Scores source and output of each row, adds "detector src" and "detector out" means to `summary.md`, fills rows resumed without scores, and is passed to `llm-best3` and `llm-target` |
+| `--target` | 0.5 | `--target-score` for `llm-target` |
 
 The `claude-*` and `opencode-*` configurations spend quota on your Claude subscription and your OpenCode plan. The `mt` configurations are free.
 
@@ -56,4 +58,4 @@ Reading the table:
 - 10 texts and one run per configuration: a small sample, and LLM output varies between runs.
 - The tell list and the fact guard are heuristics. A tell outside the list is not counted, and the guard checks names only when both texts are in Latin script.
 - Overlap rewards change, not quality. A lower number can mean a worse rewrite.
-- Nothing here measures AI detectors, and no result supports a claim of undetectable text.
+- Without `--scorer` nothing here measures AI detectors. With it, the columns are one detector's scores on this corpus; report them per detector. No result supports a claim of undetectable text.
