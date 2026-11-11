@@ -21,7 +21,7 @@ Translate into language L: `translate -t L`. Translate and humanise: `translate 
 `nab lint <DRAFT|-> [--source FILE] [--format text|json] [--strict]`. `-` reads the draft from stdin. Output is JSON (`tells`, `missingFromDraft`, `newInDraft`) by default; `--format text` prints one hit per line. No network and no model.
 
 - Without `--source`: lists word, phrase, structure, spelling and punctuation tells with their line numbers.
-- With `--source`: also lists fact tokens (code spans, URLs, paths, ticket IDs, mentions, numbers, names). `missing-from-draft` are tokens the draft lost; `new-in-draft` are tokens it gained. Confirm each by meaning: a number written as a word shows as missing.
+- With `--source`: also lists fact tokens (code spans, URLs, paths, ticket IDs, mentions, versions, numbers, names). `missing-from-draft` are tokens the draft lost; `new-in-draft` are tokens it gained. Confirm each by meaning: a number written as a word shows as missing.
 - `--strict` exits non-zero when there is any tell or any dropped fact, for scripts and CI.
 - Hits are prompts to look, not errors. Spelling hits matter only when the register is `uk` or `nz` (US spellings) or `us`.
 
