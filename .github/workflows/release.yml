@@ -85,11 +85,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      # Sigstore provenance for the npm tarballs.
+      # npm trusted publishing (OIDC) and Sigstore provenance.
       id-token: write
-    env:
-      # Step-level `if` cannot read `secrets`, so hoist it to job env and test that.
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v7
 
@@ -109,12 +106,7 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
 
-      - name: Configure npm auth
-        if: env.NPM_TOKEN != ''
-        run: npm config set "//registry.npmjs.org/:_authToken" "${NPM_TOKEN}" --location=user
-
       - name: Refuse to publish for a ref that is not a version tag
-        if: env.NPM_TOKEN != ''
         shell: bash
         run: |
           set -euo pipefail
@@ -165,10 +157,7 @@ jobs:
       # Platform packages first: the main package pins their exact version, so a
       # half-finished release would leave `npm install -g not-a-bot-cli` broken.
       - name: Publish the platform packages
-        if: env.NPM_TOKEN != ''
         shell: bash
-        env:
-          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
         run: |
           set -euo pipefail
           for dir in npm/platforms/*/; do
@@ -183,10 +172,7 @@ jobs:
           done
 
       - name: Publish the main package
-        if: env.NPM_TOKEN != ''
         working-directory: npm
-        env:
-          NODE_AUTH_TOKEN: ${{ env.NPM_TOKEN }}
         run: |
           set -euo pipefail
           version=$(node -p "require('./package.json').version")
