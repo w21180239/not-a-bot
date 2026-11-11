@@ -37,7 +37,7 @@ if (!binary) {
       `not-a-bot: no binary for ${process.platform}/${process.arch}.`,
       '',
       `The package ${platformPackage} is missing. Reinstall, or install from source:`,
-      '  npm install -g not-a-bot --force',
+      '  npm install -g not-a-bot-cli --force',
       '  cargo install --git https://github.com/w21180239/not-a-bot --locked',
       '',
       'If your platform has no prebuilt binary, cargo is the way.',

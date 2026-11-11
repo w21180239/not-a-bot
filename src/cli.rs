@@ -1050,7 +1050,7 @@ pub fn manifest_document() -> Result<serde_json::Value> {
         ],
         "install": {
             "cargo": "cargo install --git https://github.com/w21180239/not-a-bot",
-            "npm": "npm install -g not-a-bot",
+            "npm": "npm install -g not-a-bot-cli",
             "binary": "https://github.com/w21180239/not-a-bot/releases/latest"
         }
     }))

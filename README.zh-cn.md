@@ -9,7 +9,7 @@
 [快速开始](#快速开始) · [实测结果](#实测结果) · [Agent skill](#安装) · [文档](./docs/README.md) · [English](./README.md) | 简体中文
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg?style=flat)](#许可)
-[![npm](https://img.shields.io/npm/v/not-a-bot.svg?style=flat)](https://www.npmjs.com/package/not-a-bot)
+[![npm](https://img.shields.io/npm/v/not-a-bot-cli.svg?style=flat)](https://www.npmjs.com/package/not-a-bot-cli)
 [![CI](https://img.shields.io/github/actions/workflow/status/w21180239/not-a-bot/ci.yml?branch=main&style=flat&label=CI)](https://github.com/w21180239/not-a-bot/actions/workflows/ci.yml)
 [![Stars](https://img.shields.io/github/stars/w21180239/not-a-bot.svg?style=flat)](https://github.com/w21180239/not-a-bot/stargazers)
 
@@ -53,7 +53,7 @@ nab rewrite --from en --format json --quiet --preserve @code < draft.txt
 ## 安装
 
 ```bash
-npm install -g not-a-bot
+npm install -g not-a-bot-cli
 ```
 
 装完 PATH 上有 `not-a-bot` 和 `nab`，两者是同一个二进制。不用 npm 的话：`cargo install --git https://github.com/w21180239/not-a-bot`（Rust 1.89 以上），或者到 [GitHub Releases](https://github.com/w21180239/not-a-bot/releases/latest) 下载预编译二进制。`nab rewrite` 默认调用 `opencode run`；设置 `NOT_A_BOT_REWRITE_LLM=claude-cli` 就改用 `claude -p`。两个 CLI 之一需要已安装并登录。
@@ -101,7 +101,7 @@ for f in $(git diff --cached --name-only -- '*.md'); do nab lint "$f" --strict |
 
 ```yaml
 # GitHub Actions 步骤
-- run: npm install -g not-a-bot && nab lint README.md --strict
+- run: npm install -g not-a-bot-cli && nab lint README.md --strict
 ```
 
 | 预设 | 执行内容 | 适用场景 |

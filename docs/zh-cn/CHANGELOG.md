@@ -2,6 +2,12 @@
 
 文档修订历史。1.0 之前，应用变更也记录在此。
 
+## 0.1.1 — 2026-11-11
+
+### 修复
+
+- npm 包改名为 `not-a-bot-cli`：npm 判定 `not-a-bot` 与 `notabot` 过于相似而拒绝发布。安装用 `npm install -g not-a-bot-cli`，命令仍是 `not-a-bot` 和 `nab`。
+
 ## 0.1.0 — 2026-11-11
 
 not-a-bot 以新名字延续 translatex 0.3.0。除默认预设外，行为不变。
@@ -12,7 +18,7 @@ not-a-bot 以新名字延续 translatex 0.3.0。除默认预设外，行为不�
 
 ### 变更
 
-- 二进制名为 `not-a-bot`，另有行为一致的短别名 `nab`。crate 为 `not-a-bot`（库名 `not_a_bot`），npm 包为 `not-a-bot`（平台包 `not-a-bot-<os>-<arch>`），两个 npm bin 共用同一个启动器。
+- 二进制名为 `not-a-bot`，另有行为一致的短别名 `nab`。crate 为 `not-a-bot`（库名 `not_a_bot`），npm 包为 `not-a-bot-cli`（`not-a-bot` 被 npm 判定与 `notabot` 过于相似而拒绝；平台包 `not-a-bot-<os>-<arch>`），两个 npm bin 共用同一个启动器。
 - 子命令 `roundtrip` 改为 `rewrite`，默认预设改为 `standard`（LLM 出去再回来，再做事实修复）；`light` 仍可用 `--preset light` 选择。schema 类型 `RoundtripRequest`、`RoundtripResponse` 改为 `RewriteRequest`、`RewriteResponse`。
 - 配置项 `roundtrip_preset`、`roundtrip_pivot`、`roundtrip_llm`、`roundtrip_scorer`、`roundtrip_ladder` 改为 `rewrite_*`。
 - 环境变量前缀由 `TRANSLATEX_` 改为 `NOT_A_BOT_`（如 `NOT_A_BOT_REWRITE_PRESET`、`NOT_A_BOT_CONFIG`、`NOT_A_BOT_HOME`）。

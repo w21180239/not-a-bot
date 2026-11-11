@@ -9,7 +9,7 @@
 [Quick start](#quick-start) · [Measured results](#measured-results) · [Agent skill](#install) · [Docs](./docs/README.md) · English | [简体中文](./README.zh-cn.md)
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg?style=flat)](#license)
-[![npm](https://img.shields.io/npm/v/not-a-bot.svg?style=flat)](https://www.npmjs.com/package/not-a-bot)
+[![npm](https://img.shields.io/npm/v/not-a-bot-cli.svg?style=flat)](https://www.npmjs.com/package/not-a-bot-cli)
 [![CI](https://img.shields.io/github/actions/workflow/status/w21180239/not-a-bot/ci.yml?branch=main&style=flat&label=CI)](https://github.com/w21180239/not-a-bot/actions/workflows/ci.yml)
 [![Stars](https://img.shields.io/github/stars/w21180239/not-a-bot.svg?style=flat)](https://github.com/w21180239/not-a-bot/stargazers)
 
@@ -53,7 +53,7 @@ The three stock words are gone, and so is the closing pledge, which says nothing
 ## Install
 
 ```bash
-npm install -g not-a-bot
+npm install -g not-a-bot-cli
 ```
 
 This puts `not-a-bot` and `nab` on your PATH (the two are the same binary). Without npm: `cargo install --git https://github.com/w21180239/not-a-bot` (Rust 1.89 or later), or a prebuilt binary from [GitHub Releases](https://github.com/w21180239/not-a-bot/releases/latest). `nab rewrite` calls `opencode run` by default; set `NOT_A_BOT_REWRITE_LLM=claude-cli` to use `claude -p` instead. Either CLI must be installed and signed in.
@@ -101,7 +101,7 @@ for f in $(git diff --cached --name-only -- '*.md'); do nab lint "$f" --strict |
 
 ```yaml
 # GitHub Actions step
-- run: npm install -g not-a-bot && nab lint README.md --strict
+- run: npm install -g not-a-bot-cli && nab lint README.md --strict
 ```
 
 | Preset | What runs | Use it for |

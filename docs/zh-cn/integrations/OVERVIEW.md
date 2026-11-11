@@ -10,7 +10,7 @@
 
 | 渠道 | 命令 | 说明 |
 | --- | --- | --- |
-| npm | `npm install -g not-a-bot` | 拉取对应平台的二进制包，安装期不执行任何脚本 |
+| npm | `npm install -g not-a-bot-cli` | 拉取对应平台的二进制包，安装期不执行任何脚本 |
 | Cargo | `cargo install --git https://github.com/w21180239/not-a-bot --locked` | 源码构建；Rust 1.89+ 即可 |
 | 发布包 | [Releases](https://github.com/w21180239/not-a-bot/releases/latest) | `not-a-bot-<target>.tar.gz`，二进制在根目录 |
 

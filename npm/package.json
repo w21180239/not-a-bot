@@ -1,5 +1,5 @@
 {
-  "name": "not-a-bot",
+  "name": "not-a-bot-cli",
   "version": "0.1.0",
   "description": "Get AI-assisted writing past readers, reviewers and AI detectors, with every fact intact. Rewrites on your own Claude Code or OpenCode subscription, checks that names and numbers survived, and lints for AI tells offline. One binary, JSON output.",
   "license": "MIT OR Apache-2.0",

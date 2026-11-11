@@ -2,6 +2,12 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.1.1 — 2026-11-11
+
+### Fixed
+
+- npm package renamed to `not-a-bot-cli`: the registry rejected `not-a-bot` as too similar to `notabot`. Install with `npm install -g not-a-bot-cli`; the commands are still `not-a-bot` and `nab`.
+
 ## 0.1.0 — 2026-11-11
 
 not-a-bot continues translatex 0.3.0 under a new name. Nothing else changed in behaviour except the default preset.
@@ -12,7 +18,7 @@ not-a-bot continues translatex 0.3.0 under a new name. Nothing else changed in b
 
 ### Changed
 
-- The binary is `not-a-bot`, with `nab` as a short alias that behaves the same. The crate is `not-a-bot` (library `not_a_bot`) and the npm package is `not-a-bot` (platform packages `not-a-bot-<os>-<arch>`); both npm bins run the same launcher.
+- The binary is `not-a-bot`, with `nab` as a short alias that behaves the same. The crate is `not-a-bot` (library `not_a_bot`) and the npm package is `not-a-bot-cli` (npm rejected `not-a-bot` as too close to `notabot`; platform packages `not-a-bot-<os>-<arch>`); both npm bins run the same launcher.
 - The `roundtrip` subcommand is now `rewrite`, and its default preset is `standard` (LLM out and back, then a fact repair); `light` stays available with `--preset light`. The schema types `RoundtripRequest` and `RoundtripResponse` are now `RewriteRequest` and `RewriteResponse`.
 - Config keys `roundtrip_preset`, `roundtrip_pivot`, `roundtrip_llm`, `roundtrip_scorer` and `roundtrip_ladder` are now `rewrite_*`.
 - Environment variables use the `NOT_A_BOT_` prefix instead of `TRANSLATEX_` (for example `NOT_A_BOT_REWRITE_PRESET`, `NOT_A_BOT_CONFIG`, `NOT_A_BOT_HOME`).
