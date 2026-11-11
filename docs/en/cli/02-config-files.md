@@ -8,9 +8,9 @@
 
 | File | Default path | Override |
 | --- | --- | --- |
-| Config | `~/.config/translatex/config.toml` | `--config`, `TRANSLATEX_CONFIG`, `TRANSLATEX_HOME`, `XDG_CONFIG_HOME` |
-| Credentials | `~/.config/translatex/credentials.toml` | `--credentials`, `TRANSLATEX_CREDENTIALS` |
-| Cooldown state | `~/.config/translatex/cache/keys-<provider>.json` | follows the config directory |
+| Config | `~/.config/not-a-bot/config.toml` | `--config`, `NOT_A_BOT_CONFIG`, `NOT_A_BOT_HOME`, `XDG_CONFIG_HOME` |
+| Credentials | `~/.config/not-a-bot/credentials.toml` | `--credentials`, `NOT_A_BOT_CREDENTIALS` |
+| Cooldown state | `~/.config/not-a-bot/cache/keys-<provider>.json` | follows the config directory |
 
 A missing file is not an error: defaults apply.
 
@@ -24,9 +24,9 @@ default_target = "zh"
 timeout_ms = 20000     # whole-call budget per provider attempt
 retries = 1            # extra attempts for retryable errors (not timeouts)
 race_width = 3         # providers in flight at once; 1 is strictly sequential
-roundtrip_pivot = "zh" # default bridge language for `translatex roundtrip --pivot auto`
-roundtrip_preset = "light" # default round trip when no chain, preset, depth or pivot is given
-roundtrip_llm = "opencode-cli" # engine behind the LLM hops of `standard` and `strong`; or "claude-cli"
+rewrite_pivot = "zh" # default bridge language for `not-a-bot rewrite --pivot auto`
+rewrite_preset = "standard" # default round trip when no chain, preset, depth or pivot is given
+rewrite_llm = "opencode-cli" # engine behind the LLM hops of `standard` and `strong`; or "claude-cli"
 concurrency = 4        # reserved for batch sizing
 log = "warn"
 
@@ -55,8 +55,8 @@ Rules:
 - Providers named in `chain` run first, in exactly that order, whatever their priority. Everything else registered is appended by ascending priority.
 - `timeout_ms` and `retries` set request defaults; `timeoutMs` in a request overrides the timeout.
 - `race_width` sets how many providers may be in flight; `1` restores the strict sequential walk. The `--race` flag overrides it for one invocation.
-- `roundtrip_pivot` is the default bridge for `roundtrip` when the request says `"pivot": "auto"`.
-- `roundtrip_preset` picks the round trip when the request names no `chain`, `preset`, `depth` or `pivot`. `roundtrip_llm` names the engine behind the LLM hops of `standard` and `strong`.
+- `rewrite_pivot` is the default bridge for `rewrite` when the request says `"pivot": "auto"`.
+- `rewrite_preset` picks the round trip when the request names no `chain`, `preset`, `depth` or `pivot`. `rewrite_llm` names the engine behind the LLM hops of `standard` and `strong`.
 - `[provider.<name>]` accepts `base_url`, `model`, `region`, `instance`, `tier`, `bin`. Unknown keys there are rejected too.
 
 ## `credentials.toml`
@@ -88,11 +88,11 @@ The section is `<provider>.<label>`. Labels are the rotation order and appear in
 Four sources, in this order:
 
 1. Built-in free endpoints, which need no credentials.
-2. Labels from `~/.config/translatex/credentials.toml`, tried in file order.
-3. `TRANSLATEX_<PROVIDER>_<FIELD>` environment variables, which become one extra `env` label tried after the file's labels.
+2. Labels from `~/.config/not-a-bot/credentials.toml`, tried in file order.
+3. `NOT_A_BOT_<PROVIDER>_<FIELD>` environment variables, which become one extra `env` label tried after the file's labels.
 4. A field whose value is `@keyring` is read from the OS keyring when the file loads.
 
-Field names are the provider's own: `TRANSLATEX_DEEPL_API_KEY`, `TRANSLATEX_AZURE_REGION`, `TRANSLATEX_BAIDU_SECRET_KEY`.
+Field names are the provider's own: `NOT_A_BOT_DEEPL_API_KEY`, `NOT_A_BOT_AZURE_REGION`, `NOT_A_BOT_BAIDU_SECRET_KEY`.
 
 ## Keyring placeholders
 
@@ -108,8 +108,8 @@ The value is read from the OS keyring entry named `<provider>.<field>` under the
 ## Validation
 
 ```bash
-translatex providers --format json   # configured: true/false per provider
-translatex keys deepl --format json  # labels plus cooldown state
+not-a-bot providers --format json   # configured: true/false per provider
+not-a-bot keys deepl --format json  # labels plus cooldown state
 ```
 
 ## Navigation

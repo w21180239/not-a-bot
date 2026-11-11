@@ -34,9 +34,9 @@ Provider 是一个翻译后端。每个 Provider 都会报告：稳定 id、类�
 ## 运行时查看
 
 ```bash
-translatex providers --format json
-translatex languages --provider edge --format json
-translatex health --format json
+not-a-bot providers --format json
+not-a-bot languages --provider edge --format json
+not-a-bot health --format json
 ```
 
 `providers` 才是本机的权威列表：注册取决于凭据与配置，可能与文档目录不同。

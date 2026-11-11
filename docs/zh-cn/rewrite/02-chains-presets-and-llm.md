@@ -1,4 +1,4 @@
-**简体中文** · [English](../../en/roundtrip/02-chains-presets-and-llm.md)
+**简体中文** · [English](../../en/rewrite/02-chains-presets-and-llm.md)
 
 # 往返翻译 — 链、预设与 LLM 跳
 
@@ -11,7 +11,7 @@
 一跳写作 `[engine:]lang`。链是逗号分隔的跳列表，引擎和语言可以任意排列：
 
 ```bash
-translatex roundtrip "<text>" --from en --chain "opencode-cli:zh,google:ja,edge:en"
+not-a-bot rewrite "<text>" --from en --chain "opencode-cli:zh,google:ja,edge:en"
 ```
 
 - 跳里没写引擎：由自动 Provider 链处理（最多 `race_width` 个 Provider 并发竞速）。
@@ -31,26 +31,26 @@ translatex roundtrip "<text>" --from en --chain "opencode-cli:zh,google:ja,edge:
 
 中文原文用 en 代替 zh：depth 3 为 en、ja、fi，再回到中文。
 
-优先级，先匹配者生效：`--chain`、`--preset`、`--depth`、`--pivot`，最后是配置里的 `roundtrip_preset`（默认 `light`）。
+优先级，先匹配者生效：`--chain`、`--preset`、`--depth`、`--pivot`，最后是配置里的 `rewrite_preset`（默认 `standard`）。
 
 ## 预设
 
 | 预设 | 跳（英文原文） | 需要订阅 | 典型延迟 |
 | --- | --- | --- | --- |
-| `light`（默认） | zh、ja、en：出去两跳机器翻译 | 否 | 约 1 秒 |
+| `light` | zh、ja、en：出去两跳机器翻译 | 否 | 约 1 秒 |
 | `standard` | LLM 译到 zh，LLM 再回 en；两跳都"像人一样翻译并改写" | 是 | 8 到 14 秒 |
 | `strong` | LLM 到 zh，LLM 到 ja（带上一步作为历史），google 到 fi，edge 回 en，最后一次修复跳 | 是 | 约 25 秒 |
 
-`strong` 用 LLM 跳把文本送进相距较远的语言，再加机器翻译跳，最后用修复跳补回改写时丢掉的事实。没有任何方法能让文本稳定地检测不出，translatex 也不做这个承诺。目标是读起来像人写的文字，事实保持不变。`--depth 1-3` 和 `--chain` 可以手动搭出其他链。其他预设名会返回 `INVALID_INPUT`，并列出 `light, standard, strong`。
+`strong` 用 LLM 跳把文本送进相距较远的语言，再加机器翻译跳，最后用修复跳补回改写时丢掉的事实。没有任何方法能让文本稳定地检测不出，not-a-bot 也不做这个承诺。目标是读起来像人写的文字，事实保持不变。`--depth 1-3` 和 `--chain` 可以手动搭出其他链。其他预设名会返回 `INVALID_INPUT`，并列出 `light, standard, strong`。
 
 默认值写在 `config.toml`：
 
 ```toml
-roundtrip_preset = "standard"  # 默认：light
-roundtrip_llm = "claude-cli"   # 默认：opencode-cli
+rewrite_preset = "standard"  # 默认：standard
+rewrite_llm = "claude-cli"   # 默认：opencode-cli
 ```
 
-环境变量：`TRANSLATEX_ROUNDTRIP_PRESET`、`TRANSLATEX_ROUNDTRIP_LLM`。
+环境变量：`NOT_A_BOT_REWRITE_PRESET`、`NOT_A_BOT_REWRITE_LLM`。
 
 ## LLM Provider 与额度
 
@@ -78,9 +78,9 @@ bin = "opencode"
 - 这一跳的指令：翻译，并像人一样改写。
 - 往返里还会收到原文。这一跳先用最小的改动修复前面机器翻译跳丢掉的语义，再做改写。
 - 后面的 LLM 跳还会收到上一个 LLM 跳的结果作为历史。
-- 受保护片段原样传入。LLM 跳不使用占位符：提示词里列出要保留的片段，翻译完由 translatex 检查输出。片段丢了会加一条 `preserve: <provider> dropped <span>` 警告。机器翻译跳仍然用占位符遮蔽。
+- 受保护片段原样传入。LLM 跳不使用占位符：提示词里列出要保留的片段，翻译完由 not-a-bot 检查输出。片段丢了会加一条 `preserve: <provider> dropped <span>` 警告。机器翻译跳仍然用占位符遮蔽。
 
-不用自己写正则，直接用具名模式：`--preserve @code`（行内和围栏代码）和 `--preserve @url`。在 Windows 上，npm 的 `.cmd` 外壳经 cmd.exe 运行；Python 或 Node 不经 shell 启动 translatex 时，cmd.exe 会吞掉 `` `[^`]*` `` 这类正则里的 `^`。具名模式避开这个问题。
+不用自己写正则，直接用具名模式：`--preserve @code`（行内和围栏代码）和 `--preserve @url`。在 Windows 上，npm 的 `.cmd` 外壳经 cmd.exe 运行；Python 或 Node 不经 shell 启动 not-a-bot 时，cmd.exe 会吞掉 `` `[^`]*` `` 这类正则里的 `^`。具名模式避开这个问题。
 
 ## 修复跳
 
@@ -90,7 +90,7 @@ bin = "opencode"
 [{"from": "Aloha's team", "to": "Aroha's team", "why": "name respelled"}]
 ```
 
-translatex 只应用精确且很小的编辑：
+not-a-bot 只应用精确且很小的编辑：
 
 - `from` 必须在当前文本里恰好出现一次，不能为空，长度至多取 40 个字符与文本 25% 中较大者。
 - `to` 至多是 `from` 长度的三倍再加 80 个字符。
@@ -131,23 +131,23 @@ LLM 跳从不回退：换一个模型会改变结果，所以失败时直接返�
 
 ## 检测器打分、多次取优与目标分
 
-LLM 跳每次输出都不一样，所以再跑一次可能读起来不同。配上打分器后，translatex 按检测器分数在多次运行之间挑选，但有一条硬规则：保住全部事实的运行永远胜过丢了事实的运行，分数再低也不行。它用来做 benchmark 和调 preset；本地检测器每次调用都要加载模型，放在实时请求里太慢太重。
+LLM 跳每次输出都不一样，所以再跑一次可能读起来不同。配上打分器后，not-a-bot 按检测器分数在多次运行之间挑选，但有一条硬规则：保住全部事实的运行永远胜过丢了事实的运行，分数再低也不行。它用来做 benchmark 和调 preset；本地检测器每次调用都要加载模型，放在实时请求里太慢太重。
 
 ```bash
-translatex roundtrip "<text>" --from en --preset standard --best-of 3 --scorer "python score.py" --format json
-translatex roundtrip "<text>" --from en --target-score 0.4 --scorer "python score.py" --format json
+not-a-bot rewrite "<text>" --from en --preset standard --best-of 3 --scorer "python score.py" --format json
+not-a-bot rewrite "<text>" --from en --target-score 0.4 --scorer "python score.py" --format json
 ```
 
-- `--scorer "<command>"`（配置项 `roundtrip_scorer`）：translatex 把每个结果写进该命令的 stdin，从 stdout 最后一个非空行读一个 0 到 1 的分数（越高越像 AI）。命令按词切分（引号成组，反斜杠保持原样），不经过 shell；`PATH` 上的程序按 CLI provider 的同一套规则解析，包括 `.cmd` 包装脚本。每次调用的时限是 `--timeout-ms`，但不少于 120 秒，因为本地检测器每次调用都要加载模型。
+- `--scorer "<command>"`（配置项 `rewrite_scorer`）：not-a-bot 把每个结果写进该命令的 stdin，从 stdout 最后一个非空行读一个 0 到 1 的分数（越高越像 AI）。命令按词切分（引号成组，反斜杠保持原样），不经过 shell；`PATH` 上的程序按 CLI provider 的同一套规则解析，包括 `.cmd` 包装脚本。每次调用的时限是 `--timeout-ms`，但不少于 120 秒，因为本地检测器每次调用都要加载模型。
 - 打分器失败、超时，或输出的不是 [0, 1] 内的数字时，加一条 `scorer: run <n> (<preset>) unscored: <reason>` 警告，这次运行记为未打分。所有运行都没有分数时，结果与不配打分器相同。
 - `--best-of N`（1-5，默认 1）把规划好的链独立跑 N 次。挑选顺序：先看没有丢事实的（都丢了就看丢得最少的），再看分数最低的，未打分的排在已打分的后面。N 大于 1 时必须配打分器，否则返回 `INVALID_INPUT`。
-- `--target-score X`（0-1，需要打分器）：先跑请求的链（带上 `--best-of`），再依次跑 `roundtrip_ladder`（默认 `["standard", "strong"]`）里还没试过的预设。只要目前最好的运行分数不高于 X 就停下；全部试完仍未达到，就返回总体最好的运行，并加一条 `target score not met` 警告。
+- `--target-score X`（0-1，需要打分器）：先跑请求的链（带上 `--best-of`），再依次跑 `rewrite_ladder`（默认 `["standard", "strong"]`）里还没试过的预设。只要目前最好的运行分数不高于 X 就停下；全部试完仍未达到，就返回总体最好的运行，并加一条 `target score not met` 警告。
 
 响应新增 `score`（选中运行的分数，没有可用打分器时为 `null`）、`scorer`（程序名，不含参数），运行多于一次时还有 `candidates`：每次运行一条 `{presetOrChain, score, missingFacts}`，其中 `missingFacts` 是个数。只返回选中运行的文本和各跳。
 
 ```toml
-roundtrip_scorer = "python score.py"
-roundtrip_ladder = ["standard", "strong"]
+rewrite_scorer = "python score.py"
+rewrite_ladder = ["standard", "strong"]
 ```
 
 分数只是某一个检测器对某一段文本的测量结果。汇报时注明检测器名称；换一个检测器结论可能不同，分数低也不代表文本无法被检测出来。

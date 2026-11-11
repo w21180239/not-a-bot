@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Compare round-trip configurations: rewrite strength vs fact loss vs surviving AI tells.
 
-Runs each corpus text through every configuration with `translatex roundtrip` and writes
+Runs each corpus text through every configuration with `not-a-bot rewrite` and writes
 results.jsonl and summary.md to --out. With --scorer, also scores source and output with
 that detector command (text on stdin, score 0-1 on the last stdout line).
 
-Usage: python benches/roundtrip-depth/measure.py [--bin PATH] [--out DIR] [--configs light,standard-opencode] [--langs en]
+Usage: python benches/rewrite-depth/measure.py [--bin PATH] [--out DIR] [--configs light,standard-opencode] [--langs en]
        [--sleep 0.4] [--scorer CMD] [--target 0.5] [--batch-scorer CMD] [--parallel 4]
 """
 import argparse, json, os, re, shutil, subprocess, sys, tempfile, time
@@ -14,10 +14,10 @@ from statistics import mean
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# name -> extra roundtrip arguments; {scorer} and {target} come from the flags
+# name -> extra rewrite arguments; {scorer} and {target} come from the flags
 CONFIGS = {
     "light-d1": ["--depth", "1"],
-    "light": ["--preset", "light"],  # default: 2 MT hops
+    "light": ["--preset", "light"],  # 2 MT hops
     "standard-claude": ["--chain", "claude-cli:{piv},claude-cli:{src}"],
     "standard-opencode": ["--chain", "opencode-cli:{piv},opencode-cli:{src}"],
     "strong-claude": ["--chain", "claude-cli:{piv},claude-cli:ja,google:fi,edge:{src},claude-cli:fix"],
@@ -43,7 +43,7 @@ def needs_scorer(name):
 
 
 def split_command(line):
-    """Words the way translatex splits --scorer: quotes group, backslashes stay literal."""
+    """Words the way not-a-bot splits --scorer: quotes group, backslashes stay literal."""
     words, word, in_word, quote = [], "", False, None
     for c in line:
         if quote:
@@ -70,7 +70,7 @@ def detect(scorer, text, timeout):
     """Detector score for text, or None when the scorer fails."""
     try:
         words = split_command(scorer)
-        words[0] = shutil.which(words[0]) or words[0]  # PATHEXT, like translatex
+        words[0] = shutil.which(words[0]) or words[0]  # PATHEXT, like not-a-bot
         r = subprocess.run(words, input=text, capture_output=True, text=True,
                            encoding="utf-8", timeout=timeout)
         lines = [l.strip() for l in r.stdout.splitlines() if l.strip()]
@@ -105,7 +105,7 @@ def run(binary, case, args, timeout, fill):
     src = case["lang"]
     piv = "en" if src == "zh" else "zh"
     args = [fill.get(a, a).replace("{src}", src).replace("{piv}", piv) for a in args]
-    cmd = [binary, "roundtrip", "--from", src, "--preserve", PRESERVE, "--format", "json", "--quiet", *args]
+    cmd = [binary, "rewrite", "--from", src, "--preserve", PRESERVE, "--format", "json", "--quiet", *args]
     t0 = time.time()
     try:
         r = subprocess.run(cmd, input=case["text"], capture_output=True, text=True, encoding="utf-8",
@@ -143,7 +143,7 @@ def detector_mean(rows, key):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--bin", default=shutil.which("translatex") or "translatex")
+    ap.add_argument("--bin", default=shutil.which("not-a-bot") or "not-a-bot")
     ap.add_argument("--out", default=os.path.join(HERE, "out"))
     ap.add_argument("--configs", default=None, help="default: all; scorer configs only with --scorer")
     ap.add_argument("--langs", default="en", help="comma-separated corpus languages to run and summarise")

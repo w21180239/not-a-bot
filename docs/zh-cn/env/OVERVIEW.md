@@ -16,13 +16,13 @@
 
 | 变量 | 作用 |
 | --- | --- |
-| `TRANSLATEX_HOME` | 配置、凭据、缓存的根目录 |
-| `TRANSLATEX_CONFIG` | 显式指定配置文件 |
-| `TRANSLATEX_CREDENTIALS` | 显式指定凭据文件 |
-| `TRANSLATEX_CHAIN` | 逗号分隔的链覆盖 |
-| `TRANSLATEX_TIMEOUT_MS` | 默认单次预算 |
-| `TRANSLATEX_LOG` | stderr 日志级别 |
-| `TRANSLATEX_<PROVIDER>_<FIELD>` | 单个凭据字段 |
+| `NOT_A_BOT_HOME` | 配置、凭据、缓存的根目录 |
+| `NOT_A_BOT_CONFIG` | 显式指定配置文件 |
+| `NOT_A_BOT_CREDENTIALS` | 显式指定凭据文件 |
+| `NOT_A_BOT_CHAIN` | 逗号分隔的链覆盖 |
+| `NOT_A_BOT_TIMEOUT_MS` | 默认单次预算 |
+| `NOT_A_BOT_LOG` | stderr 日志级别 |
+| `NOT_A_BOT_<PROVIDER>_<FIELD>` | 单个凭据字段 |
 
 ## 导航
 

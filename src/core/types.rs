@@ -36,10 +36,10 @@ fn default_auto() -> String {
 /// sentence shapes that machine translation keeps.
 ///
 /// Hop selection, first match wins: `chain`, `preset`, `depth`, a non-auto
-/// `pivot`, then the configured `roundtrip_preset`.
+/// `pivot`, then the configured `rewrite_preset`.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct RoundtripRequest {
+pub struct RewriteRequest {
     pub text: String,
     #[serde(default = "default_auto")]
     pub source_lang: String,
@@ -74,7 +74,7 @@ pub struct RoundtripRequest {
     pub metadata: BTreeMap<String, serde_json::Value>,
     /// Detector command: reads the candidate on stdin and prints a score in
     /// [0,1] (higher = more AI-like) as its last line. Split into program and
-    /// args without a shell. Overrides the configured `roundtrip_scorer`.
+    /// args without a shell. Overrides the configured `rewrite_scorer`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scorer: Option<String>,
     /// Independent runs of the planned chain (1-5); above 1 needs a scorer.
@@ -143,7 +143,7 @@ pub struct HopEdit {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct RoundtripResponse {
+pub struct RewriteResponse {
     /// Final text, back in the detected source language.
     pub text: String,
     pub detected_source: String,

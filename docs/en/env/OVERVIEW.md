@@ -16,13 +16,13 @@ Environment variables are the lowest-friction way to configure a container or a 
 
 | Variable | Purpose |
 | --- | --- |
-| `TRANSLATEX_HOME` | Base directory for config, credentials and cache |
-| `TRANSLATEX_CONFIG` | Explicit config file path |
-| `TRANSLATEX_CREDENTIALS` | Explicit credentials file path |
-| `TRANSLATEX_CHAIN` | Comma-separated chain override |
-| `TRANSLATEX_TIMEOUT_MS` | Default per-request budget |
-| `TRANSLATEX_LOG` | stderr log level |
-| `TRANSLATEX_<PROVIDER>_<FIELD>` | One credential field |
+| `NOT_A_BOT_HOME` | Base directory for config, credentials and cache |
+| `NOT_A_BOT_CONFIG` | Explicit config file path |
+| `NOT_A_BOT_CREDENTIALS` | Explicit credentials file path |
+| `NOT_A_BOT_CHAIN` | Comma-separated chain override |
+| `NOT_A_BOT_TIMEOUT_MS` | Default per-request budget |
+| `NOT_A_BOT_LOG` | stderr log level |
+| `NOT_A_BOT_<PROVIDER>_<FIELD>` | One credential field |
 
 ## Navigation
 

@@ -5,14 +5,14 @@
 //! touching a vendor endpoint.
 
 use httpmock::prelude::*;
+use not_a_bot::core::config::Settings;
+use not_a_bot::core::creds::{Credential, CredentialStore};
+use not_a_bot::core::engine::Engine;
+use not_a_bot::core::types::TranslateRequest;
+use not_a_bot::providers::{libretranslate::LibreTranslate, llm::Llm, Provider, Registry};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use translatex::core::config::Settings;
-use translatex::core::creds::{Credential, CredentialStore};
-use translatex::core::engine::Engine;
-use translatex::core::types::TranslateRequest;
-use translatex::providers::{libretranslate::LibreTranslate, llm::Llm, Provider, Registry};
 
 fn request(text: &str, target: &str) -> TranslateRequest {
     TranslateRequest {
@@ -296,7 +296,7 @@ async fn probe_uses_the_liveness_endpoint() {
 }
 
 /// Passed only when this binary runs as a scorer; plain test runs return at once.
-const SCORER_SENTINEL: &str = "translatex-scorer-sentinel";
+const SCORER_SENTINEL: &str = "not-a-bot-scorer-sentinel";
 
 /// Scorer stub: this test binary, filtered to this test, reads the candidate
 /// and prints a score, then exits before libtest prints its summary. Works on
@@ -329,7 +329,7 @@ async fn best_of_scores_each_run_with_an_external_command() {
     registry.register(Arc::new(LibreTranslate::new(Some(&server.base_url()))));
 
     let exe = std::env::current_exe().unwrap();
-    let mut req: translatex::RoundtripRequest =
+    let mut req: not_a_bot::RewriteRequest =
         serde_json::from_str(r#"{"text":"Hello world","sourceLang":"en"}"#).unwrap();
     req.chain = vec!["libretranslate:zh".into(), "libretranslate:en".into()];
     req.best_of = Some(2);
@@ -340,9 +340,9 @@ async fn best_of_scores_each_run_with_an_external_command() {
     ));
 
     let out = engine(registry, CredentialStore::default(), settings())
-        .roundtrip(&req)
+        .rewrite(&req)
         .await
-        .expect("roundtrip");
+        .expect("rewrite");
 
     let r = &out.response;
     assert_eq!(r.score, Some(0.25), "warnings: {:?}", r.warnings);

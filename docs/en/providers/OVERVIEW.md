@@ -34,9 +34,9 @@ A provider is one translation backend. Every provider reports a stable id, a kin
 ## Inspecting at runtime
 
 ```bash
-translatex providers --format json
-translatex languages --provider edge --format json
-translatex health --format json
+not-a-bot providers --format json
+not-a-bot languages --provider edge --format json
+not-a-bot health --format json
 ```
 
 `providers` is the authoritative list for your machine: registration depends on credentials and config, so it can differ from the catalogue.

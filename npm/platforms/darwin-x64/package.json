@@ -1,12 +1,12 @@
 {
-  "name": "translatex-darwin-x64",
-  "version": "0.3.0",
-  "description": "The translatex binary for macOS x64. Installed automatically by translatex.",
+  "name": "not-a-bot-darwin-x64",
+  "version": "0.1.0",
+  "description": "The not-a-bot binary for macOS x64. Installed automatically by not-a-bot.",
   "license": "MIT OR Apache-2.0",
-  "homepage": "https://github.com/w21180239/translatex",
+  "homepage": "https://github.com/w21180239/not-a-bot",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/w21180239/translatex.git"
+    "url": "git+https://github.com/w21180239/not-a-bot.git"
   },
   "os": [
     "darwin"
@@ -15,6 +15,6 @@
     "x64"
   ],
   "files": [
-    "translatex"
+    "not-a-bot"
   ]
 }

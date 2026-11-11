@@ -4,7 +4,7 @@
 
 [← 集成](OVERVIEW.md) · [文档索引](../README.md)
 
-harness 指承载 Agent 的宿主：终端里的编码 Agent、编辑器助手，或能执行命令的聊天客户端。`translatex` 用两份文档覆盖 24 家：会加载 skill 的宿主拿到 `SKILL.md`，读项目规则的宿主拿到一段指令。每家都能直接调用 CLI，那才是真正的接入点。
+harness 指承载 Agent 的宿主：终端里的编码 Agent、编辑器助手，或能执行命令的聊天客户端。`not-a-bot` 用两份文档覆盖 24 家：会加载 skill 的宿主拿到 `SKILL.md`，读项目规则的宿主拿到一段指令。每家都能直接调用 CLI，那才是真正的接入点。
 
 <div align="center">
 <table>
@@ -60,25 +60,25 @@ harness 指承载 Agent 的宿主：终端里的编码 Agent、编辑器助手�
 
 ## 路径与命令
 
-路径相对于你要让 Agent 工作的项目；源文件来自 `translatex` 仓库。
+路径相对于你要让 Agent 工作的项目；源文件来自 `not-a-bot` 仓库。
 
 | Harness | 通道 | 写到 | 命令 |
 | --- | --- | --- | --- |
-| Claude Code | Skill | `.claude/skills/translatex/SKILL.md` | `mkdir -p .claude/skills/translatex && cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/` |
-| Claude Code | Skill（个人级） | `~/.claude/skills/translatex/SKILL.md` | 同上，放到 `$HOME` 下 |
-| Claude Code | 插件 | 由 CLI 安装 | `/plugin marketplace add w21180239/translatex`，再 `/plugin install translatex@translatex` |
-| Codex CLI | Skill | `~/.agents/skills/translatex/SKILL.md` | `mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/` |
+| Claude Code | Skill | `.claude/skills/not-a-bot/SKILL.md` | `mkdir -p .claude/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md .claude/skills/not-a-bot/` |
+| Claude Code | Skill（个人级） | `~/.claude/skills/not-a-bot/SKILL.md` | 同上，放到 `$HOME` 下 |
+| Claude Code | 插件 | 由 CLI 安装 | `/plugin marketplace add w21180239/not-a-bot`，再 `/plugin install not-a-bot@not-a-bot` |
+| Codex CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.agents/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/` |
 | Codex CLI | 指令 | `AGENTS.md`、`~/.codex/AGENTS.md` | `cat integrations/guidance/AGENTS.md >> AGENTS.md` |
-| Gemini CLI | Skill | `~/.agents/skills/translatex/SKILL.md` | 与 Codex 共用 |
+| Gemini CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` | 与 Codex 共用 |
 | Gemini CLI | 指令 | `GEMINI.md` | `cat integrations/guidance/AGENTS.md >> GEMINI.md` |
-| OpenCode | Skill | `~/.config/opencode/skills/translatex/SKILL.md` | `mkdir -p ~/.config/opencode/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/` |
+| OpenCode | Skill | `~/.config/opencode/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.config/opencode/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.config/opencode/skills/not-a-bot/` |
 | OpenCode | 指令 | `AGENTS.md` | `cat integrations/guidance/AGENTS.md >> AGENTS.md` |
-| Cursor | 规则 | `.cursor/rules/translatex.mdc` | `mkdir -p .cursor/rules && cp integrations/cursor/translatex.mdc .cursor/rules/` |
-| Cline | 规则 | `.clinerules/translatex.md` | `mkdir -p .clinerules && cat integrations/guidance/AGENTS.md > .clinerules/translatex.md` |
-| Roo Code | 规则 | `.roo/rules/translatex.md` | `mkdir -p .roo/rules && cat integrations/guidance/AGENTS.md > .roo/rules/translatex.md` |
-| Kilo Code | 规则 | `.kilocode/rules/translatex.md` | `mkdir -p .kilocode/rules && cat integrations/guidance/AGENTS.md > .kilocode/rules/translatex.md` |
-| Continue | 规则 | `.continue/rules/translatex.md` | `mkdir -p .continue/rules && cat integrations/guidance/AGENTS.md > .continue/rules/translatex.md` |
-| JetBrains AI | 规则 | `.aiassistant/rules/translatex.md` | `mkdir -p .aiassistant/rules && cat integrations/guidance/AGENTS.md > .aiassistant/rules/translatex.md` |
+| Cursor | 规则 | `.cursor/rules/not-a-bot.mdc` | `mkdir -p .cursor/rules && cp integrations/cursor/not-a-bot.mdc .cursor/rules/` |
+| Cline | 规则 | `.clinerules/not-a-bot.md` | `mkdir -p .clinerules && cat integrations/guidance/AGENTS.md > .clinerules/not-a-bot.md` |
+| Roo Code | 规则 | `.roo/rules/not-a-bot.md` | `mkdir -p .roo/rules && cat integrations/guidance/AGENTS.md > .roo/rules/not-a-bot.md` |
+| Kilo Code | 规则 | `.kilocode/rules/not-a-bot.md` | `mkdir -p .kilocode/rules && cat integrations/guidance/AGENTS.md > .kilocode/rules/not-a-bot.md` |
+| Continue | 规则 | `.continue/rules/not-a-bot.md` | `mkdir -p .continue/rules && cat integrations/guidance/AGENTS.md > .continue/rules/not-a-bot.md` |
+| JetBrains AI | 规则 | `.aiassistant/rules/not-a-bot.md` | `mkdir -p .aiassistant/rules && cat integrations/guidance/AGENTS.md > .aiassistant/rules/not-a-bot.md` |
 | Zed | 规则 | `.rules` | `cat integrations/guidance/AGENTS.md >> .rules` |
 | Aider | 指令 | `CONVENTIONS.md` | `cat integrations/guidance/AGENTS.md >> CONVENTIONS.md`，再 `aider --read CONVENTIONS.md` |
 | Qwen Code | 指令 | `QWEN.md` | `cat integrations/guidance/AGENTS.md >> QWEN.md` |
@@ -93,7 +93,7 @@ harness 指承载 Agent 的宿主：终端里的编码 Agent、编辑器助手�
 | Reasonix | 指令 | `AGENTS.md` | 同上 |
 | ZCode | 指令 | `AGENTS.md` | 同上 |
 | QwenPaw | 指令 | 项目指令文件 | 粘贴该段 |
-| 其它 | CLI | — | Agent 直接执行 `translatex … --format json` |
+| 其它 | CLI | — | Agent 直接执行 `not-a-bot … --format json` |
 
 Windows PowerShell：`New-Item -ItemType Directory -Force <dir>`，再用 `Get-Content <src> | Add-Content <dst>`。
 
@@ -101,27 +101,27 @@ Windows PowerShell：`New-Item -ItemType Directory -Force <dir>`，再用 `Get-C
 
 两份文档都只讲四条规则，其它都不需要：
 
-1. 调用 `translatex`，不要自己翻译。
+1. 调用 `not-a-bot`，不要自己翻译。
 2. 读 JSON 里的 `text`；`provider` 与 `detectedSource` 由工具给出。
 3. 代码、路径、标识符、URL 走 `--preserve`。
-4. 处理 AI 味文字用 `roundtrip --preset standard --preserve @code`，LLM 跳会重建句子；机器翻译预设保留句子，用它们之前要自己先删 AI 套话。检查 `missingFacts` 和 `warnings`，并如实报告。
+4. 处理 AI 味文字用 `rewrite --preset standard --preserve @code`，LLM 跳会重建句子；机器翻译预设保留句子，用它们之前要自己先删 AI 套话。检查 `missingFacts` 和 `warnings`，并如实报告。
 
-完整 skill 还包括错误表和重试规则：[`integrations/skill/translatex/SKILL.md`](../../../integrations/skill/translatex/SKILL.md)。
+完整 skill 还包括错误表和重试规则：[`integrations/skill/not-a-bot/SKILL.md`](../../../integrations/skill/not-a-bot/SKILL.md)。
 
 ## 验证接入
 
 让 harness 翻一句，然后看回复里有没有 provider 名：
 
 ```bash
-translatex translate "Hello world" -t zh --format json
+not-a-bot translate "Hello world" -t zh --format json
 ```
 
-有译文但没有 `provider` 字段，说明是模型自己翻的，文档没被读到。确认上面的路径、确认 harness 所在 shell 里 `translatex --version` 能跑，然后重启会话让它重新读取。
+有译文但没有 `provider` 字段，说明是模型自己翻的，文档没被读到。确认上面的路径、确认 harness 所在 shell 里 `not-a-bot --version` 能跑，然后重启会话让它重新读取。
 
 图形界面宿主（Cursor、VS Code）启动时的 `PATH` 常和终端不同。二进制装在 `~/.cargo/bin` 下时，把该目录加进宿主的运行环境，或者改用 npm 安装，让 shim 落在全局路径里。
 
 ## 导航
 
 - ← [集成](OVERVIEW.md)
-- → [往返翻译](../roundtrip/OVERVIEW.md)
+- → [往返翻译](../rewrite/OVERVIEW.md)
 - ↑ [文档索引](../README.md)

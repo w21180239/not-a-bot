@@ -3,13 +3,13 @@
 //! Everything asserted here is a shape an agent parses, so a change to any of
 //! it is a breaking change and should fail CI rather than surface at runtime.
 
+use not_a_bot::cli::{manifest_document, schema_document};
+use not_a_bot::core::config::Settings;
+use not_a_bot::core::creds::CredentialStore;
+use not_a_bot::core::types::{ProviderKind, TranslateRequest, TranslateResponse};
+use not_a_bot::providers::KNOWN_PROVIDERS;
+use not_a_bot::{Error, Registry};
 use std::collections::BTreeMap;
-use translatex::cli::{manifest_document, schema_document};
-use translatex::core::config::Settings;
-use translatex::core::creds::CredentialStore;
-use translatex::core::types::{ProviderKind, TranslateRequest, TranslateResponse};
-use translatex::providers::KNOWN_PROVIDERS;
-use translatex::{Error, Registry};
 
 const WIRE_TYPES: [&str; 8] = [
     "TranslateRequest",
@@ -18,12 +18,12 @@ const WIRE_TYPES: [&str; 8] = [
     "ProviderInfo",
     "HealthRecord",
     "AttemptRecord",
-    "RoundtripRequest",
-    "RoundtripResponse",
+    "RewriteRequest",
+    "RewriteResponse",
 ];
 
 fn default_registry() -> Registry {
-    translatex::cli::build_registry(&CredentialStore::default(), &Settings::default())
+    not_a_bot::cli::build_registry(&CredentialStore::default(), &Settings::default())
 }
 
 #[test]
@@ -33,8 +33,8 @@ fn schema_publishes_every_wire_type() {
         doc["$schema"],
         "https://json-schema.org/draft/2020-12/schema"
     );
-    assert_eq!(doc["version"], translatex::core::types::VERSION);
-    assert_eq!(doc["title"], "translatex");
+    assert_eq!(doc["version"], not_a_bot::core::types::VERSION);
+    assert_eq!(doc["title"], "not-a-bot");
 
     let defs = doc["definitions"].as_object().expect("definitions object");
     for name in WIRE_TYPES {
@@ -140,7 +140,7 @@ fn provider_catalogue_honours_kind_and_priority_bands() {
         assert!(info.max_chars > 0, "{} advertises no size limit", info.name);
         for code in &info.languages {
             assert!(
-                code == "*" || translatex::core::lang::is_known(code),
+                code == "*" || not_a_bot::core::lang::is_known(code),
                 "{} advertises a non-canonical code {code}",
                 info.name
             );
@@ -255,7 +255,7 @@ fn manifest_describes_the_cli_surface() {
     names.sort_unstable();
     assert_eq!(
         names,
-        vec!["health", "languages", "providers", "roundtrip", "translate"]
+        vec!["health", "languages", "providers", "rewrite", "translate"]
     );
 
     for command in manifest["commands"].as_array().expect("commands array") {
@@ -266,8 +266,8 @@ fn manifest_describes_the_cli_surface() {
         );
     }
 
-    // `translate` and `roundtrip` carry their request schema for generators.
-    for name in ["translate", "roundtrip"] {
+    // `translate` and `rewrite` carry their request schema for generators.
+    for name in ["translate", "rewrite"] {
         let command = manifest["commands"]
             .as_array()
             .unwrap()

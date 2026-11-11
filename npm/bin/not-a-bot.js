@@ -10,12 +10,13 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const exe = process.platform === 'win32' ? 'translatex.exe' : 'translatex';
+// Both bins (`not-a-bot` and `nab`) point at this launcher; the binaries behave the same.
+const exe = process.platform === 'win32' ? 'not-a-bot.exe' : 'not-a-bot';
 
 // npm blocks package names that look machine-generated, and "win32" trips its
-// spam filter, so the Windows package is published as translatex-windows-x64.
+// spam filter, so the Windows package is published as not-a-bot-windows-x64.
 const platformName = process.platform === 'win32' ? 'windows' : process.platform;
-const platformPackage = `translatex-${platformName}-${process.arch}`;
+const platformPackage = `not-a-bot-${platformName}-${process.arch}`;
 
 function binaryFromPlatformPackage() {
   let packageJson;
@@ -28,16 +29,16 @@ function binaryFromPlatformPackage() {
   return fs.existsSync(candidate) ? candidate : null;
 }
 
-const binary = process.env.TRANSLATEX_BINARY_PATH || binaryFromPlatformPackage();
+const binary = process.env.NOT_A_BOT_BINARY_PATH || binaryFromPlatformPackage();
 
 if (!binary) {
   process.stderr.write(
     [
-      `translatex: no binary for ${process.platform}/${process.arch}.`,
+      `not-a-bot: no binary for ${process.platform}/${process.arch}.`,
       '',
       `The package ${platformPackage} is missing. Reinstall, or install from source:`,
-      '  npm install -g translatex --force',
-      '  cargo install translatex --locked',
+      '  npm install -g not-a-bot --force',
+      '  cargo install not-a-bot --locked',
       '',
       'If your platform has no prebuilt binary, cargo is the way.',
       '',
@@ -49,7 +50,7 @@ if (!binary) {
 const child = spawn(binary, process.argv.slice(2), { stdio: 'inherit' });
 
 child.on('error', (err) => {
-  process.stderr.write(`translatex: failed to start ${binary}: ${err.message}\n`);
+  process.stderr.write(`not-a-bot: failed to start ${binary}: ${err.message}\n`);
   process.exit(1);
 });
 

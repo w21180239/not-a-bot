@@ -8,9 +8,9 @@
 
 | 文件 | 默认路径 | 覆盖方式 |
 | --- | --- | --- |
-| 配置 | `~/.config/translatex/config.toml` | `--config`、`TRANSLATEX_CONFIG`、`TRANSLATEX_HOME`、`XDG_CONFIG_HOME` |
-| 凭据 | `~/.config/translatex/credentials.toml` | `--credentials`、`TRANSLATEX_CREDENTIALS` |
-| 冷却状态 | `~/.config/translatex/cache/keys-<provider>.json` | 跟随配置目录 |
+| 配置 | `~/.config/not-a-bot/config.toml` | `--config`、`NOT_A_BOT_CONFIG`、`NOT_A_BOT_HOME`、`XDG_CONFIG_HOME` |
+| 凭据 | `~/.config/not-a-bot/credentials.toml` | `--credentials`、`NOT_A_BOT_CREDENTIALS` |
+| 冷却状态 | `~/.config/not-a-bot/cache/keys-<provider>.json` | 跟随配置目录 |
 
 文件不存在不是错误，会使用默认值。
 
@@ -24,9 +24,9 @@ default_target = "zh"
 timeout_ms = 20000     # 单次 Provider 调用的整体预算
 retries = 1            # 可重试错误的额外尝试次数（超时不重试）
 race_width = 3         # 同时在飞的 Provider 数；1 为严格串行
-roundtrip_pivot = "zh" # `translatex roundtrip --pivot auto` 的默认中转语言
-roundtrip_preset = "light" # 请求没给 chain、preset、depth、pivot 时的默认往返
-roundtrip_llm = "opencode-cli" # `standard`、`strong` 预设里 LLM 跳所用的引擎；或 "claude-cli"
+rewrite_pivot = "zh" # `not-a-bot rewrite --pivot auto` 的默认中转语言
+rewrite_preset = "standard" # 请求没给 chain、preset、depth、pivot 时的默认往返
+rewrite_llm = "opencode-cli" # `standard`、`strong` 预设里 LLM 跳所用的引擎；或 "claude-cli"
 concurrency = 4        # 预留：批次并发
 log = "warn"
 
@@ -55,8 +55,8 @@ bin = "opencode"
 - `chain` 中的 Provider 按书写顺序排在最前，与优先级无关；其余已注册的按优先级升序追加。
 - `timeout_ms`、`retries` 是请求默认值；请求里的 `timeoutMs` 覆盖超时。
 - `race_width` 控制同时在飞的 Provider 数；`1` 恢复严格串行。`--race` 参数覆盖单次调用。
-- 请求里写 `"pivot": "auto"` 时，`roundtrip_pivot` 就是默认中转语言。
-- `roundtrip_preset` 在请求没给 `chain`、`preset`、`depth`、`pivot` 时决定默认往返；`roundtrip_llm` 指定 `standard`、`strong` 预设里 LLM 跳所用的引擎。
+- 请求里写 `"pivot": "auto"` 时，`rewrite_pivot` 就是默认中转语言。
+- `rewrite_preset` 在请求没给 `chain`、`preset`、`depth`、`pivot` 时决定默认往返；`rewrite_llm` 指定 `standard`、`strong` 预设里 LLM 跳所用的引擎。
 - `[provider.<name>]` 只接受 `base_url`、`model`、`region`、`instance`、`tier`、`bin`，其他键同样会被拒绝。
 
 ## `credentials.toml`
@@ -88,11 +88,11 @@ secret_key = "..."
 四种来源，依次是：
 
 1. 内置免费接口，不需要凭据。
-2. `~/.config/translatex/credentials.toml` 里的标签，按文件顺序轮换。
-3. `TRANSLATEX_<PROVIDER>_<FIELD>` 环境变量，合并成一个 `env` 标签，排在文件标签之后。
+2. `~/.config/not-a-bot/credentials.toml` 里的标签，按文件顺序轮换。
+3. `NOT_A_BOT_<PROVIDER>_<FIELD>` 环境变量，合并成一个 `env` 标签，排在文件标签之后。
 4. 字段写成 `@keyring` 时，加载文件时从系统钥匙串读取。
 
-字段名沿用 Provider 自己的命名：`TRANSLATEX_DEEPL_API_KEY`、`TRANSLATEX_AZURE_REGION`、`TRANSLATEX_BAIDU_SECRET_KEY`。
+字段名沿用 Provider 自己的命名：`NOT_A_BOT_DEEPL_API_KEY`、`NOT_A_BOT_AZURE_REGION`、`NOT_A_BOT_BAIDU_SECRET_KEY`。
 
 ## 钥匙串占位符
 
@@ -108,8 +108,8 @@ api_key = "@keyring"
 ## 校验
 
 ```bash
-translatex providers --format json   # 每个 Provider 的 configured
-translatex keys deepl --format json  # 标签与冷却状态
+not-a-bot providers --format json   # 每个 Provider 的 configured
+not-a-bot keys deepl --format json  # 标签与冷却状态
 ```
 
 ## 导航

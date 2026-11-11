@@ -39,7 +39,7 @@
 | `INVALID_INPUT` | 否 | `fix_input` | 空文本、错误语言码、源目标相同 |
 | `INVALID_PRESERVE_PATTERN` | 否 | `fix_preserve_pattern` | 正则无法编译 |
 | `CONFIG_ERROR` | 否 | `fix_config_file` | TOML 格式错误或未知键 |
-| `INTERNAL` | 否 | `report_bug` | translatex 自身的缺陷 |
+| `INTERNAL` | 否 | `report_bug` | not-a-bot 自身的缺陷 |
 
 ## 决策表
 

@@ -7,10 +7,10 @@ Cursor reads project rules from `.cursor/rules/*.mdc` and, in recent versions,
 
 ```bash
 mkdir -p .cursor/rules
-cp integrations/cursor/translatex.mdc .cursor/rules/translatex.mdc
+cp integrations/cursor/not-a-bot.mdc .cursor/rules/not-a-bot.mdc
 ```
 
-[`translatex.mdc`](translatex.mdc) sets `alwaysApply: false`, so Cursor loads it
+[`not-a-bot.mdc`](not-a-bot.mdc) sets `alwaysApply: false`, so Cursor loads it
 when the request looks like a translation task instead of padding every prompt.
 
 ## AGENTS.md instead
@@ -24,7 +24,7 @@ Use one or the other. Two copies drift.
 ## Verify
 
 ```bash
-translatex translate "Hello world" -t zh --format json
+not-a-bot translate "Hello world" -t zh --format json
 ```
 
 Then ask Cursor to translate a sentence. A correct run shows a terminal command

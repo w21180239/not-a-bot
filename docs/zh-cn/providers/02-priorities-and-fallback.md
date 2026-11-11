@@ -9,7 +9,7 @@
 `Registry::chain` 按以下顺序生成尝试列表：
 
 1. **Fallback 列表** —— `--fallback` / `fallbackChain`，按书写顺序。
-2. **配置链** —— `config.toml` 的 `chain` 或 `TRANSLATEX_CHAIN`。
+2. **配置链** —— `config.toml` 的 `chain` 或 `NOT_A_BOT_CHAIN`。
 3. **其余已注册 Provider** —— 按 `priority` 升序。
 
 去重按解析后的 Provider id 进行，因此别名与目标不会同时出现。用 `--provider` 指定时：
@@ -49,9 +49,9 @@
 | Provider | 原因 | 如何启用 |
 | --- | --- | --- |
 | `reverso` | Cloudflare 拒绝本客户端的 TLS 指纹，每次尝试都在握手阶段失败 | `--provider reverso`、`--fallback reverso`，或写进 `chain` |
-| `claude-cli`、`opencode-cli` | 慢，且每次调用消耗订阅额度 | 点名使用：`roundtrip` 的某一跳（`claude-cli:zh`）、预设（`standard`、`strong`）、`--provider`、`--fallback` 或 `chain` |
+| `claude-cli`、`opencode-cli` | 慢，且每次调用消耗订阅额度 | 点名使用：`rewrite` 的某一跳（`claude-cli:zh`）、预设（`standard`、`strong`）、`--provider`、`--fallback` 或 `chain` |
 
-跳过列表是 `src/providers/mod.rs` 中的 `DEFAULT_EXCLUDED`。注册表不会按优先级把这类 Provider 追加进链；但只要显式点名（指定、fallback 或配置链），仍会尝试，`translatex providers` 也仍会列出它。
+跳过列表是 `src/providers/mod.rs` 中的 `DEFAULT_EXCLUDED`。注册表不会按优先级把这类 Provider 追加进链；但只要显式点名（指定、fallback 或配置链），仍会尝试，`not-a-bot providers` 也仍会列出它。
 
 ## 尝试行为
 
@@ -75,7 +75,7 @@
 
 冷却的目的是在凭据之间轮换，而不是让 Provider 下线：
 
-- 有 Key 的 Provider 把冷却状态写入 `~/.config/translatex/cache/keys-<provider>.json`，所有进程共享。
+- 有 Key 的 Provider 把冷却状态写入 `~/.config/not-a-bot/cache/keys-<provider>.json`，所有进程共享。
 - 无 Key 的 Provider 使用不受管理的环。它的唯一伪凭据永不冷却，因为没有第二个 Key 可换，冷却只会悄悄让这个通道消失。
 - 如果所有 Provider 的所有 Key 都在冷却，错误是带最长剩余时间的 `RATE_LIMITED`，而不是 `NO_PROVIDER`。
 

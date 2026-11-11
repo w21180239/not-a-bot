@@ -7,9 +7,9 @@
 ## `translate`
 
 ```bash
-translatex translate "Hello world" -t zh
-translatex translate -t zh --json '{"text":"Hello","sourceLang":"en"}'
-echo "Hello" | translatex translate -t ja
+not-a-bot translate "Hello world" -t zh
+not-a-bot translate -t zh --json '{"text":"Hello","sourceLang":"en"}'
+echo "Hello" | not-a-bot translate -t ja
 ```
 
 | 参数 | 默认 | 说明 |
@@ -30,13 +30,13 @@ echo "Hello" | translatex translate -t ja
 - `--preserve` 在链之前执行。还原失败记为一次失败尝试，继续下一个 Provider。
 - `--from auto` 要求 Provider 支持检测。`autoDetect: false` 的 Provider 会被跳过；强行指定则返回 `AUTO_DETECT_UNSUPPORTED`。
 
-## `roundtrip`
+## `rewrite`
 
 ```bash
-translatex roundtrip "In today's fast-paced landscape, …" --from en --format json
-translatex polish draft.md --pivot ja
-translatex roundtrip "…" --from en --preset standard --preserve @code
-translatex roundtrip "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
+not-a-bot rewrite "In today's fast-paced landscape, …" --from en --format json
+not-a-bot polish draft.md --pivot ja
+not-a-bot rewrite "…" --from en --preset standard --preserve @code
+not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
 ```
 
 | 参数 | 默认 | 说明 |
@@ -45,26 +45,26 @@ translatex roundtrip "…" --from en --chain "opencode-cli:zh,edge:en,opencode-c
 | `-s, --from` | `auto` | 源语言 |
 | `--pivot` | `auto` | 中转语言 |
 | `--chain` | — | 逗号分隔的跳 `[engine:]lang`；末尾没回到源语言时自动补一跳；`<llm>:fix` 为修复跳 |
-| `--preset` | 配置 `roundtrip_preset`（`light`） | `light`、`standard`、`strong` |
+| `--preset` | 配置 `rewrite_preset`（`standard`） | `light`、`standard`、`strong` |
 | `--depth` | — | 1-3 跳机器翻译，依次经 zh、ja、fi（中文原文为 en、ja、fi） |
 | `-p, --provider` | `auto` | 两跳都用指定 Provider |
 | `--fallback` | 空 | 指定 Provider 之后尝试的列表 |
 | `--preserve` | 空 | 需要原样保留的正则，或具名模式 `@code`、`@url`；可重复 |
 | `--timeout-ms` | 配置值 | 每跳预算 |
 | `--request-id` | 自动生成 | 关联 id |
-| `--json` | — | 完整 `RoundtripRequest`，覆盖其它参数 |
+| `--json` | — | 完整 `RewriteRequest`，覆盖其它参数 |
 
-选跳规则，先匹配者生效：`--chain`、`--preset`、`--depth`、`--pivot`，最后是配置里的 `roundtrip_preset`（默认 `light`，两跳机器翻译）。`claude-cli` 和 `opencode-cli` 只在某一跳、预设或 `--provider` 点名时运行。响应带 `chain`、`hops`、`missingFacts` 和 `warnings`；每次运行后都要读 `missingFacts`。链、预设与修复跳见 [roundtrip/02-chains-presets-and-llm.md](../roundtrip/02-chains-presets-and-llm.md)。
+选跳规则，先匹配者生效：`--chain`、`--preset`、`--depth`、`--pivot`，最后是配置里的 `rewrite_preset`（默认 `standard`；`light` 是两跳机器翻译）。`claude-cli` 和 `opencode-cli` 只在某一跳、预设或 `--provider` 点名时运行。响应带 `chain`、`hops`、`missingFacts` 和 `warnings`；每次运行后都要读 `missingFacts`。链、预设与修复跳见 [rewrite/02-chains-presets-and-llm.md](../rewrite/02-chains-presets-and-llm.md)。
 
-结果永远回到源语言。`pivot: auto` 对非中文用中文、对中文用英文；技术类英文的官方备选是 `--pivot ja`，见 [roundtrip/01-pivot-choice.md](../roundtrip/01-pivot-choice.md)。
+结果永远回到源语言。`pivot: auto` 对非中文用中文、对中文用英文；技术类英文的官方备选是 `--pivot ja`，见 [rewrite/01-pivot-choice.md](../rewrite/01-pivot-choice.md)。
 
 中转语言等于源语言时会自动换成另一侧，因此 `--from en --pivot en` 实际是 `en -> zh -> en`，不会变成空操作。
 
 ## `batch`
 
 ```bash
-translatex batch --file jobs.ndjson --parallel 4
-cat jobs.ndjson | translatex batch --parallel 8
+not-a-bot batch --file jobs.ndjson --parallel 4
+cat jobs.ndjson | not-a-bot batch --parallel 8
 ```
 
 输入为每行一个 `TranslateRequest`。输出每行一个对象，虽然并发执行，但会按输入顺序排好：
@@ -79,8 +79,8 @@ cat jobs.ndjson | translatex batch --parallel 8
 ## `providers`
 
 ```bash
-translatex providers --format json
-translatex providers --format text
+not-a-bot providers --format json
+not-a-bot providers --format text
 ```
 
 JSON 形式为 `{providers: ProviderInfo[]}`；文本形式为 `name<TAB>status`，方便 shell 处理。
@@ -88,8 +88,8 @@ JSON 形式为 `{providers: ProviderInfo[]}`；文本形式为 `name<TAB>status`
 ## `languages`
 
 ```bash
-translatex languages                       # 全部规范语言码
-translatex languages --provider google     # 该 Provider 声明的集合
+not-a-bot languages                       # 全部规范语言码
+not-a-bot languages --provider google     # 该 Provider 声明的集合
 ```
 
 Provider 集合里的 `*` 表示接受任意规范语言码。未知名字返回 `PROVIDER_NOT_FOUND`；已实现但未配置返回 `PROVIDER_NOT_CONFIGURED`。
@@ -97,15 +97,15 @@ Provider 集合里的 `*` 表示接受任意规范语言码。未知名字返回
 ## `keys`
 
 ```bash
-translatex keys                    # 已配置 Provider 的冷却与失败状态
-translatex keys deepl              # 单个 Provider
-translatex keys --reset            # 清空全部冷却文件
+not-a-bot keys                    # 已配置 Provider 的冷却与失败状态
+not-a-bot keys deepl              # 单个 Provider
+not-a-bot keys --reset            # 清空全部冷却文件
 ```
 
 ## `health`
 
 ```bash
-translatex health --format json
+not-a-bot health --format json
 ```
 
 用真实接口探测每个已注册 Provider，返回 `{healthy, providers: HealthRecord[]}`；有已配置 Provider 不健康时进程以非零退出。
@@ -113,13 +113,13 @@ translatex health --format json
 ## `schema`、`manifest`、`init`、`completions`
 
 ```bash
-translatex schema      > schema.json
-translatex manifest    > manifest.json
-translatex init --path ~/.config/translatex/config.toml
-translatex completions bash
+not-a-bot schema      > schema.json
+not-a-bot manifest    > manifest.json
+not-a-bot init --path ~/.config/not-a-bot/config.toml
+not-a-bot completions bash
 ```
 
-`schema` 输出 draft 2020-12 定义：`TranslateRequest`、`TranslateResponse`、`ErrorResponse`、`ProviderInfo`、`HealthRecord`、`AttemptRecord`、`RoundtripRequest`、`RoundtripResponse`。
+`schema` 输出 draft 2020-12 定义：`TranslateRequest`、`TranslateResponse`、`ErrorResponse`、`ProviderInfo`、`HealthRecord`、`AttemptRecord`、`RewriteRequest`、`RewriteResponse`。
 
 `manifest` 输出 `{interface: "cli", commands: [{name, command, description, inputSchema?}], skill, install}`，Agent 不必解析 `--help` 就能发现操作。
 

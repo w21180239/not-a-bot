@@ -1,10 +1,10 @@
-//! Detector scores for roundtrip candidates: best-of selection and the preset
+//! Detector scores for rewrite candidates: best-of selection and the preset
 //! ladder behind `targetScore`. Fact preservation outranks the score.
 
 use crate::core::config::Settings;
-use crate::core::engine::RoundtripOutcome;
+use crate::core::engine::RewriteOutcome;
 use crate::core::error::{Error, Result};
-use crate::core::types::{Candidate, RoundtripRequest};
+use crate::core::types::{Candidate, RewriteRequest};
 use async_trait::async_trait;
 use std::cmp::Ordering;
 use std::future::Future;
@@ -148,7 +148,7 @@ fn rank(a: &Candidate, b: &Candidate) -> Ordering {
 
 /// Name of what a request runs: the comma-joined chain, the preset, or the
 /// depth/pivot/configured default, in planning precedence.
-pub fn label(req: &RoundtripRequest, settings: &Settings) -> String {
+pub fn label(req: &RewriteRequest, settings: &Settings) -> String {
     if !req.chain.is_empty() {
         return req.chain.join(",");
     }
@@ -162,20 +162,20 @@ pub fn label(req: &RoundtripRequest, settings: &Settings) -> String {
     if !pivot.is_empty() && pivot != "auto" {
         return format!("pivot-{pivot}");
     }
-    settings.roundtrip_preset()
+    settings.rewrite_preset()
 }
 
 /// Validate the scoring options, then run the request `bestOf` times per rung
 /// and return the selected run. Without a scorer this is a single `run`.
 pub async fn search<F, Fut>(
-    req: &RoundtripRequest,
+    req: &RewriteRequest,
     settings: &Settings,
     scorer: Option<&dyn Scorer>,
     mut run: F,
-) -> Result<RoundtripOutcome>
+) -> Result<RewriteOutcome>
 where
-    F: FnMut(RoundtripRequest) -> Fut,
-    Fut: Future<Output = Result<RoundtripOutcome>>,
+    F: FnMut(RewriteRequest) -> Fut,
+    Fut: Future<Output = Result<RewriteOutcome>>,
 {
     let best_of = req.best_of.unwrap_or(1);
     if !(1..=MAX_BEST_OF).contains(&best_of) {
@@ -193,12 +193,12 @@ where
     let Some(scorer) = scorer else {
         if best_of > 1 {
             return Err(Error::InvalidInput(
-                "bestOf above 1 needs a scorer to choose between runs; pass --scorer or set roundtrip_scorer".into(),
+                "bestOf above 1 needs a scorer to choose between runs; pass --scorer or set rewrite_scorer".into(),
             ));
         }
         if req.target_score.is_some() {
             return Err(Error::InvalidInput(
-                "targetScore needs a scorer; pass --scorer or set roundtrip_scorer".into(),
+                "targetScore needs a scorer; pass --scorer or set rewrite_scorer".into(),
             ));
         }
         return run(req.clone()).await;
@@ -211,7 +211,7 @@ where
         .get_or_insert_with(|| uuid::Uuid::new_v4().to_string());
     let mut rungs = vec![(label(&base, settings), base.clone())];
     if req.target_score.is_some() {
-        for preset in settings.roundtrip_ladder() {
+        for preset in settings.rewrite_ladder() {
             if rungs.iter().any(|(l, _)| *l == preset) {
                 continue;
             }
@@ -223,7 +223,7 @@ where
         }
     }
 
-    let mut runs: Vec<RoundtripOutcome> = Vec::new();
+    let mut runs: Vec<RewriteOutcome> = Vec::new();
     let mut candidates: Vec<Candidate> = Vec::new();
     let mut notes = Vec::new();
     let mut first_err = None;
@@ -269,7 +269,7 @@ where
     }
 
     let Some(best) = select(&candidates) else {
-        return Err(first_err.unwrap_or_else(|| Error::InvalidInput("no roundtrip ran".into())));
+        return Err(first_err.unwrap_or_else(|| Error::InvalidInput("no rewrite ran".into())));
     };
     if let Some(target) = req.target_score {
         match candidates[best].score {
@@ -301,7 +301,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::types::RoundtripResponse;
+    use crate::core::types::RewriteResponse;
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
 
@@ -321,9 +321,9 @@ mod tests {
         FakeScorer(pairs.iter().map(|(t, s)| (t.to_string(), *s)).collect())
     }
 
-    fn outcome(text: &str, missing: usize) -> RoundtripOutcome {
-        RoundtripOutcome {
-            response: RoundtripResponse {
+    fn outcome(text: &str, missing: usize) -> RewriteOutcome {
+        RewriteOutcome {
+            response: RewriteResponse {
                 text: text.into(),
                 detected_source: "en".into(),
                 chain: vec!["en".into()],
@@ -342,8 +342,8 @@ mod tests {
         }
     }
 
-    fn req(preset: &str) -> RoundtripRequest {
-        let mut r: RoundtripRequest = serde_json::from_str(r#"{"text":"hi"}"#).unwrap();
+    fn req(preset: &str) -> RewriteRequest {
+        let mut r: RewriteRequest = serde_json::from_str(r#"{"text":"hi"}"#).unwrap();
         r.preset = Some(preset.into());
         r
     }
@@ -362,8 +362,8 @@ mod tests {
     fn runner(
         calls: Calls,
         missing: &'static [(&'static str, usize)],
-    ) -> impl FnMut(RoundtripRequest) -> futures::future::Ready<Result<RoundtripOutcome>> {
-        move |r: RoundtripRequest| {
+    ) -> impl FnMut(RewriteRequest) -> futures::future::Ready<Result<RewriteOutcome>> {
+        move |r: RewriteRequest| {
             let mut calls = calls.lock().unwrap();
             let label = r.preset.clone().unwrap_or_default();
             let n = calls.iter().filter(|c| **c == label).count() + 1;
@@ -543,7 +543,7 @@ mod tests {
         let mut r = req("standard");
         r.target_score = Some(0.1);
         let settings = Settings {
-            roundtrip_ladder: Some(vec!["STANDARD".into(), "strong".into()]),
+            rewrite_ladder: Some(vec!["STANDARD".into(), "strong".into()]),
             ..Default::default()
         };
         let s = scorer(&[("standard#1", 0.5), ("strong#1", 0.4)]);
@@ -595,8 +595,8 @@ mod tests {
     #[test]
     fn labels_follow_planning_precedence() {
         let s = Settings::default();
-        let mut r: RoundtripRequest = serde_json::from_str(r#"{"text":"hi"}"#).unwrap();
-        assert_eq!(label(&r, &s), "light");
+        let mut r: RewriteRequest = serde_json::from_str(r#"{"text":"hi"}"#).unwrap();
+        assert_eq!(label(&r, &s), "standard");
         r.pivot = "ja".into();
         assert_eq!(label(&r, &s), "pivot-ja");
         r.depth = Some(3);

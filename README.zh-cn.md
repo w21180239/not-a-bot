@@ -1,10 +1,12 @@
 <div align="center">
 
-# translatex
+# not-a-bot
 
 **命令行 AI 人性化改写：把 AI 味的文字改得像人写的。同时也是给 Agent 用的免费翻译，一个二进制，不用 API Key。**
 
 用你自己的 Claude 或 OpenCode 订阅，对 AI 生成的文字做人性化改写和润色。人名、数字、代码原样保留，丢了什么会明确告诉你。同一个 6 MB 二进制还能通过 28 个翻译引擎翻译，其中 14 个是免费网页接口、不需要 Key，并带一份 skill，24 家编码 Agent 复制即用。
+
+not-a-bot 以新名字延续 translatex 0.3.0。
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#许可)
 [![Tests](https://img.shields.io/badge/tests-319-brightgreen.svg)](#开发)
@@ -12,9 +14,9 @@
 [![Binary](https://img.shields.io/badge/binary-6%20MB-lightgrey.svg)](#安装)
 [![Agent-native](https://img.shields.io/badge/agent--native-JSON-purple.svg)](#支持的-harness)
 
-`translatex roundtrip "<AI 味的文字>" --from en --preset standard`
+`not-a-bot rewrite "<AI 味的文字>" --from en --preset standard`
 
-[English](./README.md) · [简体中文](./README.zh-cn.md) · [Русский](./README.ru.md) · [文档](./docs/README.md)
+[English](./README.md) · [简体中文](./README.zh-cn.md) · [文档](./docs/README.md)
 
 </div>
 
@@ -26,7 +28,7 @@
 - [改写前后](#改写前后)
 - [选哪个预设](#选哪个预设)
 - [实测结果](#实测结果)
-- [为什么选 translatex](#为什么选-translatex)
+- [为什么选 not-a-bot](#为什么选-not-a-bot)
 - [能力](#能力)
 - [安装](#安装)
 - [快速开始](#快速开始)
@@ -44,12 +46,12 @@
 
 一个 AI 文本人性化改写工具，加一个免费翻译 CLI，装在同一个二进制里。
 
-- **AI 文字人性化改写。** `translatex roundtrip` 改写带 AI 味的文字（套话开头、"不仅……更是……"、"值得注意的是"），让它读起来像人写的。它用你自己的 Claude Code 或 OpenCode 订阅，不用 API Key，也没有额外账单。原理是由 LLM 来做的回译：翻到另一种语言再翻回来，两跳都在改写。
+- **AI 文字人性化改写。** `not-a-bot rewrite` 改写带 AI 味的文字（套话开头、"不仅……更是……"、"值得注意的是"），让它读起来像人写的。它用你自己的 Claude Code 或 OpenCode 订阅，不用 API Key，也没有额外账单。原理是由 LLM 来做的回译：翻到另一种语言再翻回来，两跳都在改写。
 - **免费的往返。** 默认预设走免费网页引擎，零成本。它改用词、保留句子结构，速度快，改写力度较轻。
 - **事实不丢。** 每次往返后都拿原文核对人名、数字、ID、URL 和代码。丢了什么，会列在 `missingFacts` 里并给出警告。
-- **修复一跳。** `strong` 在最后加一跳，让 LLM 提出小编辑。translatex 只应用精确且很小的编辑，所以改写结果保留，丢掉的事实补回来。
-- **给 Agent 的翻译。** `translatex translate` 最多让三个免费引擎（Google、Edge、Papago、搜狗等）竞速，输出 JSON，错误带类型。不用注册，不用配置。
-- **不承诺骗过 AI 检测器。** 目标是读起来像人写的文字，同时事实不丢。没有任何方法能让文本稳定地检测不出，translatex 也不做这个承诺。
+- **修复一跳。** `strong` 在最后加一跳，让 LLM 提出小编辑。not-a-bot 只应用精确且很小的编辑，所以改写结果保留，丢掉的事实补回来。
+- **给 Agent 的翻译。** `not-a-bot translate` 最多让三个免费引擎（Google、Edge、Papago、搜狗等）竞速，输出 JSON，错误带类型。不用注册，不用配置。
+- **不承诺骗过 AI 检测器。** 目标是读起来像人写的文字，同时事实不丢。没有任何方法能让文本稳定地检测不出，not-a-bot 也不做这个承诺。
 
 如果你在找 AI 人性化改写工具、去 AI 腔的办法、想在脚本或编码 Agent 里给 AI 生成的文字去 AI 味和润色：这是一个 CLI，Claude Code、Codex、OpenCode、Cursor 等 24 家 harness 都能调用，改写由 DeepSeek、Haiku 或你订阅里的任何模型完成。
 
@@ -62,7 +64,7 @@ In today's fast-paced landscape, Aroha's team isn't just shipping a feature, the
 ```
 
 ```bash
-translatex roundtrip "<上面这段>" --from en --preset standard --format json
+not-a-bot rewrite "<上面这段>" --from en --preset standard --format json
 ```
 
 `--preset standard`（OpenCode CLI，DeepSeek，两跳共 31 秒）的输出，2026-11-11 跑一次，只保留主要字段：
@@ -99,7 +101,7 @@ translatex roundtrip "<上面这段>" --from en --preset standard --format json
 
 | 预设 | 做什么 | 改写力度 | 速度 | 丢失事实（10 段文本） | 需要 |
 | --- | --- | --- | --- | --- | --- |
-| `light`（默认） | 两跳机器翻译（en 到 zh 到 ja 再到 en） | 轻：用词变，句子不变 | 约 1 秒 | 5 | 无 |
+| `light` | 两跳机器翻译（en 到 zh 到 ja 再到 en） | 轻：用词变，句子不变 | 约 1 秒 | 5 | 无 |
 | `standard` | LLM 出去再回来，两跳都"像人一样翻译并改写" | 去掉结构性 AI 腔 | 8 到 14 秒 | 0 | Claude 或 OpenCode 订阅 |
 | `strong` | LLM 跳到 zh 和 ja，机器翻译跳经 fi 回来，最后一跳修复 | 改写最强，且补回丢掉的事实 | 约 25 秒 | 1 | 订阅 |
 
@@ -107,12 +109,12 @@ translatex roundtrip "<上面这段>" --from en --preset standard --format json
 
 ## 实测结果
 
-2026-11-11 运行：每种配置 10 段文本，只跑一次（5 段 AI 味英文、3 段事实密集的职场英文、2 段中文）。脚本与语料见 [`benches/roundtrip-depth/`](./benches/roundtrip-depth/README.md)。
+2026-11-11 运行：每种配置 10 段文本，只跑一次（5 段 AI 味英文、3 段事实密集的职场英文、2 段中文）。脚本与语料见 [`benches/rewrite-depth/`](./benches/rewrite-depth/README.md)。
 
 | 配置 | 与原文的词重合度 | 剩余 AI 腔（共 10） | 丢失事实 | 延迟 |
 | --- | --- | --- | --- | --- |
-| light，1 跳（`--depth 1`，0.1.x 默认） | 0.556 | 7 | 5 | 0.5 s |
-| light，2 跳（0.3 默认） | 0.520 | 5 | 5 | 0.9 s |
+| light，1 跳（`--depth 1`，最早的默认） | 0.556 | 7 | 5 | 0.5 s |
+| light，2 跳（上一版默认） | 0.520 | 5 | 5 | 0.9 s |
 | 3 跳机器翻译（`--depth 3`） | 0.480 | 6 | 8 | 1.1 s |
 | standard，经 opencode-cli（DeepSeek） | 0.446 | 0 | 0 | 14 s |
 | standard，经 claude-cli（Haiku） | 0.535 | 0 | 0 | 8 s |
@@ -128,11 +130,11 @@ translatex roundtrip "<上面这段>" --from en --preset standard --format json
 - LLM 跳去掉了结构性 AI 腔，在这批语料上事实全部保留。
 - 放在 LLM 跳之后的机器翻译跳可能把对比句式带回来（"ei ainoastaan ... vaan myös" 回成 "not only ... but also"），所以没有修复跳的同一条链仍留几处。
 - 修复跳把这条链的事实丢失从 3 到 5 个降到 1 个，并保留了大部分改写，这就是 `strong`。
-- 早先的结论（2026-11-04）：德语、法语、西班牙语中转几乎不改写，中文和日文改写最多。见 [docs/zh-cn/roundtrip/01-pivot-choice.md](./docs/zh-cn/roundtrip/01-pivot-choice.md)。
+- 早先的结论（2026-11-04）：德语、法语、西班牙语中转几乎不改写，中文和日文改写最多。见 [docs/zh-cn/rewrite/01-pivot-choice.md](./docs/zh-cn/rewrite/01-pivot-choice.md)。
 
 局限：10 段文本、只跑一次，样本很小；AI 腔清单和事实检查都是启发式；重合度奖励的是"改得多"，不是"改得好"。这里没有测任何 AI 检测器。
 
-## 为什么选 translatex
+## 为什么选 not-a-bot
 
 | 为什么会被选 | 意味着什么 |
 | --- | --- |
@@ -164,12 +166,12 @@ translatex roundtrip "<上面这段>" --from en --preset standard --format json
 
 | 能力 | 说明 |
 | --- | --- |
-| **人性化改写 / 去 AI 腔** | `roundtrip` 经一跳或多跳翻出再翻回。机器翻译跳免费；LLM 跳会重建句子。预设 `light`、`standard`、`strong`，或自己写 `--chain`。 |
+| **人性化改写 / 去 AI 腔** | `rewrite` 经一跳或多跳翻出再翻回。机器翻译跳免费；LLM 跳会重建句子。预设 `light`、`standard`、`strong`，或自己写 `--chain`。 |
 | **事实检查** | 每次往返后给出 `missingFacts` 和警告：结果里丢掉的人名、数字、ID、URL 和代码。 |
 | **修复跳** | `<llm>:fix` 让 LLM 提出小编辑，只应用精确的；丢失的事实一定补回，其余编辑共用一份预算，所以抄不回原文。 |
 | **28 个 Provider** | 14 个免费网页接口、9 个官方 API、5 个 LLM（OpenAI、Anthropic、DeepSeek，以及本机的 `claude-cli` 和 `opencode-cli`）。LibreTranslate 通过 `base_url` 按需启用。 |
 | **回退链** | 按优先级排序；默认最多三个 Provider 同时在飞，慢接口拖不住后面健康的通道。`--fallback` 顺序原样保留。 |
-| **Key 轮换** | 单 Provider 多 Key 轮询，冷却状态跨进程共享在 `~/.config/translatex/cache/`。 |
+| **Key 轮换** | 单 Provider 多 Key 轮询，冷却状态跨进程共享在 `~/.config/not-a-bot/cache/`。 |
 | **结构化输出** | stdout 只输出 JSON / NDJSON，日志走 stderr，退出码可直接分支。 |
 | **保护片段** | 正则或 `@code`、`@url` 匹配的片段在机器翻译前打码、翻译后还原；LLM 跳会拿到片段清单，事后检查。 |
 | **24 家 harness** | Claude Code、Codex、Cursor、Zed 等 24 家共用同一份 skill 或指令块，无需启动服务。路径见 [integrations/](./integrations/README.md)。 |
@@ -179,45 +181,45 @@ translatex roundtrip "<上面这段>" --from en --preset standard --format json
 ## 安装
 
 ```bash
-npm install -g translatex                 # 按平台下载预编译二进制
-cargo install translatex                 # 或源码构建，Rust 1.89+
+npm install -g not-a-bot                 # 按平台下载预编译二进制
+cargo install not-a-bot                 # 或源码构建，Rust 1.89+
 # 或直接取预编译二进制
-# https://github.com/w21180239/translatex/releases/latest
+# https://github.com/w21180239/not-a-bot/releases/latest
 ```
 
 验证：
 
 ```bash
-translatex --version
-translatex providers --format text
+not-a-bot --version
+not-a-bot providers --format text
 ```
 
 ## 快速开始
 
 ```bash
 # 零配置，只走网页接口
-translatex translate "Hello world" -t zh
+not-a-bot translate "Hello world" -t zh
 
 # 指定 Provider 并保留回退列表
-translatex translate "Deploy failed" -t ja --provider deepl --fallback google,edge
+not-a-bot translate "Deploy failed" -t ja --provider deepl --fallback google,edge
 
 # 从 stdin 读取
-echo "Good morning" | translatex translate -t fr
+echo "Good morning" | not-a-bot translate -t fr
 
 # 关闭自动检测，显式给源语言
-translatex translate "Guten Tag" -s de -t en
+not-a-bot translate "Guten Tag" -s de -t en
 
 # NDJSON 批量，并发 4
-translatex batch --file examples/batch.ndjson --parallel 4
+not-a-bot batch --file examples/batch.ndjson --parallel 4
 
 # 不做翻译的代码片段
-translatex translate 'Run `make test` before pushing.' -t zh --preserve @code
+not-a-bot translate 'Run `make test` before pushing.' -t zh --preserve @code
 
 # 人性化改写 AI 味文字：LLM 经中文翻出再翻回（用你的 Claude 或 OpenCode 订阅）
-translatex roundtrip "In today's fast-paced landscape, it's important to note that …" --from en --preset standard --preserve @code
+not-a-bot rewrite "In today's fast-paced landscape, it's important to note that …" --from en --preset standard --preserve @code
 
 # 免费且快：两跳机器翻译，之后读 missingFacts
-translatex roundtrip "In today's fast-paced landscape, it's important to note that …" --from en
+not-a-bot rewrite "In today's fast-paced landscape, it's important to note that …" --from en
 ```
 
 成功响应：
@@ -298,9 +300,9 @@ translatex roundtrip "In today's fast-paced landscape, it's important to note th
 
 ```bash
 # 会加载 skill 的宿主
-mkdir -p .claude/skills/translatex && cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/
-mkdir -p ~/.config/opencode/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/
-mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/   # Codex、Gemini CLI
+mkdir -p .claude/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md .claude/skills/not-a-bot/
+mkdir -p ~/.config/opencode/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.config/opencode/skills/not-a-bot/
+mkdir -p ~/.agents/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/   # Codex、Gemini CLI
 
 # 其余宿主按自己的文件名读同一段内容
 cat integrations/guidance/AGENTS.md >> AGENTS.md
@@ -316,35 +318,35 @@ cat integrations/guidance/AGENTS.md >> AGENTS.md
 
 | 命令 | 用途 |
 | --- | --- |
-| `translatex translate "…" -t zh --format json` | 单条翻译 |
-| `translatex roundtrip "…" --from en --preset standard --format json` | 人性化改写：经一跳或多跳翻出再翻回 |
-| `translatex providers --format json` | 本机能用哪些 Provider |
-| `translatex health --format json` | 探测所有已配置 Provider |
+| `not-a-bot translate "…" -t zh --format json` | 单条翻译 |
+| `not-a-bot rewrite "…" --from en --preset standard --format json` | 人性化改写：经一跳或多跳翻出再翻回 |
+| `not-a-bot providers --format json` | 本机能用哪些 Provider |
+| `not-a-bot health --format json` | 探测所有已配置 Provider |
 
 ## 往返改写：原理
 
-`roundtrip` 把文本经一跳或多跳翻译出去，再翻回原语言。翻到语法结构不同的语言，文本必须被重建，生成式文字的套话也就不会原样回来。机器翻译跳是顺带做到这一点；LLM 跳则被明确要求"像人一样翻译并改写"。
+`rewrite` 把文本经一跳或多跳翻译出去，再翻回原语言。翻到语法结构不同的语言，文本必须被重建，生成式文字的套话也就不会原样回来。机器翻译跳是顺带做到这一点；LLM 跳则被明确要求"像人一样翻译并改写"。
 
 ```bash
-translatex roundtrip "<text>" --from en --preset standard --preserve @code --format json
-translatex roundtrip "<text>" --from en --depth 3                    # zh、ja、fi 再回来，只用机器翻译
-translatex roundtrip "<text>" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
-translatex roundtrip --from en --pivot ja < draft.md                 # 别名：translatex polish
+not-a-bot rewrite "<text>" --from en --preset standard --preserve @code --format json
+not-a-bot rewrite "<text>" --from en --depth 3                    # zh、ja、fi 再回来，只用机器翻译
+not-a-bot rewrite "<text>" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:fix"
+not-a-bot rewrite --from en --pivot ja < draft.md                 # 别名：not-a-bot polish
 ```
 
-- **选跳。** 先匹配者生效：`--chain "<[engine:]lang,...>"`、`--preset <name>`、`--depth 1-3`、`--pivot <lang>`，最后是配置里的 `roundtrip_preset`（默认 `light`）。链末尾没回到源语言时，自动补一跳。
-- **LLM Provider。** `claude-cli` 在你的 Claude 订阅上运行 `claude -p`（默认模型 haiku）；`opencode-cli` 在你的 OpenCode 额度上运行 `opencode run`（默认模型 `opencode-go/deepseek-v4.1-flash`）。它们不需要 Key，每跳几秒，只在被点名时运行：`auto` 从不选它们。`roundtrip_llm`（默认 `opencode-cli`）决定 `standard` 和 `strong` 预设用哪个引擎。
+- **选跳。** 先匹配者生效：`--chain "<[engine:]lang,...>"`、`--preset <name>`、`--depth 1-3`、`--pivot <lang>`，最后是配置里的 `rewrite_preset`（默认 `standard`）。链末尾没回到源语言时，自动补一跳。
+- **LLM Provider。** `claude-cli` 在你的 Claude 订阅上运行 `claude -p`（默认模型 haiku）；`opencode-cli` 在你的 OpenCode 额度上运行 `opencode run`（默认模型 `opencode-go/deepseek-v4.1-flash`）。它们不需要 Key，每跳几秒，只在被点名时运行：`auto` 从不选它们。`rewrite_llm`（默认 `opencode-cli`）决定 `standard` 和 `strong` 预设用哪个引擎。
 - **以原文为锚。** LLM 跳也会收到源文本，在改写之前先用最小的改动修复前面机器翻译跳丢掉的语义。
-- **修复跳。** `<llm>:fix` 返回 JSON 小编辑列表（`from`、`to`、`why`）。translatex 只应用精确且很小的编辑。补回缺失事实的编辑一律应用；其余编辑共用一份小预算，所以这一跳抄不回原文。每条编辑记录在 `edits` 里，带 `kind`（`fact` 或 `meaning`）、`applied` 和 `reason`。
+- **修复跳。** `<llm>:fix` 返回 JSON 小编辑列表（`from`、`to`、`why`）。not-a-bot 只应用精确且很小的编辑。补回缺失事实的编辑一律应用；其余编辑共用一份小预算，所以这一跳抄不回原文。每条编辑记录在 `edits` 里，带 `kind`（`fact` 或 `meaning`）、`applied` 和 `reason`。
 - **事实检查。** `missingFacts` 列出源文本里有、结果里没有的人名、数字、ID、代码片段和 URL（数字按数位比较，人名按整词比较），并加一条 `fact check:` 警告。与常见句首词同形的人名可能漏检。
 - **优先引擎。** 点名的机器翻译引擎是"优先"而非"钉死"。遇到可重试错误（限流、超时、网络、额度），这一跳改用另一个引擎，并避开相邻两跳的引擎，同时加警告。LLM 跳从不回退。
 - **占位符。** 机器翻译跳对受保护片段打码。LLM 跳原样接收片段，提示词里列出清单，片段丢了会加警告。
 
-保护代码和链接请用 `--preserve @code` 和 `--preserve @url`，不要写 `` `[^`]*` `` 这类正则：在 Windows 上，npm 的 `.cmd` 外壳经 cmd.exe 运行，Python 或 Node 不经 shell 启动 translatex 时会吞掉其中的 `^`。
+保护代码和链接请用 `--preserve @code` 和 `--preserve @url`，不要写 `` `[^`]*` `` 这类正则：在 Windows 上，npm 的 `.cmd` 外壳经 cmd.exe 运行，Python 或 Node 不经 shell 启动 not-a-bot 时会吞掉其中的 `^`。
 
 响应字段：`text`、`detectedSource`、`chain`（依次经过的语言）、`hops`（`from`、`to`、`provider`、`text`、`latencyMs`，修复跳多一个 `edits`）、`provider`（最后一跳）、`missingFacts`、`warnings`、`latencyMs`、`requestId`、`chars`。
 
-合同、API 文档、配置和读者要核对的数字不要往返：每一跳都会改写，事实检查只是启发式。链、预设与编辑规则见 [docs/zh-cn/roundtrip/02-chains-presets-and-llm.md](./docs/zh-cn/roundtrip/02-chains-presets-and-llm.md)；测量与方法见 [docs/zh-cn/roundtrip/01-pivot-choice.md](./docs/zh-cn/roundtrip/01-pivot-choice.md)。
+合同、API 文档、配置和读者要核对的数字不要往返：每一跳都会改写，事实检查只是启发式。链、预设与编辑规则见 [docs/zh-cn/rewrite/02-chains-presets-and-llm.md](./docs/zh-cn/rewrite/02-chains-presets-and-llm.md)；测量与方法见 [docs/zh-cn/rewrite/01-pivot-choice.md](./docs/zh-cn/rewrite/01-pivot-choice.md)。
 
 ## Provider 一览
 
@@ -394,7 +396,7 @@ translatex roundtrip --from en --pivot ja < draft.md                 # 别名：
 | 60 | Claude Code CLI | `claude-cli` | 无；在你的 Claude 订阅上运行 `claude -p`，可选 `model`（默认 haiku）和 `bin` |
 | 61 | OpenCode CLI | `opencode-cli` | 无；在你的 OpenCode 额度上运行 `opencode run`，可选 `model`（默认 `opencode-go/deepseek-v4.1-flash`）和 `bin` |
 
-`claude-cli` 和 `opencode-cli` 从不加入自动链，只在被点名时运行：`roundtrip` 的某一跳、预设、`--provider` 或 `--fallback`。
+`claude-cli` 和 `opencode-cli` 从不加入自动链，只在被点名时运行：`rewrite` 的某一跳、预设、`--provider` 或 `--fallback`。
 
 ## 实测状态
 
@@ -409,11 +411,11 @@ translatex roundtrip --from en --pivot ja < draft.md                 # 别名：
 | 仅自建 | `libretranslate` —— 已无可用公共实例，自建后配置 `base_url` |
 | 上游停用 | `iflytek` —— 已别名到 `iflyrec`，旧配置继续可用 |
 
-在你自己的网络环境里，先跑 `translatex health --format json` 再依赖这张表。
+在你自己的网络环境里，先跑 `not-a-bot health --format json` 再依赖这张表。
 
 ## 配置
 
-`~/.config/translatex/config.toml`（也可用 `--config` 或 `TRANSLATEX_CONFIG`）：
+`~/.config/not-a-bot/config.toml`（也可用 `--config` 或 `NOT_A_BOT_CONFIG`）：
 
 ```toml
 # 替换内置 auto 链。有凭据的官方 Provider 仍会追加在其后。
@@ -423,9 +425,9 @@ default_target = "zh"
 timeout_ms = 20000
 retries = 1
 race_width = 3
-roundtrip_pivot = "auto"
-roundtrip_preset = "light"          # light、standard、strong
-roundtrip_llm = "opencode-cli"   # 或 "claude-cli"；standard 和 strong 预设所用的引擎
+rewrite_pivot = "auto"
+rewrite_preset = "standard"          # light、standard、strong
+rewrite_llm = "opencode-cli"   # 或 "claude-cli"；standard 和 strong 预设所用的引擎
 log = "warn"
 
 [provider.libretranslate]
@@ -444,7 +446,7 @@ model = "opencode-go/deepseek-v4.1-flash"
 bin = "opencode"
 ```
 
-`~/.config/translatex/credentials.toml`：
+`~/.config/not-a-bot/credentials.toml`：
 
 ```toml
 [deepl.default]
@@ -459,14 +461,14 @@ region = "eastasia"
 api_key = "..."
 ```
 
-解析顺序：`credentials.toml` 里的 Key 标签按文件顺序轮换，`TRANSLATEX_<PROVIDER>_<FIELD>` 在其后追加一个 `env` 标签，字段写成 `@keyring` 时从系统钥匙串读取。免费接口三者都不需要。
+解析顺序：`credentials.toml` 里的 Key 标签按文件顺序轮换，`NOT_A_BOT_<PROVIDER>_<FIELD>` 在其后追加一个 `env` 标签，字段写成 `@keyring` 时从系统钥匙串读取。免费接口三者都不需要。
 
 ## CLI 参考
 
 | 命令 | 用途 |
 | --- | --- |
 | `translate [TEXT]` | 单条翻译；省略文本时读 stdin |
-| `roundtrip [TEXT]` | 经一跳或多跳往返，人性化改写 AI 味文字（`--chain`、`--preset`、`--depth`、`--pivot`） |
+| `rewrite [TEXT]` | 经一跳或多跳往返，人性化改写 AI 味文字（`--chain`、`--preset`、`--depth`、`--pivot`） |
 | `batch` | NDJSON 进、NDJSON 出，顺序保持不变 |
 | `providers` | 各 Provider 的能力与配置状态 |
 | `languages` | 规范语言码，或某个 Provider 声明的集合 |
@@ -506,8 +508,8 @@ api_key = "..."
 | --- | --- |
 | English | [docs/en/OVERVIEW.md](./docs/en/OVERVIEW.md) |
 | 简体中文 | [docs/zh-cn/OVERVIEW.md](./docs/zh-cn/OVERVIEW.md) |
-| 往返改写：概览、链与预设、实测结果 | [docs/zh-cn/roundtrip/OVERVIEW.md](./docs/zh-cn/roundtrip/OVERVIEW.md) |
-| 测量脚本与结果 | [benches/roundtrip-depth/README.md](./benches/roundtrip-depth/README.md) |
+| 往返改写：概览、链与预设、实测结果 | [docs/zh-cn/rewrite/OVERVIEW.md](./docs/zh-cn/rewrite/OVERVIEW.md) |
+| 测量脚本与结果 | [benches/rewrite-depth/README.md](./benches/rewrite-depth/README.md) |
 | Harness 接入 | [integrations/README.md](./integrations/README.md) |
 | Agent 集成 | [AGENTS.md](./AGENTS.md) |
 

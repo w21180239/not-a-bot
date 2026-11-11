@@ -19,8 +19,8 @@ The wire contract is the same for every command: one request object in, one resp
 | --- | --- | --- |
 | `TranslateRequest` | `translate`, `batch` | What to translate and how |
 | `TranslateResponse` | success paths | Result plus provenance |
-| `RoundtripRequest` | `roundtrip` | Text plus `chain`, `preset`, `depth` or `pivot` |
-| `RoundtripResponse` | `roundtrip` success | Final text, `chain`, per-hop `hops` (with `edits` for repair hops), `missingFacts`, `warnings` |
+| `RewriteRequest` | `rewrite` | Text plus `chain`, `preset`, `depth` or `pivot` |
+| `RewriteResponse` | `rewrite` success | Final text, `chain`, per-hop `hops` (with `edits` for repair hops), `missingFacts`, `warnings` |
 | `ErrorResponse` | CLI failures | Typed error, plus the hops already tried |
 | `WireError` | inside `ErrorResponse` | Code, message, retry hints |
 | `ProviderInfo` | `providers` | Capability and configuration |
@@ -30,7 +30,7 @@ The wire contract is the same for every command: one request object in, one resp
 Generate the schema from the binary rather than copying it:
 
 ```bash
-translatex schema --format json
+not-a-bot schema --format json
 ```
 
 ## Stability

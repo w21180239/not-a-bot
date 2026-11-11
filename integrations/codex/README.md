@@ -6,8 +6,8 @@ either or both; the binary is the same.
 ## Skill
 
 ```bash
-mkdir -p ~/.agents/skills/translatex
-cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/SKILL.md
+mkdir -p ~/.agents/skills/not-a-bot
+cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/SKILL.md
 ```
 
 `~/.agents/skills/` is the cross-runtime alias Codex, Gemini CLI and Copilot CLI
@@ -28,7 +28,7 @@ cat integrations/guidance/AGENTS.md >> ~/.codex/AGENTS.md
 ## Verify
 
 ```bash
-translatex translate "Deploy failed" -t zh --format json
+not-a-bot translate "Deploy failed" -t zh --format json
 codex exec "translate 'Deploy failed' to Chinese"
 ```
 

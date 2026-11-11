@@ -46,17 +46,17 @@ pub struct Settings {
     pub concurrency: Option<usize>,
     /// Provider attempts kept in flight at once. `1` is strictly sequential.
     pub race_width: Option<usize>,
-    /// Default pivot for `roundtrip` when the request says `auto`.
-    pub roundtrip_pivot: Option<String>,
-    /// Default `roundtrip` preset when the request names no chain, preset,
+    /// Default pivot for `rewrite` when the request says `auto`.
+    pub rewrite_pivot: Option<String>,
+    /// Default `rewrite` preset when the request names no chain, preset,
     /// depth or pivot (`light`, `standard`, `strong`).
-    pub roundtrip_preset: Option<String>,
+    pub rewrite_preset: Option<String>,
     /// Engine behind the LLM hops of the `standard` and `strong` presets.
-    pub roundtrip_llm: Option<String>,
-    /// Detector command for roundtrip candidates (see `RoundtripRequest::scorer`).
-    pub roundtrip_scorer: Option<String>,
+    pub rewrite_llm: Option<String>,
+    /// Detector command for rewrite candidates (see `RewriteRequest::scorer`).
+    pub rewrite_scorer: Option<String>,
     /// Presets tried in order when `--target-score` is not met.
-    pub roundtrip_ladder: Option<Vec<String>>,
+    pub rewrite_ladder: Option<Vec<String>>,
     pub log: Option<String>,
     /// provider -> extra knobs (base_url, model, instance, ...).
     pub provider: BTreeMap<String, ProviderSettings>,
@@ -90,7 +90,7 @@ impl Settings {
     }
 
     fn apply_env(mut self) -> Self {
-        if let Ok(v) = std::env::var("TRANSLATEX_CHAIN") {
+        if let Ok(v) = std::env::var("NOT_A_BOT_CHAIN") {
             let chain: Vec<String> = v
                 .split(',')
                 .map(|s| s.trim().to_lowercase())
@@ -100,22 +100,22 @@ impl Settings {
                 self.chain = Some(chain);
             }
         }
-        if let Ok(v) = std::env::var("TRANSLATEX_TIMEOUT_MS") {
+        if let Ok(v) = std::env::var("NOT_A_BOT_TIMEOUT_MS") {
             if let Ok(ms) = v.parse() {
                 self.timeout_ms = Some(ms);
             }
         }
-        if let Ok(v) = std::env::var("TRANSLATEX_LOG") {
+        if let Ok(v) = std::env::var("NOT_A_BOT_LOG") {
             self.log = Some(v);
         }
-        if let Ok(v) = std::env::var("TRANSLATEX_ROUNDTRIP_PIVOT") {
-            self.roundtrip_pivot = Some(v);
+        if let Ok(v) = std::env::var("NOT_A_BOT_REWRITE_PIVOT") {
+            self.rewrite_pivot = Some(v);
         }
-        if let Ok(v) = std::env::var("TRANSLATEX_ROUNDTRIP_PRESET") {
-            self.roundtrip_preset = Some(v);
+        if let Ok(v) = std::env::var("NOT_A_BOT_REWRITE_PRESET") {
+            self.rewrite_preset = Some(v);
         }
-        if let Ok(v) = std::env::var("TRANSLATEX_ROUNDTRIP_LLM") {
-            self.roundtrip_llm = Some(v);
+        if let Ok(v) = std::env::var("NOT_A_BOT_REWRITE_LLM") {
+            self.rewrite_llm = Some(v);
         }
         self
     }
@@ -141,27 +141,27 @@ impl Settings {
         self.race_width.unwrap_or(DEFAULT_RACE_WIDTH).max(1)
     }
 
-    /// `roundtrip_pivot` when it names a language; `auto` and blank values
+    /// `rewrite_pivot` when it names a language; `auto` and blank values
     /// leave the per-request default in charge.
     pub fn pivot_override(&self) -> Option<String> {
-        self.roundtrip_pivot
+        self.rewrite_pivot
             .as_deref()
             .map(|p| p.trim().to_lowercase())
             .filter(|p| !p.is_empty() && p != "auto")
     }
 
-    /// Preset used when a roundtrip request asks for nothing specific.
-    pub fn roundtrip_preset(&self) -> String {
-        self.roundtrip_preset
+    /// Preset used when a rewrite request asks for nothing specific.
+    pub fn rewrite_preset(&self) -> String {
+        self.rewrite_preset
             .as_deref()
             .map(|p| p.trim().to_lowercase())
             .filter(|p| !p.is_empty())
-            .unwrap_or_else(|| "light".to_string())
+            .unwrap_or_else(|| "standard".to_string())
     }
 
     /// Engine for preset LLM hops.
-    pub fn roundtrip_llm(&self) -> String {
-        self.roundtrip_llm
+    pub fn rewrite_llm(&self) -> String {
+        self.rewrite_llm
             .as_deref()
             .map(|p| p.trim().to_lowercase())
             .filter(|p| !p.is_empty())
@@ -169,8 +169,8 @@ impl Settings {
     }
 
     /// Configured scorer command; blank means none.
-    pub fn roundtrip_scorer(&self) -> Option<String> {
-        self.roundtrip_scorer
+    pub fn rewrite_scorer(&self) -> Option<String> {
+        self.rewrite_scorer
             .as_deref()
             .map(str::trim)
             .filter(|s| !s.is_empty())
@@ -178,8 +178,8 @@ impl Settings {
     }
 
     /// Escalation presets for `--target-score`, in order.
-    pub fn roundtrip_ladder(&self) -> Vec<String> {
-        self.roundtrip_ladder
+    pub fn rewrite_ladder(&self) -> Vec<String> {
+        self.rewrite_ladder
             .clone()
             .unwrap_or_else(|| vec!["standard".into(), "strong".into()])
             .into_iter()
@@ -194,7 +194,7 @@ impl Settings {
 }
 
 pub fn default_path() -> Option<PathBuf> {
-    if let Ok(p) = std::env::var("TRANSLATEX_CONFIG") {
+    if let Ok(p) = std::env::var("NOT_A_BOT_CONFIG") {
         return Some(PathBuf::from(p));
     }
     base_dir().map(|d| d.join("config.toml"))
@@ -207,29 +207,29 @@ pub fn cache_dir() -> Option<PathBuf> {
     Some(cache)
 }
 
-/// `~/.config/translatex`, honouring `XDG_CONFIG_HOME`.
+/// `~/.config/not-a-bot`, honouring `XDG_CONFIG_HOME`.
 fn base_dir() -> Option<PathBuf> {
-    if let Ok(dir) = std::env::var("TRANSLATEX_HOME") {
+    if let Ok(dir) = std::env::var("NOT_A_BOT_HOME") {
         return Some(PathBuf::from(dir));
     }
     if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
-        return Some(PathBuf::from(xdg).join("translatex"));
+        return Some(PathBuf::from(xdg).join("not-a-bot"));
     }
-    directories::BaseDirs::new().map(|d| d.home_dir().join(".config").join("translatex"))
+    directories::BaseDirs::new().map(|d| d.home_dir().join(".config").join("not-a-bot"))
 }
 
-pub const CONFIG_TEMPLATE: &str = r#"# translatex config
+pub const CONFIG_TEMPLATE: &str = r#"# not-a-bot config
 # chain expands `--provider auto`; keyed providers are used only when configured.
 # chain = ["deepl", "azure", "google", "googlecloud", "baidu", "libretranslate"]
 # default_target = "zh"
 # timeout_ms = 20000
 # retries = 2
 # race_width = 3   # provider attempts in flight; 1 is strictly sequential
-# roundtrip_pivot = "zh"   # "auto" picks zh for non-Chinese text, en for Chinese
-# roundtrip_preset = "light"  # light (2 MT hops) | standard (LLM out and back) | strong
-# roundtrip_llm = "opencode-cli"   # engine for preset LLM hops: opencode-cli | claude-cli
-# roundtrip_scorer = "python score.py"   # detector: text on stdin, score 0-1 on the last stdout line
-# roundtrip_ladder = ["standard", "strong"]   # presets tried when --target-score is not met
+# rewrite_pivot = "zh"   # "auto" picks zh for non-Chinese text, en for Chinese
+# rewrite_preset = "standard"  # light (2 MT hops) | standard (LLM out and back) | strong
+# rewrite_llm = "opencode-cli"   # engine for preset LLM hops: opencode-cli | claude-cli
+# rewrite_scorer = "python score.py"   # detector: text on stdin, score 0-1 on the last stdout line
+# rewrite_ladder = ["standard", "strong"]   # presets tried when --target-score is not met
 # log = "warn"
 
 # [provider.googlecloud]

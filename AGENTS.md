@@ -1,6 +1,6 @@
 # AGENTS.md
 
-How `translatex` is meant to be used by an agent: every interface is machine-readable, every failure is actionable, and every behaviour is deterministic.
+How `not-a-bot` is meant to be used by an agent: every interface is machine-readable, every failure is actionable, and every behaviour is deterministic.
 
 ## Design goal
 
@@ -11,13 +11,13 @@ An agent should never parse human-oriented output or guess a retry strategy. Rea
 ### 1. CLI
 
 ```bash
-translatex translate "Hello world" -t zh --format json
-translatex roundtrip "In today's fast-paced landscape, …" --from en --preset standard --preserve @code --format json
-translatex batch --file jobs.ndjson --parallel 4
-translatex providers --format json
-translatex languages --provider google --format json
-translatex health --format json
-translatex schema --format json
+not-a-bot translate "Hello world" -t zh --format json
+not-a-bot rewrite "In today's fast-paced landscape, …" --from en --preset standard --preserve @code --format json
+not-a-bot batch --file jobs.ndjson --parallel 4
+not-a-bot providers --format json
+not-a-bot languages --provider google --format json
+not-a-bot health --format json
+not-a-bot schema --format json
 ```
 
 **Request**
@@ -77,7 +77,7 @@ All field names are camelCase. Unknown fields are rejected with `INVALID_INPUT`,
 ### 2. JSON Schema
 
 ```bash
-translatex schema --format json
+not-a-bot schema --format json
 ```
 
 Draft 2020-12 definitions for `TranslateRequest`, `TranslateResponse`, `ErrorResponse`, `ProviderInfo`, `HealthRecord`, `AttemptRecord`.
@@ -109,8 +109,8 @@ Free web endpoints occupy priorities 1-12 and are always available. Official API
 Inspect the live set rather than assuming:
 
 ```bash
-translatex providers --format json
-translatex health --format json
+not-a-bot providers --format json
+not-a-bot health --format json
 ```
 
 `claude-cli` and `opencode-cli` run the local Claude Code or OpenCode CLI on the user's subscription (slow, spends quota); like `reverso` they never join the automatic chain and run only when named.
@@ -124,11 +124,11 @@ Up to `race_width` providers (default 3) run concurrently: the first success win
 Later wins:
 
 1. Built-in free endpoints.
-2. `~/.config/translatex/credentials.toml` (or `--credentials`, `TRANSLATEX_CREDENTIALS`).
-3. `TRANSLATEX_<PROVIDER>_<FIELD>` environment variables.
+2. `~/.config/not-a-bot/credentials.toml` (or `--credentials`, `NOT_A_BOT_CREDENTIALS`).
+3. `NOT_A_BOT_<PROVIDER>_<FIELD>` environment variables.
 4. OS keyring when a field is set to `@keyring`.
 
-Cooldown state lives in `~/.config/translatex/cache/keys-<provider>.json` and is shared across processes. `translatex keys --reset` clears it.
+Cooldown state lives in `~/.config/not-a-bot/cache/keys-<provider>.json` and is shared across processes. `not-a-bot keys --reset` clears it.
 
 Credentials never appear in output. Do not pass secrets as command-line flags; use the credentials file, environment variables, or the OS keyring.
 
@@ -145,7 +145,7 @@ Canonical ISO 639-1 with a few extensions. Aliases accepted:
 | `iw` | `he` |
 | `auto`, `detect` | `auto` |
 
-Full list: `translatex languages --format json`.
+Full list: `not-a-bot languages --format json`.
 
 ## Preserve patterns
 
@@ -153,7 +153,7 @@ Full list: `translatex languages --format json`.
 
 ## Round trips
 
-`roundtrip` translates out through one or more hops and back. Use it when the
+`rewrite` translates out through one or more hops and back. Use it when the
 user wants prose that reads less like a model wrote it. The result is in the
 source language; the response carries `chain` (languages visited), `hops`
 (per-hop `from`, `to`, `provider`, `text`, `latencyMs`, and `edits` on a repair
@@ -162,24 +162,24 @@ hop), `provider` (final hop), `missingFacts`, `warnings`, `latencyMs`,
 more than one run happened, `candidates` (`presetOrChain`, `score`,
 `missingFacts` count).
 
-- Hop selection, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, configured `roundtrip_preset` (default `light`).
+- Hop selection, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, configured `rewrite_preset` (default `standard`).
 - `--chain "claude-cli:zh,google:fi,edge:en"`: hops `[engine:]lang`; no engine races the fallback chain; a named MT engine is preferred, and a retryable failure (`RATE_LIMITED`, `TIMEOUT`, `NETWORK_ERROR`, `QUOTA_EXHAUSTED`) hands the hop to the automatic chain, avoiding the previous hop's provider, with a `hop <n>: <engine> failed (<code>), served by <other>` warning; named LLM engines never fall back; a hop back to the source is appended when needed. `engine:fix` (LLM engines only) stays in the current language and repairs meaning against the original.
 - `fix` hop edits carry `kind`: `fact` edits restore a lost name, number or other fact and always apply; `meaning` edits share one budget, so together they cannot copy the original back.
 - `--depth 1-3`: machine translation only, zh -> ja -> fi (en -> ja -> fi for Chinese). The default preset `light` is depth 2.
-- Presets: `light` (default, two machine hops), `standard` (LLM out and back through `roundtrip_llm`, default `opencode-cli`, alternative `claude-cli`), `strong` (LLM zh, LLM ja, google fi, edge back, then a repair hop). Any other name fails with `INVALID_INPUT` listing `light, standard, strong`. Config `roundtrip_preset` (default `light`), env `TRANSLATEX_ROUNDTRIP_PRESET`, `TRANSLATEX_ROUNDTRIP_LLM`.
+- Presets: `light` (two machine hops), `standard` (default; LLM out and back through `rewrite_llm`, default `opencode-cli`, alternative `claude-cli`), `strong` (LLM zh, LLM ja, google fi, edge back, then a repair hop). Any other name fails with `INVALID_INPUT` listing `light, standard, strong`. Config `rewrite_preset` (default `standard`), env `NOT_A_BOT_REWRITE_PRESET`, `NOT_A_BOT_REWRITE_LLM`.
 - LLM hops rewrite in humanize style; later LLM hops also get the previous LLM hop as history and the original text.
 - Machine hops change words but keep sentence shapes ("not just X, it's Y" survives) and respell names (Aroha -> Aloha). Read `missingFacts` (also a `fact check:` warning) and `warnings`, and report them; names are checked as whole words in Latin-script text, and a name that doubles as a common sentence-starting word can slip through.
 - LLM presets rebuild the sentences and remove the structural tells; `strong` rewrites most. Use `--preserve @code` and `--preserve @url` for code and links. No preset is a claim about AI detectors.
-- `--scorer "<command>"` (config `roundtrip_scorer`), for benchmarks and tuning rather than live requests: a detector reads each result on stdin and prints a 0-1 score (higher = more AI-like) on its last stdout line; no shell; a failure adds a `scorer: ... unscored` warning. `--best-of 1-5` keeps the run with no missing facts (else the fewest), then the lowest score. `--target-score 0-1` then climbs `roundtrip_ladder` (default `standard,strong`) and warns `target score not met` when no rung reaches it. Both need a scorer, else `INVALID_INPUT`. A score is one detector's measurement; report it per detector.
+- `--scorer "<command>"` (config `rewrite_scorer`), for benchmarks and tuning rather than live requests: a detector reads each result on stdin and prints a 0-1 score (higher = more AI-like) on its last stdout line; no shell; a failure adds a `scorer: ... unscored` warning. `--best-of 1-5` keeps the run with no missing facts (else the fewest), then the lowest score. `--target-score 0-1` then climbs `rewrite_ladder` (default `standard,strong`) and warns `target score not met` when no rung reaches it. Both need a scorer, else `INVALID_INPUT`. A score is one detector's measurement; report it per detector.
 - `--pivot ja` rewrites as strongly and keeps more grammar; use it for technical English.
 - Never round-trip legal text, API reference, configuration or numbers the reader will check; the fact guard is a heuristic.
 
 ## Installation
 
 ```bash
-npm install -g translatex
-cargo install translatex
-# or: https://github.com/w21180239/translatex/releases/latest
+npm install -g not-a-bot
+cargo install not-a-bot
+# or: https://github.com/w21180239/not-a-bot/releases/latest
 ```
 
 Single binary, no runtime dependencies. Per-harness CLI and skill setup:
@@ -188,14 +188,14 @@ Single binary, no runtime dependencies. Per-harness CLI and skill setup:
 ## Testing an integration
 
 ```bash
-echo '{"text":"hi","targetLang":"zh"}' | translatex batch --format json
-translatex schema --format json | sha256sum    # schema stability
-translatex health --format json
+echo '{"text":"hi","targetLang":"zh"}' | not-a-bot batch --format json
+not-a-bot schema --format json | sha256sum    # schema stability
+not-a-bot health --format json
 ```
 
 ## Versioning
 
-`translatex --version` returns semver. Field names and error codes are the public contract; adding optional fields is not a breaking change, removing or renaming one is.
+`not-a-bot --version` returns semver. Field names and error codes are the public contract; adding optional fields is not a breaking change, removing or renaming one is.
 
 ## License
 

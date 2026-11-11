@@ -87,7 +87,7 @@ jobs:
         with:
           node-version: 24
 
-      - run: node --check npm/bin/translatex.js
+      - run: node --check npm/bin/not-a-bot.js
 
       - name: Check the platform manifests are wired together
         working-directory: npm

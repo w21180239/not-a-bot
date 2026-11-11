@@ -10,16 +10,16 @@ Nothing in the chain can serve this request.
 
 | Cause | Check | Fix |
 | --- | --- | --- |
-| Every provider filtered out for the pair | `translatex providers --format json` | Choose another target, or a provider that covers it |
-| `chain` in config lists only unregistered providers | `translatex providers` | List registered ids, or delete `chain` |
-| Keyed-only chain and no credentials | `translatex keys` | Add credentials |
+| Every provider filtered out for the pair | `not-a-bot providers --format json` | Choose another target, or a provider that covers it |
+| `chain` in config lists only unregistered providers | `not-a-bot providers` | List registered ids, or delete `chain` |
+| Keyed-only chain and no credentials | `not-a-bot keys` | Add credentials |
 
 ## `PROVIDER_NOT_CONFIGURED`
 
 The id exists in the binary but is not registered. For keyed providers this means an incomplete credential set: for example Baidu needs both `appid` and `secret_key`. Check the field names against the provider table, then:
 
 ```bash
-translatex providers --format json | jq '.providers[] | select(.name=="baidu")'
+not-a-bot providers --format json | jq '.providers[] | select(.name=="baidu")'
 ```
 
 ## `AUTO_DETECT_UNSUPPORTED`
@@ -48,8 +48,8 @@ Cloudflare rejects the TLS fingerprint of a rustls client. The endpoint itself i
 
 ## `TIMEOUT` for every provider
 
-1. Confirm the budget: `translatex translate "hi" -t zh --timeout-ms 30000`.
-2. Confirm egress: `translatex health --format json`.
+1. Confirm the budget: `not-a-bot translate "hi" -t zh --timeout-ms 30000`.
+2. Confirm egress: `not-a-bot health --format json`.
 3. Behind a proxy, set `HTTPS_PROXY`; reqwest honours it.
 
 Remember that a timeout is not retried inline by design, so a slow provider costs exactly one budget before the chain moves on.
@@ -70,8 +70,8 @@ Invalid JSON lines are skipped with a stderr warning. Run the batch again withou
 ## Cooldowns will not clear
 
 ```bash
-translatex keys --reset
-ls ~/.config/translatex/cache/
+not-a-bot keys --reset
+ls ~/.config/not-a-bot/cache/
 ```
 
 If the directory is not writable, cooldowns are memory-only for that process and every call starts clean.
@@ -79,7 +79,7 @@ If the directory is not writable, cooldowns are memory-only for that process and
 ## The agent translates by hand instead of calling the CLI
 
 1. Confirm the skill or instructions file is in the path the harness documents.
-2. `translatex --version` must succeed in the same shell the agent uses; a GUI-launched agent often has a different `PATH`.
+2. `not-a-bot --version` must succeed in the same shell the agent uses; a GUI-launched agent often has a different `PATH`.
 3. Ask for a translation and check the reply for a `provider` name. A reply without one means the agent never ran the command.
 
 ## Navigation

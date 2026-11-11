@@ -5,7 +5,7 @@
 [← Integrations](OVERVIEW.md) · [Documentation index](../README.md)
 
 A harness is the agent host: a terminal coding agent, an editor assistant, or a
-chat client that runs commands. `translatex` reaches 24 of them with two
+chat client that runs commands. `not-a-bot` reaches 24 of them with two
 documents — a skill for hosts that load skills, and an instructions block for
 those that read project rules. Every harness also gets the CLI, which is the
 actual integration.
@@ -67,25 +67,25 @@ tokens instead of a full page.
 ## Paths and commands
 
 Paths are relative to the project you want the agent to work in; the source files
-come from a `translatex` checkout.
+come from a `not-a-bot` checkout.
 
 | Harness | Channel | Write to | Command |
 | --- | --- | --- | --- |
-| Claude Code | Skill | `.claude/skills/translatex/SKILL.md` | `mkdir -p .claude/skills/translatex && cp integrations/skill/translatex/SKILL.md .claude/skills/translatex/` |
-| Claude Code | Skill (personal) | `~/.claude/skills/translatex/SKILL.md` | same, under `$HOME` |
-| Claude Code | Plugin | installed by the CLI | `/plugin marketplace add w21180239/translatex` then `/plugin install translatex@translatex` |
-| Codex CLI | Skill | `~/.agents/skills/translatex/SKILL.md` | `mkdir -p ~/.agents/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.agents/skills/translatex/` |
+| Claude Code | Skill | `.claude/skills/not-a-bot/SKILL.md` | `mkdir -p .claude/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md .claude/skills/not-a-bot/` |
+| Claude Code | Skill (personal) | `~/.claude/skills/not-a-bot/SKILL.md` | same, under `$HOME` |
+| Claude Code | Plugin | installed by the CLI | `/plugin marketplace add w21180239/not-a-bot` then `/plugin install not-a-bot@not-a-bot` |
+| Codex CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.agents/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.agents/skills/not-a-bot/` |
 | Codex CLI | Instructions | `AGENTS.md`, `~/.codex/AGENTS.md` | `cat integrations/guidance/AGENTS.md >> AGENTS.md` |
-| Gemini CLI | Skill | `~/.agents/skills/translatex/SKILL.md` | shared with Codex |
+| Gemini CLI | Skill | `~/.agents/skills/not-a-bot/SKILL.md` | shared with Codex |
 | Gemini CLI | Instructions | `GEMINI.md` | `cat integrations/guidance/AGENTS.md >> GEMINI.md` |
-| OpenCode | Skill | `~/.config/opencode/skills/translatex/SKILL.md` | `mkdir -p ~/.config/opencode/skills/translatex && cp integrations/skill/translatex/SKILL.md ~/.config/opencode/skills/translatex/` |
+| OpenCode | Skill | `~/.config/opencode/skills/not-a-bot/SKILL.md` | `mkdir -p ~/.config/opencode/skills/not-a-bot && cp integrations/skill/not-a-bot/SKILL.md ~/.config/opencode/skills/not-a-bot/` |
 | OpenCode | Instructions | `AGENTS.md` | `cat integrations/guidance/AGENTS.md >> AGENTS.md` |
-| Cursor | Rule | `.cursor/rules/translatex.mdc` | `mkdir -p .cursor/rules && cp integrations/cursor/translatex.mdc .cursor/rules/` |
-| Cline | Rule | `.clinerules/translatex.md` | `mkdir -p .clinerules && cat integrations/guidance/AGENTS.md > .clinerules/translatex.md` |
-| Roo Code | Rule | `.roo/rules/translatex.md` | `mkdir -p .roo/rules && cat integrations/guidance/AGENTS.md > .roo/rules/translatex.md` |
-| Kilo Code | Rule | `.kilocode/rules/translatex.md` | `mkdir -p .kilocode/rules && cat integrations/guidance/AGENTS.md > .kilocode/rules/translatex.md` |
-| Continue | Rule | `.continue/rules/translatex.md` | `mkdir -p .continue/rules && cat integrations/guidance/AGENTS.md > .continue/rules/translatex.md` |
-| JetBrains AI | Rule | `.aiassistant/rules/translatex.md` | `mkdir -p .aiassistant/rules && cat integrations/guidance/AGENTS.md > .aiassistant/rules/translatex.md` |
+| Cursor | Rule | `.cursor/rules/not-a-bot.mdc` | `mkdir -p .cursor/rules && cp integrations/cursor/not-a-bot.mdc .cursor/rules/` |
+| Cline | Rule | `.clinerules/not-a-bot.md` | `mkdir -p .clinerules && cat integrations/guidance/AGENTS.md > .clinerules/not-a-bot.md` |
+| Roo Code | Rule | `.roo/rules/not-a-bot.md` | `mkdir -p .roo/rules && cat integrations/guidance/AGENTS.md > .roo/rules/not-a-bot.md` |
+| Kilo Code | Rule | `.kilocode/rules/not-a-bot.md` | `mkdir -p .kilocode/rules && cat integrations/guidance/AGENTS.md > .kilocode/rules/not-a-bot.md` |
+| Continue | Rule | `.continue/rules/not-a-bot.md` | `mkdir -p .continue/rules && cat integrations/guidance/AGENTS.md > .continue/rules/not-a-bot.md` |
+| JetBrains AI | Rule | `.aiassistant/rules/not-a-bot.md` | `mkdir -p .aiassistant/rules && cat integrations/guidance/AGENTS.md > .aiassistant/rules/not-a-bot.md` |
 | Zed | Rule | `.rules` | `cat integrations/guidance/AGENTS.md >> .rules` |
 | Aider | Instructions | `CONVENTIONS.md` | `cat integrations/guidance/AGENTS.md >> CONVENTIONS.md` then `aider --read CONVENTIONS.md` |
 | Qwen Code | Instructions | `QWEN.md` | `cat integrations/guidance/AGENTS.md >> QWEN.md` |
@@ -100,7 +100,7 @@ come from a `translatex` checkout.
 | Reasonix | Instructions | `AGENTS.md` | same |
 | ZCode | Instructions | `AGENTS.md` | same |
 | QwenPaw | Instructions | the project instructions file | paste the block |
-| Anything else | CLI | — | the agent runs `translatex … --format json` |
+| Anything else | CLI | — | the agent runs `not-a-bot … --format json` |
 
 Windows PowerShell: `New-Item -ItemType Directory -Force <dir>`, then
 `Get-Content <src> | Add-Content <dst>`.
@@ -109,16 +109,16 @@ Windows PowerShell: `New-Item -ItemType Directory -Force <dir>`, then
 
 Both documents carry the same four rules, and nothing else is required:
 
-1. Run `translatex`, do not translate by hand.
+1. Run `not-a-bot`, do not translate by hand.
 2. Read `text` from the JSON; `provider` and `detectedSource` come from the tool.
 3. Pass `--preserve` for code, paths, identifiers and URLs.
-4. For AI-sounding text, `roundtrip --preset standard --preserve @code` rebuilds the
+4. For AI-sounding text, `rewrite --preset standard --preserve @code` rebuilds the
    sentences; the machine-translation presets keep them, so delete AI filler
    yourself before using those. Check `missingFacts` and `warnings`, and
    report them.
 
 The full skill adds the error table and the retry rules; see
-[`integrations/skill/translatex/SKILL.md`](../../../integrations/skill/translatex/SKILL.md).
+[`integrations/skill/not-a-bot/SKILL.md`](../../../integrations/skill/not-a-bot/SKILL.md).
 
 ## Verify an install
 
@@ -126,12 +126,12 @@ Ask the harness to translate one sentence, then check the reply for a provider
 name:
 
 ```bash
-translatex translate "Hello world" -t zh --format json
+not-a-bot translate "Hello world" -t zh --format json
 ```
 
 A reply with a translation but no `provider` field came from the model, not the
 tool. That means the document was not loaded: confirm the path above, confirm
-`translatex --version` works in the shell the harness uses, and restart the
+`not-a-bot --version` works in the shell the harness uses, and restart the
 session so the file is read again.
 
 GUI hosts (Cursor, VS Code) often start with a different `PATH` than a terminal.
@@ -141,5 +141,5 @@ host's environment or install from npm, which puts the shim on the global path.
 ## Navigation
 
 - ← [Integrations](OVERVIEW.md)
-- → [Round trips](../roundtrip/OVERVIEW.md)
+- → [Round trips](../rewrite/OVERVIEW.md)
 - ↑ [Documentation index](../README.md)

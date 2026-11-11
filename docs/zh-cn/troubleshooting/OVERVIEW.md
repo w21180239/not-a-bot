@@ -7,8 +7,8 @@
 先跑两条命令，它们能回答大部分问题：
 
 ```bash
-translatex providers --format json | jq '.providers[] | {name, kind, priority, configured}'
-translatex health --format json
+not-a-bot providers --format json | jq '.providers[] | {name, kind, priority, configured}'
+not-a-bot health --format json
 ```
 
 ## 文件索引
@@ -22,7 +22,7 @@ translatex health --format json
 | 症状 | 先查什么 |
 | --- | --- |
 | `NO_PROVIDER` | 有免费接口注册吗？该语言对的链是否为空？ |
-| `PROVIDER_NOT_CONFIGURED` | 凭据字段是否齐全？`translatex keys <provider>` |
+| `PROVIDER_NOT_CONFIGURED` | 凭据字段是否齐全？`not-a-bot keys <provider>` |
 | `PROVIDER_NOT_FOUND` | 拼写错误，或从未配置的有 Key Provider |
 | `AUTO_DETECT_UNSUPPORTED` | 改用 `-s en`，不要依赖 `auto` |
 | `CHAIN_EXHAUSTED` | 加 `--verbose` 看逐跳轨迹 |

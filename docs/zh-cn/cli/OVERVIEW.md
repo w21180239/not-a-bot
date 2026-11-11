@@ -4,14 +4,14 @@
 
 [← 文档索引](../README.md)
 
-stdout 只承载机器可读输出；日志、警告、进度都走 stderr，所以 `translatex … | jq` 永远可用。
+stdout 只承载机器可读输出；日志、警告、进度都走 stderr，所以 `not-a-bot … | jq` 永远可用。
 
 ## 命令索引
 
 | 命令 | 作用 | 详情 |
 | --- | --- | --- |
 | `translate` | 单条翻译，参数或 stdin | [01-commands.md](01-commands.md) |
-| `roundtrip` | 经多跳机器翻译或 LLM 往返，人性化改写 AI 味文字 | [01-commands.md](01-commands.md) |
+| `rewrite` | 经多跳机器翻译或 LLM 往返，人性化改写 AI 味文字 | [01-commands.md](01-commands.md) |
 | `batch` | NDJSON 进、NDJSON 出 | [01-commands.md](01-commands.md) |
 | `providers` | 能力与配置状态 | [01-commands.md](01-commands.md) |
 | `languages` | 规范语言码或单个 Provider 的集合 | [01-commands.md](01-commands.md) |
@@ -30,8 +30,8 @@ stdout 只承载机器可读输出；日志、警告、进度都走 stderr，所
 | `--quiet` | 输出紧凑单行 JSON |
 | `--verbose` | 结果中附带逐跳尝试轨迹 |
 | `--race N` | `auto` 下同时保持的 Provider 数（默认 3，`1` 为串行） |
-| `--config PATH` | 指定配置路径（环境变量 `TRANSLATEX_CONFIG`） |
-| `--credentials PATH` | 指定凭据路径（环境变量 `TRANSLATEX_CREDENTIALS`） |
+| `--config PATH` | 指定配置路径（环境变量 `NOT_A_BOT_CONFIG`） |
+| `--credentials PATH` | 指定凭据路径（环境变量 `NOT_A_BOT_CREDENTIALS`） |
 | `--log LEVEL` | stderr 日志级别：`error`、`warn`、`info`、`debug` |
 
 ## 退出码

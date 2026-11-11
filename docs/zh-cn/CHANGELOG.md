@@ -2,6 +2,28 @@
 
 文档修订历史。1.0 之前，应用变更也记录在此。
 
+## 0.1.0 — 未发布
+
+not-a-bot 以新名字延续 translatex 0.3.0。除默认预设外，行为不变。
+
+### 变更
+
+- 二进制名为 `not-a-bot`，另有行为一致的短别名 `nab`。crate 为 `not-a-bot`（库名 `not_a_bot`），npm 包为 `not-a-bot`（平台包 `not-a-bot-<os>-<arch>`），两个 npm bin 共用同一个启动器。
+- 子命令 `roundtrip` 改为 `rewrite`，默认预设改为 `standard`（LLM 出去再回来）；`light` 仍可用 `--preset light` 选择。schema 类型 `RoundtripRequest`、`RoundtripResponse` 改为 `RewriteRequest`、`RewriteResponse`。
+- 配置项 `roundtrip_preset`、`roundtrip_pivot`、`roundtrip_llm`、`roundtrip_scorer`、`roundtrip_ladder` 改为 `rewrite_*`。
+- 环境变量前缀由 `TRANSLATEX_` 改为 `NOT_A_BOT_`（如 `NOT_A_BOT_REWRITE_PRESET`、`NOT_A_BOT_CONFIG`、`NOT_A_BOT_HOME`）。
+- 配置和缓存目录改为 `~/.config/not-a-bot`。旧名字、旧变量和旧目录不再读取。
+- Provider 元数据键改用 `not-a-bot.` 前缀（`not-a-bot.style`、`not-a-bot.history`、`not-a-bot.original`），HTTP User-Agent 为 `not-a-bot/<version>`。
+- 集成 skill `translatex` 改名为 `not-a-bot`。
+
+### 移除
+
+- 俄文 README 和 `docs/ru`。
+
+## translatex 历史
+
+以下条目早于改名，描述的是 translatex，包括它的 `roundtrip` 命令和 `TRANSLATEX_*` 变量。
+
 ## 未发布
 
 ### 变更
