@@ -6,17 +6,18 @@
 Every LLM output is cached in cache/llm (keyed by model + prompt), detector scores in
 cache/detector.jsonl, so reruns resume and only new work is paid for.
 """
-import argparse, hashlib, json, os, re, statistics, subprocess, sys, tempfile
+import argparse, hashlib, json, os, re, statistics, subprocess, sys, tempfile, time
 from concurrent.futures import ThreadPoolExecutor
 
 import llm
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DETECT_PY = r"D:\VVPlayground\wei-harness\humanizer\evals\.venv\Scripts\python.exe"
-DETECT = r"D:\VVPlayground\wei-harness\humanizer\evals\detect.py"
+DETECT_PY = os.path.join(HERE, "..", "detector", ".venv", "Scripts", "python.exe")
+DETECT = os.path.join(HERE, "..", "detector", "detect.py")
 DET_CACHE = os.path.join(HERE, "cache", "detector.jsonl")
 LABEL = {"en": "English (en)", "zh": "Chinese (Simplified) (zh)", "ja": "Japanese (ja)"}
 WORKERS = 4
+TX_BIN = os.path.join(HERE, "..", "..", "target", "release", "not-a-bot.exe")  # build under test
 
 # ---- prompt pieces: copied verbatim from src/providers/cli_llm.rs build_prompt ----
 HISTORY = ("The previous step turned this input:\n<<<\n{prev_in}\n>>>\ninto:\n<<<\n{prev_out}\n>>>\n"
@@ -75,6 +76,13 @@ T_HUM_FOLD = LEAD + SHAPE + CUT_FOLD + HARD + TAIL
 T_HUM_FINAL_FOLD = HISTORY + ORIGINAL + LEAD + SHAPE + CUT_FOLD + HARD + TAIL
 T_HUM_LIGHT = LEAD + SHAPE + CUT_LIGHT + HARD + TAIL
 T_HUM_FINAL_LIGHT = HISTORY + ORIGINAL + LEAD + SHAPE + CUT_LIGHT + HARD + TAIL
+# Round 5: a repair hop that restores facts only (the meaning-repair `fix` hop put deleted sentences back).
+FACTFIX = ("Below are an ORIGINAL text and a REWRITE of it. The rewrite deliberately deleted sentences that only "
+           "express feelings, pledges or pleasantries; that is correct, do not restore them. Check only hard facts: "
+           "every name, place, product, number, date, amount, currency, ID, version, path and code span in the "
+           "original must appear in the rewrite exactly as written. Where one is missing or altered, put it back "
+           "with the smallest edit, inside an existing sentence where possible. Change nothing else. Output only the "
+           "full rewrite, with no preamble or notes.\n\nORIGINAL:\n<<<\n{original}\n>>>\nREWRITE:\n<<<\n{text}\n>>>\n")
 T_HUM_CUT = LEAD + SHAPE + CUT + HARD + TAIL
 T_HUM_FINAL_CUT = HISTORY + ORIGINAL + LEAD + SHAPE + CUT + HARD + TAIL
 T_DIRECT_CUT = LEAD_SAME + SHAPE + CUT + HARD + TAIL
@@ -104,6 +112,18 @@ VARIANTS = {
     "v6-oc": [hop(OC, "en", "zh", T_HUM_CUT), hop(OC, "zh", "en", T_HUM_FINAL_CUT)],
     "v9-oc-fold": [hop(OC, "en", "zh", T_HUM_FOLD), hop(OC, "zh", "en", T_HUM_FINAL_FOLD)],
     "v10-oc-light": [hop(OC, "en", "zh", T_HUM_LIGHT), hop(OC, "zh", "en", T_HUM_FINAL_LIGHT)],
+    "v11-oc-factfix": [hop(OC, "en", "zh", T_HUM_LIGHT), hop(OC, "zh", "en", T_HUM_FINAL_LIGHT),
+                       hop(OC, "en", "en", FACTFIX)],
+    "v14-oc-cut-factfix": [hop(OC, "en", "zh", T_HUM_CUT), hop(OC, "zh", "en", T_HUM_FINAL_CUT),
+                           hop(OC, "en", "en", FACTFIX)],
+    "v12-oc-3hop": [hop(OC, "en", "zh", T_HUM_LIGHT), hop(OC, "zh", "ja", T_HUM_FINAL_LIGHT),
+                    hop(OC, "ja", "en", T_HUM_FINAL_LIGHT)],
+    "v13-oc-3hop-factfix": [hop(OC, "en", "zh", T_HUM_LIGHT), hop(OC, "zh", "ja", T_HUM_FINAL_LIGHT),
+                            hop(OC, "ja", "en", T_HUM_FINAL_LIGHT), hop(OC, "en", "en", FACTFIX)],
+    # The real binary (TX_BIN), so a result transfers to the product as is.
+    "tx-standard": [{"chain": "opencode-cli:zh,opencode-cli:en", "model": "tx", "from": "en", "to": "en"}],
+    "tx-standard-fix": [{"chain": "opencode-cli:zh,opencode-cli:en,opencode-cli:fix", "model": "tx", "from": "en",
+                         "to": "en"}],
 }
 
 JUDGE = ("Compare an ORIGINAL text with a REWRITE of it. Reply with ONLY a JSON object, no prose, no code fence:\n"
@@ -117,17 +137,48 @@ JUDGE = ("Compare an ORIGINAL text with a REWRITE of it. Reply with ONLY a JSON 
 
 
 # ---- pipeline ----
-def run_hops(hops, row):
+def tx_call(chain, text, rep):
+    """Final text of `not-a-bot rewrite --chain`, cached by binary build, chain, text and rep."""
+    st = os.stat(TX_BIN)
+    k = hashlib.sha256(f"{st.st_size}:{st.st_mtime_ns}\n{chain}\n{rep}\n{text}".encode("utf-8")).hexdigest()[:32]
+    path = os.path.join(HERE, "cache", "tx", k + ".json")
+    if os.path.exists(path):
+        return json.load(open(path, encoding="utf-8"))["output"]
+    cmd = [TX_BIN, "rewrite", "--from", "en", "--preserve", "@code", "--format", "json", "--quiet",
+           "--timeout-ms", "600000", "--chain", chain]
+    for i in range(3):
+        p = subprocess.run(cmd, input=text.encode("utf-8"), capture_output=True, timeout=1200)
+        try:
+            out = json.loads(p.stdout.decode("utf-8").strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            out = {"error": p.stderr.decode("utf-8", "replace")[:200]}
+        if "text" in out:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            json.dump({"chain": chain, "output": out["text"], "missingFacts": out.get("missingFacts", [])},
+                      open(path, "w", encoding="utf-8"), ensure_ascii=False)
+            return out["text"]
+        time.sleep(3 + 5 * i)
+    raise RuntimeError(f"not-a-bot: {str(out.get('error'))[:200]}")
+
+
+def run_hops(hops, row, rep=0):
     """Return list of hop outputs (None on failure)."""
     text, outs = row["text"], []
     orig_lang = LABEL[hops[0]["from"]]
     for h in hops:
+        if h.get("chain"):
+            try:
+                outs.append(tx_call(h["chain"], row["text"], rep))
+            except Exception as e:  # noqa: BLE001
+                print(f"  fail {row['id']}: {str(e)[:120]}", file=sys.stderr)
+                return outs + [None]
+            continue
         prompt = h["prompt_template"].format(
             text=text, original=row["text"], source=LABEL[h["from"]], target=LABEL[h["to"]],
             orig_lang=orig_lang, prev_in=outs[-2] if len(outs) > 1 else row["text"] if outs else "",
             prev_out=outs[-1] if outs else "")
         try:
-            text = llm.call(h["model"], prompt)
+            text = llm.call(h["model"], prompt, rep=rep)
         except Exception as e:  # noqa: BLE001
             print(f"  fail {row['id']}: {str(e)[:120]}", file=sys.stderr)
             return outs + [None]
@@ -191,11 +242,15 @@ def cmd_run(a):
     for n in names:
         if n not in VARIANTS:
             sys.exit(f"unknown variant {n}; have {', '.join(VARIANTS)}")
-    jobs = [(n, r) for n in names for r in corpus]
-    print(f"{len(names)} variants x {len(corpus)} texts; rewriting", file=sys.stderr)
+    # rep 0 is the original sample; rep k > 0 is stored as "<variant>@r<k>".
+    runs = [(n, k, n if k == 0 else f"{n}@r{k}") for n in names for k in range(a.rep)]
+    jobs = [(label, r) for _, _, label in runs for r in corpus]
+    base = {label: (n, k) for n, k, label in runs}
+    print(f"{len(runs)} runs x {len(corpus)} texts; rewriting", file=sys.stderr)
     with ThreadPoolExecutor(WORKERS) as ex:
-        hop_outs = list(ex.map(lambda j: run_hops(VARIANTS[j[0]], j[1]), jobs))
-    finals = {(n, r["id"]): o[-1] if len(o) == len(VARIANTS[n]) else None for (n, r), o in zip(jobs, hop_outs)}
+        hop_outs = list(ex.map(lambda j: run_hops(VARIANTS[base[j[0]][0]], j[1], base[j[0]][1]), jobs))
+    finals = {(n, r["id"]): o[-1] if len(o) == len(VARIANTS[base[n][0]]) else None
+              for (n, r), o in zip(jobs, hop_outs)}
     texts = [r["text"] for r in corpus] + [v for v in finals.values() if v]
     p_ai = detect(texts)
     print("judging", file=sys.stderr)
@@ -204,7 +259,7 @@ def cmd_run(a):
     with ThreadPoolExecutor(WORKERS) as ex:
         judged = dict(zip([k for k, _ in jlist], ex.map(lambda kv: judge(src[kv[0][1]]["text"], kv[1]), jlist)))
     os.makedirs(a.results, exist_ok=True)
-    for n in names:
+    for n in base:
         with open(os.path.join(a.results, n + ".jsonl"), "w", encoding="utf-8") as f:
             for (jn, r), outs in zip(jobs, hop_outs):
                 if jn != n:
@@ -217,7 +272,8 @@ def cmd_run(a):
                     "facts": r["facts"], "facts_lost": lost if out else None,
                     "len_ratio": round(words(out) / words(r["text"]), 3) if out else None,
                     "judge": judged.get((n, r["id"])), "error": out is None,
-                    "hop_models": [h["model"] + ":" + h["from"] + ">" + h["to"] for h in VARIANTS[n]],
+                    "hop_models": [h.get("chain") or h["model"] + ":" + h["from"] + ">" + h["to"]
+                                   for h in VARIANTS[base[n][0]]],
                 }, ensure_ascii=False) + "\n")
     cmd_summary(a)
 
@@ -257,6 +313,20 @@ def cmd_summary(a):
         L.append(f"| {r['name']} | {r['n']} | {r['mean']:.3f} | {r['median']:.3f} | {r['lt05']:.0%} | {r['src_mean']:.3f} | "
                  f"{r['texts_lost']}/{r['n'] - r['err']} | {r['tok_ret']:.1%} | {r['len']:.2f} | {r['sm']:.2f} | "
                  f"{r['rh']:.2f} | {r['added']}/{r['judged']} | {r['err']} |")
+    pooled = {}
+    for r in rows:
+        pooled.setdefault(r["name"].split("@")[0], []).append(r)
+    multi = {k: v for k, v in pooled.items() if len(v) > 1}
+    if multi:
+        L += ["", "## Pooled over samples", "",
+              "Mean over samples; range = min-max of the per-sample means.", "",
+              "| variant | samples | mean p_ai (range) | <0.5 | fact loss (range) | same_meaning | reads_human |",
+              "|---|---|---|---|---|---|---|"]
+        for k, v in sorted(multi.items(), key=lambda kv: mean([r["mean"] for r in kv[1]])):
+            ms, fl = [r["mean"] for r in v], [r["texts_lost"] for r in v]
+            L.append(f"| {k} | {len(v)} | {mean(ms):.3f} ({min(ms):.3f}-{max(ms):.3f}) | "
+                     f"{mean([r['lt05'] for r in v]):.0%} | {mean(fl):.1f} ({min(fl)}-{max(fl)}) / {v[0]['n']} | "
+                     f"{mean([r['sm'] for r in v]):.2f} | {mean([r['rh'] for r in v]):.2f} |")
     L += ["", "## Hops", ""] + [f"- {r['name']}: {r['hops']}" for r in rows]
     L += ["", "## Fact losses", ""]
     for r in rows:
@@ -274,6 +344,7 @@ def main():
     r = sub.add_parser("run")
     r.add_argument("--variants", help="comma list; default all")
     r.add_argument("--limit", type=int, help="N texts spread evenly over the corpus (smoke)")
+    r.add_argument("--rep", type=int, default=1, help="samples per variant; extra ones are <variant>@r<k>")
     s = sub.add_parser("summary")
     for p in (r, s):
         p.add_argument("--results", default=os.path.join(HERE, "results"))

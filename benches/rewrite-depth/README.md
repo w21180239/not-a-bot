@@ -53,7 +53,7 @@ Reading the table:
 - Machine translation changes words and keeps sentence structure, so "not just X, it's Y" survives at every depth.
 - A third machine-translation hop loses more facts (8 against 5) than it gains in rewriting.
 - LLM hops remove the structural tells and kept every fact on this corpus.
-- The repair hop brings the same chain without it (earlier run, by hand) from 3 to 5 missing facts down to 1 and keeps most of the rewrite; that chain with the repair hop is `strong`.
+- The repair hop brings the same chain without it (earlier run, by hand) from 3 to 5 missing facts down to 1 and keeps most of the rewrite; that chain with the repair hop was the earlier `strong`; the current `standard` ends with a fact-only repair hop instead.
 
 ## Caveats
 

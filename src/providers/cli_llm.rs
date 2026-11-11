@@ -25,6 +25,8 @@ pub const HISTORY_KEY: &str = "not-a-bot.history";
 /// Source text of the whole round trip, and its language, for drift repair.
 pub const ORIGINAL_KEY: &str = "not-a-bot.original";
 pub const ORIGINAL_LANG_KEY: &str = "not-a-bot.original_lang";
+/// JSON array of fact tokens of the original that the text to repair lacks (fix hops).
+pub const MISSING_KEY: &str = "not-a-bot.missing";
 /// JSON array of spans the output must carry verbatim (`--preserve` matches,
 /// sent unmasked because LLMs mangle opaque placeholders).
 pub const PRESERVE_KEY: &str = "not-a-bot.preserve";
@@ -259,16 +261,32 @@ pub fn build_prompt(req: &TranslateRequest) -> Result<String> {
     if style == "fix" {
         let original = original
             .ok_or_else(|| Error::InvalidInput(format!("{STYLE_KEY} fix needs {ORIGINAL_KEY}")))?;
+        let missing: Vec<&str> = req
+            .metadata
+            .get(MISSING_KEY)
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+            .unwrap_or_default();
+        let missing = if missing.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "- A fact check found these tokens of the ORIGINAL absent from the REWRITE: {}. Restore each exactly as written (numbers as digits, not words); skip one only when it is an ordinary word such as a heading or sentence opener.\n",
+                missing.join(", ")
+            )
+        };
         return Ok(format!(
-            "Below are an ORIGINAL text and a REWRITE of it in {target}. The rewrite may have lost, changed or added meaning. \
-             List the repairs that restore the original meaning, as ONLY a JSON array with no prose and no code fence:\n\
+            "Below are an ORIGINAL text and a REWRITE of it in {target}. The rewrite deliberately changed wording and structure and cut sentences that only express feelings, pledges or pleasantries; that is correct, do not undo it. \
+             Check only hard facts: every name, place, product, number, date, amount, currency, ID, version, path, code span, negation and qualifier in the original must survive in the rewrite. \
+             List the repairs that restore a missing or altered fact, as ONLY a JSON array with no prose and no code fence:\n\
              [{{\"from\": \"<exact substring of REWRITE>\", \"to\": \"<replacement>\", \"why\": \"<few words>\"}}]\n\
-             Output [] when the meaning already matches.\n\
+             Output [] when every fact survives.\n\
              Rules:\n\
-             - Each \"from\" is the shortest span that contains the error, usually one word or number; a whole clause only when the clause itself is missing, invented or inverted.\n\
-             - Never use an edit to change wording, style or structure that is already correct in meaning.\n\
-             - Names must match the original letter for letter; check numbers, dates, currencies, IDs, code spans, negations and qualifiers.\n\
-             - When a whole clause is missing, set \"from\" to the word right before where it belongs and \"to\" to that word plus the inserted clause, written in the REWRITE's style.\n\
+             - Each \"from\" is the shortest span that contains the error, usually one word or number.\n\
+             - Never restore a cut sentence that carries no fact, and never change wording, style or structure.\n\
+             - Names must match the original letter for letter.\n\
+             - When a fact is missing, set \"from\" to the word right before where it belongs and \"to\" to that word plus the fact, written in the REWRITE's style; a fact from a cut sentence goes into the nearest kept sentence.\n\
+             {missing}\
              ORIGINAL ({orig_lang}):\n<<<\n{original}\n>>>\nREWRITE ({target}):\n<<<\n{}\n>>>\n",
             req.text
         ));
@@ -545,6 +563,17 @@ Ask Aroha.
     }
 
     #[test]
+    fn fix_style_lists_missing_facts_only_when_given() {
+        let r = with(req(Some("fix"), None), ORIGINAL_KEY, "Pay $24.95 by 2 May.");
+        assert!(!build_prompt(&r).unwrap().contains("A fact check found"));
+        let mut r = r;
+        r.metadata
+            .insert(MISSING_KEY.into(), serde_json::json!(["$24.95", "2"]));
+        let p = build_prompt(&r).unwrap();
+        assert!(p.contains("absent from the REWRITE: $24.95, 2. Restore each exactly as written"));
+    }
+
+    #[test]
     fn fix_style_compares_rewrite_with_original() {
         let r = with(req(Some("fix"), None), ORIGINAL_KEY, "Ask Aroha.");
         let mut r = with(r, ORIGINAL_LANG_KEY, "en");
@@ -553,6 +582,8 @@ Ask Aroha.
         let p = build_prompt(&r).unwrap();
         assert!(p.starts_with("Below are an ORIGINAL text and a REWRITE of it in English (en)."));
         assert!(p.contains("as ONLY a JSON array") && p.contains("Output [] when"));
+        assert!(p.contains("Check only hard facts"));
+        assert!(p.contains("Never restore a cut sentence that carries no fact"));
         assert!(p.contains(r#"[{"from": "<exact substring of REWRITE>""#));
         assert!(p.contains(
             "ORIGINAL (English (en)):

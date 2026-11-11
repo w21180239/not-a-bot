@@ -42,15 +42,27 @@ Precedence, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, then
 | Preset | Hops (English source) | Needs a subscription | Typical latency |
 | --- | --- | --- | --- |
 | `light` | zh, ja, en: two machine-translation hops out | no | about 1 s |
-| `standard` | LLM to zh, LLM back to en; both hops "translate and rewrite like a person" | yes | 8 to 14 s |
-| `strong` | LLM to zh, LLM to ja (previous step as history), google to fi, edge back to en, then a repair hop | yes | about 25 s |
+| `standard` | LLM to zh, LLM back to en, then a fact-only repair hop (`<llm>:fix`); the first two hops "translate and rewrite like a person" | yes | about 70 s on opencode (three LLM calls) |
+| `strong` | LLM to zh, LLM back to en; no repair hop | yes | about 30 s on opencode |
 
-`strong` pushes the text through distant languages with LLM hops, adds
-machine-translation hops, and ends with the repair hop that restores facts the
-rewrite dropped. No method makes text reliably undetectable, and not-a-bot does
-not promise it. The aim is prose that reads like a person wrote it, with the
-facts intact. `--depth 1-3` and `--chain` build other chains by hand. Any other
-preset name fails with `INVALID_INPUT`, listing `light, standard, strong`.
+The humanize hops delete sentences that only express feelings, pledges or
+pleasantries. `standard` then repairs hard facts only: names, places, products,
+numbers, dates, amounts, currencies, IDs, versions, paths, code spans, negations
+and qualifiers. The repair hop is told which tokens the fact check found missing
+and never restores a cut feeling or pledge sentence. `strong` skips the repair
+hop: it rewrites furthest and scored lowest with the detector, but may drop a
+fact, which `missingFacts` always reports. `standard` and `strong` need an LLM
+engine: a `rewrite_llm` that is not one fails with `INVALID_INPUT`.
+
+No method makes text reliably undetectable, and not-a-bot does not promise it.
+The aim is prose that reads like a person wrote it, with the facts intact.
+`--depth 1-3` and `--chain` build other chains by hand. Any other preset name
+fails with `INVALID_INPUT`, listing `light, standard, strong`.
+
+Measured with the real binary (30 English texts, desklib detector, 2 to 3
+samples each; `benches/prompt-lab`): the earlier brief scored a mean `p_ai` of
+0.579 with 2.3 texts losing a fact token; `standard` 0.387 with 1.3; `strong`
+0.367 with 2.0.
 
 Set the default in `config.toml`:
 
@@ -88,7 +100,7 @@ a preset or `--provider`.
 ## What an LLM hop receives
 
 - The hop instruction: translate, and rewrite the way a person would.
-- In a round trip, the original text as well. The hop first repairs meaning that earlier machine-translation hops lost, with the smallest change that fixes it, then rewrites.
+- In a round trip, the original text as well. The hop first restores hard facts that earlier machine-translation hops lost, with the smallest change that fixes them, then rewrites.
 - For a later LLM hop, the previous LLM hop as history.
 - The protected spans, as-is. An LLM hop gets no placeholders; the prompt lists the spans to keep, and not-a-bot checks the output afterwards. A dropped span adds a `preserve: <provider> dropped <span>` warning. Machine-translation hops still mask spans.
 
@@ -99,9 +111,14 @@ spawns not-a-bot without a shell. The named patterns avoid that.
 
 ## The repair hop
 
-`<llm>:fix` (for example `opencode-cli:fix`, or the last hop of `strong`)
+`<llm>:fix` (for example `opencode-cli:fix`, or the last hop of `standard`)
 leaves the text in its current language and asks the LLM for a JSON list of
-small edits instead of a new text:
+small edits instead of a new text. It repairs facts against the original: names,
+places, products, numbers, dates, amounts, currencies, IDs, versions, paths, code
+spans, negations and qualifiers. It receives the fact check's list of missing
+tokens, and it never restores a sentence the humanize hops cut for expressing
+only feelings, pledges or pleasantries; a fact from a cut sentence goes into the
+nearest kept sentence.
 
 ```json
 [{"from": "Aloha's team", "to": "Aroha's team", "why": "name respelled"}]
@@ -126,8 +143,7 @@ Each hop reports what happened to every edit:
 Skip reasons include `from not found`, `from not unique`, `no change`,
 `to too long for from` and `copies the original back`.
 
-The repair hop cut the fact loss of the same chain without it from 3 to 5 facts to 1 on the
-corpus below, and kept most of the rewrite.
+On the benchmark corpus the repair hop cut the fact loss of the same chain without it and kept most of the rewrite.
 
 ## Fact guard
 
@@ -190,7 +206,7 @@ the text is undetectable.
 | Situation | Choose |
 | --- | --- |
 | Humanise AI-sounding prose and keep the facts | `--preset standard` |
-| Maximum rewriting, and a few facts may need a repair pass | `--preset strong` |
+| Maximum rewriting, and a fact may drop (listed in `missingFacts`) | `--preset strong` |
 | No subscription, or speed matters | `--preset light` (default) |
 | Machine translation, a little more rewriting | `--depth 3`; fact loss rises faster than rewriting |
 | Text with code or URLs | add `--preserve @code --preserve @url` to any preset |

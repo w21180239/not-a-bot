@@ -39,7 +39,7 @@ NOT_A_BOT_BINARY_PATH=/path/to/not-a-bot npm install -g not-a-bot
 Or skip npm entirely:
 
 ```bash
-cargo install not-a-bot --locked
+cargo install --git https://github.com/w21180239/not-a-bot --locked
 ```
 
 Full documentation: https://github.com/w21180239/not-a-bot

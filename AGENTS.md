@@ -164,13 +164,13 @@ more than one run happened, `candidates` (`presetOrChain`, `score`,
 `missingFacts` count).
 
 - Hop selection, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, configured `rewrite_preset` (default `standard`).
-- `--chain "claude-cli:zh,google:fi,edge:en"`: hops `[engine:]lang`; no engine races the fallback chain; a named MT engine is preferred, and a retryable failure (`RATE_LIMITED`, `TIMEOUT`, `NETWORK_ERROR`, `QUOTA_EXHAUSTED`) hands the hop to the automatic chain, avoiding the previous hop's provider, with a `hop <n>: <engine> failed (<code>), served by <other>` warning; named LLM engines never fall back; a hop back to the source is appended when needed. `engine:fix` (LLM engines only) stays in the current language and repairs meaning against the original.
+- `--chain "claude-cli:zh,google:fi,edge:en"`: hops `[engine:]lang`; no engine races the fallback chain; a named MT engine is preferred, and a retryable failure (`RATE_LIMITED`, `TIMEOUT`, `NETWORK_ERROR`, `QUOTA_EXHAUSTED`) hands the hop to the automatic chain, avoiding the previous hop's provider, with a `hop <n>: <engine> failed (<code>), served by <other>` warning; named LLM engines never fall back; a hop back to the source is appended when needed. `engine:fix` (LLM engines only) stays in the current language and repairs facts against the original: names, places, products, numbers, dates, amounts, currencies, IDs, versions, paths, code spans, negations, qualifiers. It is given the fact check's list of missing tokens and never restores cut feeling or pledge sentences.
 - `fix` hop edits carry `kind`: `fact` edits restore a lost name, number or other fact and always apply; `meaning` edits share one budget, so together they cannot copy the original back.
 - `--depth 1-3`: machine translation only, zh -> ja -> fi (en -> ja -> fi for Chinese). The default preset `light` is depth 2.
-- Presets: `light` (two machine hops), `standard` (default; LLM out and back through `rewrite_llm`, default `opencode-cli`, alternative `claude-cli`), `strong` (LLM zh, LLM ja, google fi, edge back, then a repair hop). Any other name fails with `INVALID_INPUT` listing `light, standard, strong`. Config `rewrite_preset` (default `standard`), env `NOT_A_BOT_REWRITE_PRESET`, `NOT_A_BOT_REWRITE_LLM`.
-- LLM hops rewrite in humanize style; later LLM hops also get the previous LLM hop as history and the original text.
+- Presets: `light` (two machine hops), `standard` (default; LLM out, LLM back, then a fact-only `<llm>:fix` hop; `rewrite_llm` is `opencode-cli` by default, alternative `claude-cli`), `strong` (LLM out and back, no repair: rewrites furthest, lowest detector score, may drop a fact, always reported in `missingFacts`). `standard` and `strong` reject a non-LLM `rewrite_llm` with `INVALID_INPUT`. Any other name fails with `INVALID_INPUT` listing `light, standard, strong`. Config `rewrite_preset` (default `standard`), env `NOT_A_BOT_REWRITE_PRESET`, `NOT_A_BOT_REWRITE_LLM`.
+- LLM hops rewrite in humanize style and delete sentences that only express feelings, pledges or pleasantries; later LLM hops also get the previous LLM hop as history and the original text.
 - Machine hops change words but keep sentence shapes ("not just X, it's Y" survives) and respell names (Aroha -> Aloha). Read `missingFacts` (also a `fact check:` warning) and `warnings`, and report them; names are checked as whole words in Latin-script text, and a name that doubles as a common sentence-starting word can slip through.
-- LLM presets rebuild the sentences and remove the structural tells; `strong` rewrites most. Use `--preserve @code` and `--preserve @url` for code and links. No preset is a claim about AI detectors.
+- LLM presets rebuild the sentences and remove the structural tells; `strong` rewrites most (benches/prompt-lab, 30 texts: mean p_ai 0.387 standard, 0.367 strong, 0.579 for the earlier brief; texts with a lost fact token 1.3, 2.0, 2.3). Use `--preserve @code` and `--preserve @url` for code and links. No preset is a claim about AI detectors.
 - `--scorer "<command>"` (config `rewrite_scorer`), for benchmarks and tuning rather than live requests: a detector reads each result on stdin and prints a 0-1 score (higher = more AI-like) on its last stdout line; no shell; a failure adds a `scorer: ... unscored` warning. `--best-of 1-5` keeps the run with no missing facts (else the fewest), then the lowest score. `--target-score 0-1` then climbs `rewrite_ladder` (default `standard,strong`) and warns `target score not met` when no rung reaches it. Both need a scorer, else `INVALID_INPUT`. A score is one detector's measurement; report it per detector.
 - `--pivot ja` rewrites as strongly and keeps more grammar; use it for technical English.
 - Never round-trip legal text, API reference, configuration or numbers the reader will check; the fact guard is a heuristic.
@@ -179,7 +179,7 @@ more than one run happened, `candidates` (`presetOrChain`, `score`,
 
 ```bash
 npm install -g not-a-bot
-cargo install not-a-bot
+cargo install --git https://github.com/w21180239/not-a-bot
 # or: https://github.com/w21180239/not-a-bot/releases/latest
 ```
 

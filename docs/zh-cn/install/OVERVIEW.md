@@ -16,7 +16,7 @@
 
 | 方式 | 命令 | 说明 |
 | --- | --- | --- |
-| Cargo | `cargo install not-a-bot` | 开启 LTO 编译，需要几分钟 |
+| Cargo | `cargo install --git https://github.com/w21180239/not-a-bot` | 开启 LTO 编译，需要几分钟 |
 | 预编译 | 从 [Releases](https://github.com/w21180239/not-a-bot/releases/latest) 下载 | Windows、Linux、macOS |
 | 源码 | `cargo build --release` | 产物在 `target/release/not-a-bot` |
 

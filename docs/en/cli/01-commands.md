@@ -45,8 +45,8 @@ not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:
 | `TEXT` | stdin | Text to round-trip |
 | `-s, --from` | `auto` | Source language |
 | `--pivot` | `auto` | Bridge language |
-| `--chain` | — | Hops `[engine:]lang`, comma-separated; a final hop back to the source is appended when missing; `<llm>:fix` repairs |
-| `--preset` | config `rewrite_preset` (`standard`) | `light`, `standard`, `strong` |
+| `--chain` | — | Hops `[engine:]lang`, comma-separated; a final hop back to the source is appended when missing; `<llm>:fix` repairs facts only |
+| `--preset` | config `rewrite_preset` (`standard`) | `light` (two machine-translation hops), `standard` (LLM out and back, then a fact repair), `strong` (LLM out and back, no repair, may drop a fact); the last two need an LLM `rewrite_llm`, else `INVALID_INPUT` |
 | `--depth` | — | 1-3 machine-translation hops through zh, ja, fi (Chinese sources: en, ja, fi) |
 | `-p, --provider` | `auto` | Pin one provider for both hops |
 | `--fallback` | empty | Providers tried after the pinned one |

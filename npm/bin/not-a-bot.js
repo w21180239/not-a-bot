@@ -38,7 +38,7 @@ if (!binary) {
       '',
       `The package ${platformPackage} is missing. Reinstall, or install from source:`,
       '  npm install -g not-a-bot --force',
-      '  cargo install not-a-bot --locked',
+      '  cargo install --git https://github.com/w21180239/not-a-bot --locked',
       '',
       'If your platform has no prebuilt binary, cargo is the way.',
       '',

@@ -18,3 +18,15 @@ Experiments on the LLM humanize brief (`build_prompt` in `src/providers/cli_llm.
 - High-scoring outputs keep the source's content-free sentences (thanks, excitement, pledges, generic lessons). Listing human-writing features, a ja pivot, a literal first hop or a haiku final hop all scored worse than the baseline.
 - Deleting feeling and pledge sentences (v10, now in `build_prompt`) lowers the score; a broader cut (v6) lowers it the same but drops place names that sat inside the cut sentences.
 - Checked with the real binary on `benches/rewrite-depth` (8 English texts, desklib): `standard` 0.657 to 0.611, `strong` 0.711 to 0.697, no missing facts before or after.
+
+## Rounds 4-6 (30 texts, 2-3 samples each, real binary)
+
+| variant | mean p_ai | texts with a lost fact token |
+|---|---|---|
+| earlier brief | 0.579 | 2.3 |
+| `standard` (LLM out, LLM back, fact-only fix hop) | 0.387 | 1.3 |
+| `strong` (LLM out, LLM back) | 0.367 | 2.0 |
+
+- Sampling noise is large: the same text and variant move several points between samples, so compare pooled means over 2-3 samples (`--rep`, real-binary `tx-*` variants), not single runs.
+- The first fix hop repaired meaning against the original and restored the feeling and pledge sentences the humanize hops had deleted, which raised the score back toward the baseline.
+- A fact-only repair that also receives the fact check's list of missing tokens restores the facts and leaves the cut sentences deleted. This is the `standard` preset; `strong` skips the repair hop and may drop a fact, always reported in `missingFacts`.

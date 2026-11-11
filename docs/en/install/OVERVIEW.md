@@ -16,7 +16,7 @@ Install the binary, run one request, and turn on shell completion.
 
 | Method | Command | Notes |
 | --- | --- | --- |
-| Cargo | `cargo install not-a-bot` | Compiles with LTO; a few minutes |
+| Cargo | `cargo install --git https://github.com/w21180239/not-a-bot` | Compiles with LTO; a few minutes |
 | Prebuilt | download from [Releases](https://github.com/w21180239/not-a-bot/releases/latest) | Windows, Linux, macOS |
 | Source | `cargo build --release` | Binary at `target/release/not-a-bot` |
 

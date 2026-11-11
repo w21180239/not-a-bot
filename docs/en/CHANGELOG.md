@@ -13,12 +13,15 @@ not-a-bot continues translatex 0.3.0 under a new name. Nothing else changed in b
 ### Changed
 
 - The binary is `not-a-bot`, with `nab` as a short alias that behaves the same. The crate is `not-a-bot` (library `not_a_bot`) and the npm package is `not-a-bot` (platform packages `not-a-bot-<os>-<arch>`); both npm bins run the same launcher.
-- The `roundtrip` subcommand is now `rewrite`, and its default preset is `standard` (LLM out and back); `light` stays available with `--preset light`. The schema types `RoundtripRequest` and `RoundtripResponse` are now `RewriteRequest` and `RewriteResponse`.
+- The `roundtrip` subcommand is now `rewrite`, and its default preset is `standard` (LLM out and back, then a fact repair); `light` stays available with `--preset light`. The schema types `RoundtripRequest` and `RoundtripResponse` are now `RewriteRequest` and `RewriteResponse`.
 - Config keys `roundtrip_preset`, `roundtrip_pivot`, `roundtrip_llm`, `roundtrip_scorer` and `roundtrip_ladder` are now `rewrite_*`.
 - Environment variables use the `NOT_A_BOT_` prefix instead of `TRANSLATEX_` (for example `NOT_A_BOT_REWRITE_PRESET`, `NOT_A_BOT_CONFIG`, `NOT_A_BOT_HOME`).
 - The config and cache directory is `~/.config/not-a-bot`. Old names, variables and directories are not read.
 - Provider metadata keys use the `not-a-bot.` prefix (`not-a-bot.style`, `not-a-bot.history`, `not-a-bot.original`), and the HTTP User-Agent is `not-a-bot/<version>`.
 - The `translatex` integration skill is now `not-a-bot`.
+- Presets: `standard` (default) is an LLM hop out, an LLM hop back and a fact-only repair hop (`<llm>:fix`); `strong` is an LLM hop out and back with no repair (furthest rewrite, lowest detector score, may drop a fact, always listed in `missingFacts`); `light` is unchanged. `standard` and `strong` reject a non-LLM `rewrite_llm` with `INVALID_INPUT`. Humanize hops delete sentences that only express feelings, pledges or pleasantries.
+- The fix hop (`engine:fix`) restores hard facts only (names, places, products, numbers, dates, amounts, currencies, IDs, versions, paths, code spans, negations, qualifiers) against the original, is given the fact check's list of missing tokens, and never restores cut feeling or pledge sentences. Before, it repaired meaning.
+- Install from source with `cargo install --git https://github.com/w21180239/not-a-bot`; the crate is not published to crates.io.
 
 ### Added
 

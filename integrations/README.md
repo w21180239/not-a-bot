@@ -6,7 +6,7 @@ calls the command and reads JSON. The same setup works in 24 harnesses; only the
 place the document goes differs.
 
 ```bash
-npm install -g not-a-bot     # or: cargo install not-a-bot
+npm install -g not-a-bot     # or: cargo install --git https://github.com/w21180239/not-a-bot
 not-a-bot --version
 ```
 

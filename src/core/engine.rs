@@ -336,7 +336,9 @@ impl Engine {
     /// undo it. The output is checked for facts the input had and lost.
     async fn rewrite_once(&self, req: &RewriteRequest) -> Result<RewriteOutcome> {
         use crate::core::chain::{plan, resolve_source, Target};
-        use crate::providers::cli_llm::{HISTORY_KEY, ORIGINAL_KEY, ORIGINAL_LANG_KEY, STYLE_KEY};
+        use crate::providers::cli_llm::{
+            HISTORY_KEY, MISSING_KEY, ORIGINAL_KEY, ORIGINAL_LANG_KEY, STYLE_KEY,
+        };
 
         let started = Instant::now();
         let request_id = req
@@ -407,6 +409,10 @@ impl Engine {
                 if !hops.is_empty() {
                     metadata.insert(ORIGINAL_KEY.into(), req.text.clone().into());
                     metadata.insert(ORIGINAL_LANG_KEY.into(), detected.clone().into());
+                }
+                if fix {
+                    let missing = crate::core::facts::missing_facts(&req.text, &text);
+                    metadata.insert(MISSING_KEY.into(), serde_json::json!(missing));
                 }
                 if let (false, Some((input, output))) = (fix, &llm_history) {
                     metadata.insert(
@@ -1779,6 +1785,10 @@ mod tests {
         );
         assert_eq!(calls[2].0, "en");
         assert_eq!(calls[2].1["not-a-bot.style"], "fix");
+        assert!(
+            calls[2].1["not-a-bot.missing"].is_array(),
+            "the fix hop gets the fact check's missing tokens"
+        );
         assert_eq!(
             out.response.text, "hullo>zh>en",
             "only the vetted edit applies"

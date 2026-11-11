@@ -11,7 +11,7 @@
 | 渠道 | 命令 | 说明 |
 | --- | --- | --- |
 | npm | `npm install -g not-a-bot` | 拉取对应平台的二进制包，安装期不执行任何脚本 |
-| Cargo | `cargo install not-a-bot --locked` | 源码构建；Rust 1.89+ 即可 |
+| Cargo | `cargo install --git https://github.com/w21180239/not-a-bot --locked` | 源码构建；Rust 1.89+ 即可 |
 | 发布包 | [Releases](https://github.com/w21180239/not-a-bot/releases/latest) | `not-a-bot-<target>.tar.gz`，二进制在根目录 |
 
 npm 包本身只是壳：二进制放在按平台的包里（`not-a-bot-linux-x64`、`not-a-bot-darwin-arm64`、`not-a-bot-windows-x64` 等），以 optional 依赖声明，npm 会装对应平台那一个，安装期不跑任何脚本。`bin/not-a-bot.js` 负责 exec；离线环境可以用 `NOT_A_BOT_BINARY_PATH` 指向本地构建产物。
