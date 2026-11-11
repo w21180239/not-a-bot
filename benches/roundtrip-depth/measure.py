@@ -6,9 +6,10 @@ results.jsonl and summary.md to --out. With --scorer, also scores source and out
 that detector command (text on stdin, score 0-1 on the last stdout line).
 
 Usage: python benches/roundtrip-depth/measure.py [--bin PATH] [--out DIR] [--configs light,standard-opencode] [--langs en]
-       [--sleep 0.4] [--scorer CMD] [--target 0.5]
+       [--sleep 0.4] [--scorer CMD] [--target 0.5] [--batch-scorer CMD] [--parallel 4]
 """
-import argparse, json, os, re, shutil, subprocess, sys, time
+import argparse, json, os, re, shutil, subprocess, sys, tempfile, time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from statistics import mean
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -79,6 +80,21 @@ def detect(scorer, text, timeout):
     return value if value is not None and 0.0 <= value <= 1.0 else None
 
 
+def detect_batch(batch_scorer, texts, timeout):
+    """{text: score} from one detector process: `<cmd> --batch IN.jsonl --out OUT.jsonl`, rows gain "p_ai"."""
+    with tempfile.TemporaryDirectory() as d:
+        src, dst = os.path.join(d, "in.jsonl"), os.path.join(d, "out.jsonl")
+        with open(src, "w", encoding="utf-8") as f:
+            for t in texts:
+                f.write(json.dumps({"text": t}, ensure_ascii=False) + "\n")
+        words = split_command(batch_scorer)
+        words[0] = shutil.which(words[0]) or words[0]
+        r = subprocess.run([*words, "--batch", src, "--out", dst], capture_output=True, timeout=timeout)
+        if r.returncode != 0:
+            sys.exit("batch scorer failed: " + r.stderr.decode("utf-8", "replace")[-400:])
+        return {row["text"]: row.get("p_ai") for row in map(json.loads, open(dst, encoding="utf-8"))}
+
+
 def content_words(text, lang):
     if lang == "zh":
         return set(re.findall(r"[一-鿿]", text))
@@ -135,6 +151,10 @@ def main():
     ap.add_argument("--timeout", type=int, default=600)
     ap.add_argument("--scorer", default=None, help="detector command: text on stdin, score 0-1 on the last line")
     ap.add_argument("--target", type=float, default=0.5, help="--target-score for standard-target")
+    ap.add_argument("--batch-scorer", default=None,
+                    help="detector taking --batch IN --out OUT (one model load); fills the detector columns "
+                         "after the runs instead of one --scorer call per text")
+    ap.add_argument("--parallel", type=int, default=1, help="texts run concurrently")
     a = ap.parse_args()
     if a.configs:
         names = a.configs.split(",")
@@ -154,7 +174,7 @@ def main():
     src_scores = {}
 
     def add_detector(row):
-        if not a.scorer or "detector_out" in row or row["id"] not in by_id:
+        if a.batch_scorer or not a.scorer or "detector_out" in row or row["id"] not in by_id:
             return
         if row["id"] not in src_scores:
             src_scores[row["id"]] = detect(a.scorer, by_id[row["id"]]["text"], a.timeout)
@@ -174,11 +194,16 @@ def main():
     with open(path, "w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
-        for name in names:
-            for c in cases:
-                if (name, c["id"]) in done:
-                    continue
-                res = run(a.bin, c, CONFIGS[name], a.timeout, fill)
+        todo = [(name, c) for name in names for c in cases if (name, c["id"]) not in done]
+
+        def job(name, c):
+            res = run(a.bin, c, CONFIGS[name], a.timeout, fill)
+            time.sleep(a.sleep)
+            return name, c, res
+
+        with ThreadPoolExecutor(max(1, a.parallel)) as pool:
+            for fut in as_completed([pool.submit(job, n, c) for n, c in todo]):
+                name, c, res = fut.result()
                 row = {"config": name, "id": c["id"], "kind": c["kind"], "lang": c["lang"], **res}
                 if "text" in res:
                     row.update(score(c, res))
@@ -186,8 +211,17 @@ def main():
                 rows.append(row)
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
                 f.flush()
-                time.sleep(a.sleep)
                 print(f"{name} {c['id']} {'ERR ' + str(res.get('error')) if 'error' in res else 'ok'}", file=sys.stderr)
+    if a.batch_scorer:
+        need = [r for r in rows if "text" in r and r["id"] in by_id and r.get("detector_out") is None]
+        if need:
+            texts = {by_id[r["id"]]["text"] for r in need} | {r["text"] for r in need}
+            scores = detect_batch(a.batch_scorer, sorted(texts), a.timeout * 4)
+            for r in need:
+                r["detector_src"], r["detector_out"] = scores.get(by_id[r["id"]]["text"]), scores.get(r["text"])
+            with open(path, "w", encoding="utf-8") as f:
+                for r in rows:
+                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
     shown = [r for r in rows if r["lang"] in langs]  # resumed rows may hold other languages
     L = [f"Languages: {', '.join(langs)} ({len(cases)} texts per configuration)", "",
          "| config | ok | overlap (lower = more rewrite) | length change | missing facts (guard) | stock phrases kept"

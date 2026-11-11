@@ -13,3 +13,4 @@ npm/platforms/*/translatex
 npm/platforms/*/translatex.exe
 npm/*.tgz
 npm/platforms/*/*.tgz
+__pycache__/

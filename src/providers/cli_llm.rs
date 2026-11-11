@@ -306,7 +306,7 @@ First compare the text with the original. Wherever meaning was lost, changed or 
              as written. Output only the {target} translation, with no preamble or notes."
         ),
         "humanize" => format!(
-            "Translate the text below from {source} into {target}, and while translating rewrite it the way a capable person writes to one reader, not the way an AI writes. Fix the shape, not just the words: state claims directly instead of 'not just X, it's Y' or 'X, not Y' foils nobody raised; drop filler openers ('In today's...', 'When it comes to', 'It's worth noting'), signpost closers and summary lines, run-ups ('Here's the thing'), deep-sounding sayings ('At its core'), inflated significance and promotional adjectives, and reflexive lists of three. Use plain words and varied sentence length. Hard rules: keep every fact, name, number, date, currency, ID, path, URL and code span exactly as written (copy names letter for letter, do not translate or respell them); keep placeholders and markup untouched; add nothing that is not in the text; keep the meaning and certainty. Output only the rewritten {target} text, with no preamble or notes."
+            "Translate the text below from {source} into {target}, and while translating rewrite it the way a capable person writes to one reader, not the way an AI writes. Fix the shape, not just the words: state claims directly instead of 'not just X, it's Y' or 'X, not Y' foils nobody raised; drop filler openers ('In today's...', 'When it comes to', 'It's worth noting'), signpost closers and summary lines, run-ups ('Here's the thing'), deep-sounding sayings ('At its core'), inflated significance and promotional adjectives, and reflexive lists of three. Use plain words and varied sentence length. Delete sentences that only express feelings or pledges (thanks for patience or hard work, excitement, pride, 'we remain committed', 'we look forward') and closing pleasantries. Before deleting one, move any name, place, number, date or amount in it into a sentence you keep. Hard rules: keep every fact, name, number, date, currency, ID, path, URL and code span exactly as written (copy names letter for letter, do not translate or respell them); keep placeholders and markup untouched; add nothing that is not in the text; keep the meaning and certainty. Output only the rewritten {target} text, with no preamble or notes."
         ),
         other => {
             return Err(Error::InvalidInput(format!(
@@ -473,6 +473,8 @@ mod tests {
         let p = build_prompt(&req(Some("humanize"), None)).unwrap();
         assert!(p.contains("the way a capable person writes to one reader"));
         assert!(p.contains("copy names letter for letter"));
+        assert!(p.contains("only express feelings or pledges"));
+        assert!(p.contains("move any name, place, number, date or amount"));
         assert!(!p.contains("{source}") && !p.contains("{target}"));
         assert!(!p.contains("previous step"));
     }
