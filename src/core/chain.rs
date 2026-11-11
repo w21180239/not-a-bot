@@ -207,16 +207,19 @@ fn expand_preset(
     };
     let lang = |code: &str| Target::Lang(code.to_string());
     let out = if is_chinese(source) { "en" } else { "zh" };
+    if matches!(name.as_str(), "standard" | "strong") && !is_llm(&llm) {
+        return Err(Error::InvalidInput(format!(
+            "rewrite_llm {llm:?} is not an LLM engine; preset {name} needs one"
+        )));
+    }
     let hops = match name.as_str() {
         "light" => return expand_depth(2, source, settings),
-        "standard" => vec![hop(&llm, lang(out)), hop(&llm, Target::Source)],
-        "strong" => vec![
+        "standard" => vec![
             hop(&llm, lang(out)),
-            hop(&llm, lang("ja")),
-            hop("google", lang("fi")),
-            hop("edge", Target::Source),
+            hop(&llm, Target::Source),
             parse_hop(&format!("{llm}:fix"), is_llm)?,
         ],
+        "strong" => vec![hop(&llm, lang(out)), hop(&llm, Target::Source)],
         other => {
             return Err(Error::InvalidInput(format!(
                 "unknown rewrite preset {other:?}; valid: {}",
@@ -291,30 +294,24 @@ mod tests {
     }
 
     #[test]
-    fn strong_preset_ends_with_a_repair_pass() {
+    fn strong_preset_is_two_llm_hops_without_repair() {
         let mut r = req();
         let s = Settings::default();
         r.preset = Some("strong".into());
         let p = plan(&r, &s, "zh", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["en", "ja", "fi", "SRC", "FIX"]);
-        assert_eq!(
-            engines(&p),
-            vec![
-                "opencode-cli",
-                "opencode-cli",
-                "google",
-                "edge",
-                "opencode-cli"
-            ]
-        );
+        assert_eq!(langs(&p), vec!["en", "SRC"]);
+        assert_eq!(engines(&p), vec!["opencode-cli", "opencode-cli"]);
         let s = Settings {
             rewrite_llm: Some("google".into()),
             ..Settings::default()
         };
-        assert_eq!(
-            plan(&r, &s, "en", &llm).unwrap_err().code(),
-            "INVALID_INPUT"
-        );
+        for preset in ["standard", "strong"] {
+            r.preset = Some(preset.into());
+            assert_eq!(
+                plan(&r, &s, "en", &llm).unwrap_err().code(),
+                "INVALID_INPUT"
+            );
+        }
     }
 
     #[test]
@@ -335,7 +332,7 @@ mod tests {
         assert_eq!(s.rewrite_preset(), "standard");
         assert_eq!(s.rewrite_ladder(), vec!["standard", "strong"]);
         let p = plan(&req(), &s, "en", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["zh", "SRC"]);
+        assert_eq!(langs(&p), vec!["zh", "SRC", "FIX"]);
     }
 
     fn req() -> RewriteRequest {
@@ -436,9 +433,9 @@ mod tests {
         let s = Settings::default();
         r.preset = Some("strong".into());
         let p = plan(&r, &s, "en", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["zh", "ja", "fi", "SRC", "FIX"]);
+        assert_eq!(langs(&p), vec!["zh", "SRC"]);
         let p = plan(&r, &s, "zh", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["en", "ja", "fi", "SRC", "FIX"]);
+        assert_eq!(langs(&p), vec!["en", "SRC"]);
 
         r.preset = Some("standard".into());
         let s = Settings {
@@ -446,9 +443,15 @@ mod tests {
             ..Settings::default()
         };
         let p = plan(&r, &s, "en", &llm).unwrap();
-        assert_eq!(langs(&p), vec!["zh", "SRC"]);
-        assert_eq!(engines(&p), vec!["opencode-cli", "opencode-cli"]);
-        assert_eq!(langs(&plan(&r, &s, "zh", &llm).unwrap()), vec!["en", "SRC"]);
+        assert_eq!(langs(&p), vec!["zh", "SRC", "FIX"]);
+        assert_eq!(
+            engines(&p),
+            vec!["opencode-cli", "opencode-cli", "opencode-cli"]
+        );
+        assert_eq!(
+            langs(&plan(&r, &s, "zh", &llm).unwrap()),
+            vec!["en", "SRC", "FIX"]
+        );
 
         r.preset = Some("light".into());
         assert_eq!(
@@ -487,7 +490,8 @@ mod tests {
         r.depth = None;
         assert_eq!(langs(&plan(&r, &s, "en", &llm).unwrap()), vec!["ja", "SRC"]);
         r.pivot = "auto".into();
-        assert_eq!(engines(&plan(&r, &s, "en", &llm).unwrap())[3], "edge");
+        // Falls through to the configured preset, strong: no repair hop.
+        assert_eq!(langs(&plan(&r, &s, "en", &llm).unwrap()), vec!["zh", "SRC"]);
     }
 
     #[test]

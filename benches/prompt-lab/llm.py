@@ -63,10 +63,10 @@ def _run(model, prompt, timeout):
     return out
 
 
-def call(model, prompt, timeout=300, retries=2, clean=True):
-    """Return output text; cached on disk by (model, prompt). Raises after retries."""
+def call(model, prompt, timeout=300, retries=2, clean=True, rep=0):
+    """Return output text; cached on disk by (model, prompt, rep). rep > 0 draws a fresh sample. Raises after retries."""
     os.makedirs(CACHE, exist_ok=True)
-    k = key_of(model, prompt)
+    k = key_of(model if not rep else f"{model}#rep{rep}", prompt)
     path = os.path.join(CACHE, k + ".json")
     with _guard:
         lock = _locks.setdefault(k, threading.Lock())
