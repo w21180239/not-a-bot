@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1020"/>
+      <stop offset="1" stop-color="#171B3A"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <g transform="translate(64 56) scale(0.75)">
+    <path d="M28 12h72c11 0 20 9 20 20v48c0 11-9 20-20 20H58L34 118c-2 1.7-5 .4-5-2.1V100h-1C17 100 8 91 8 80V32c0-11 9-20 20-20z" fill="#4F46E5"/>
+    <g fill="#FFFFFF">
+      <rect x="28" y="34" width="62" height="8" rx="4"/>
+      <rect x="28" y="52" width="72" height="8" rx="4"/>
+      <rect x="28" y="70" width="34" height="8" rx="4"/>
+    </g>
+    <rect x="68" y="64" width="7" height="20" rx="2" fill="#FBBF24"/>
+  </g>
+  <text x="176" y="124" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="76" font-weight="700" fill="#FFFFFF">not-a-bot</text>
+  <text x="68" y="198" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="32" fill="#C7CBE8">Get AI-assisted writing past readers, reviewers and AI detectors,</text>
+  <text x="68" y="240" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="32" fill="#C7CBE8">with every fact intact.</text>
+
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif">
+    <text x="1216" y="112" text-anchor="end" font-size="64" font-weight="700" fill="#FBBF24">0.999 → 0.39</text>
+    <text x="1216" y="146" text-anchor="end" font-size="20" fill="#9AA0C8">mean detector score, 30 texts, one detector</text>
+  </g>
+
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18">
+    <rect x="64" y="288" width="568" height="290" rx="14" fill="#10142B" stroke="#2A2F5A"/>
+    <text x="88" y="324" font-size="15" font-weight="700" letter-spacing="2" fill="#F87171">BEFORE</text>
+    <text fill="#E3E5F5">
+      <tspan x="88" y="360">CropSense Pro is the smart irrigation platform built for</tspan>
+      <tspan x="88" y="388">Waikato growers who want to do more with every drop. In</tspan>
+      <tspan x="88" y="416">the 2025-26 growing season, farms using CropSense Pro</tspan>
+      <tspan x="88" y="444">reduced water use by 27% while maintaining consistent</tspan>
+      <tspan x="88" y="472">yields, and the dashboard integrates <tspan fill="#F87171" font-weight="700">seamlessly</tspan> with the</tspan>
+      <tspan x="88" y="500">tools you already use. Our goal is to <tspan fill="#F87171" font-weight="700">empower</tspan> growers to</tspan>
+      <tspan x="88" y="528"><tspan fill="#F87171" font-weight="700">unlock</tspan> their full potential.</tspan>
+    </text>
+    <text x="88" y="560" font-size="15" fill="#9AA0C8">3 lint hits</text>
+
+    <rect x="648" y="288" width="568" height="290" rx="14" fill="#10142B" stroke="#4F46E5" stroke-width="2"/>
+    <text x="672" y="324" font-size="15" font-weight="700" letter-spacing="2" fill="#34D399">AFTER  nab rewrite</text>
+    <text fill="#FFFFFF">
+      <tspan x="672" y="360">CropSense Pro is a smart irrigation platform made for</tspan>
+      <tspan x="672" y="388">Waikato growers who want more out of every drop. In the</tspan>
+      <tspan x="672" y="416">2025-26 growing season, farms using it cut their water</tspan>
+      <tspan x="672" y="444">use by 27% and held yields steady. The dashboard plugs</tspan>
+      <tspan x="672" y="472">straight into the tools you already use.</tspan>
+    </text>
+    <text x="672" y="560" font-size="15" fill="#9AA0C8">0 lint hits, CropSense Pro, Waikato, 2025-26 and 27% kept</text>
+  </g>
+</svg>

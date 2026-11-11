@@ -7,7 +7,7 @@
     {
       "name": "not-a-bot",
       "source": "./integrations/claude-code/plugin",
-      "description": "Write, audit and rewrite prose so it reads like a person wrote it, and translate text, with the not-a-bot CLI."
+      "description": "Get AI-assisted writing past readers, reviewers and AI detectors, with every fact intact. Rewrites on your own Claude Code or OpenCode subscription, checks that names and numbers survived, and lints for AI tells offline."
     }
   ]
 }
