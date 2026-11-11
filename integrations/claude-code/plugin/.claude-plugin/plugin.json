@@ -1,6 +1,6 @@
 {
   "name": "not-a-bot",
-  "description": "Write, audit and rewrite prose so it reads like a person wrote it, and translate text, with the not-a-bot CLI.",
+  "description": "Get AI-assisted writing past readers, reviewers and AI detectors, with every fact intact. Rewrites on your own Claude Code or OpenCode subscription, checks that names and numbers survived, and lints for AI tells offline.",
   "version": "0.1.0",
   "author": {
     "name": "w21180239"
@@ -8,5 +8,5 @@
   "homepage": "https://github.com/w21180239/not-a-bot",
   "repository": "https://github.com/w21180239/not-a-bot",
   "license": "MIT OR Apache-2.0",
-  "keywords": ["translation", "cli", "i18n", "humanize"]
+  "keywords": ["humanizer", "ai-humanizer", "humanize-ai-text", "ai-writing", "ai-slop", "ai-detector", "writing-tools", "claude-code", "agent-skills", "cli", "rust", "llm"]
 }

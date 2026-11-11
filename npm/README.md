@@ -1,6 +1,6 @@
 # not-a-bot
 
-**Humanize AI-sounding text from the command line, and translate for your agent: no API key, no signup, no config.**
+**Get AI-assisted writing past readers, reviewers and AI detectors, with every fact intact.**
 
 `npm install -g not-a-bot` puts a 6 MB static binary on `PATH`. `rewrite`
 rewrites AI-generated text to read like a person wrote it, on your own Claude or
