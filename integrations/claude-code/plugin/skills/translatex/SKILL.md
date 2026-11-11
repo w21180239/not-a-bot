@@ -127,8 +127,10 @@ did not see.
   for technical English that must stay precise.
 - A third machine-translation hop (`mt-deep`) loses more facts than it gains in
   rewriting; prefer `llm` over it.
-- `--scorer "<command>"` (or config `roundtrip_scorer`) scores each result with
-  a detector the user supplies: text on stdin, a 0-1 score (higher = more
+- Scoring is for benchmarking and tuning presets, not for live requests: a
+  local detector loads a model on every call. Pass these flags only when the
+  user asks for a scored run. `--scorer "<command>"` (or config
+  `roundtrip_scorer`) scores each result with a detector the user supplies: text on stdin, a 0-1 score (higher = more
   AI-like) on the last stdout line. `--best-of 1-5` keeps the run with no
   missing facts, then the lowest score; `--target-score 0-1` climbs
   `roundtrip_ladder` (default `llm,lynote-fix`) until the score is at or below

@@ -15,6 +15,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
+/// Minimum time a scorer call gets, whatever the request timeout.
+const SCORER_TIMEOUT_FLOOR_MS: u64 = 120_000;
+
 pub struct Engine {
     registry: Arc<Registry>,
     creds: CredentialStore,
@@ -298,9 +301,12 @@ impl Engine {
             .filter(|s| !s.is_empty())
             .map(str::to_string)
             .or_else(|| self.settings.roundtrip_scorer());
+        // Local detectors load a model per call (10+ s on CPU), so the scorer
+        // gets the same kind of floor as the local agent CLIs.
         let timeout_ms = req
             .timeout_ms
-            .unwrap_or_else(|| self.settings.timeout().as_millis() as u64);
+            .unwrap_or_else(|| self.settings.timeout().as_millis() as u64)
+            .max(SCORER_TIMEOUT_FLOOR_MS);
         let scorer = command
             .map(|c| CommandScorer::parse(&c, timeout_ms))
             .transpose()?;
