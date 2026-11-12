@@ -337,7 +337,8 @@ impl Engine {
     async fn rewrite_once(&self, req: &RewriteRequest) -> Result<RewriteOutcome> {
         use crate::core::chain::{plan, resolve_source, Target};
         use crate::providers::cli_llm::{
-            HISTORY_KEY, MISSING_KEY, ORIGINAL_KEY, ORIGINAL_LANG_KEY, STYLE_KEY,
+            HISTORY_KEY, MISSING_KEY, OPENING_KEY, ORIGINAL_KEY, ORIGINAL_LANG_KEY, REGISTER_KEY,
+            STYLE_KEY, TERMS_KEY,
         };
 
         let started = Instant::now();
@@ -356,6 +357,12 @@ impl Engine {
                 .is_some_and(|p| p.info().kind == ProviderKind::Llm)
         };
         let mut plan = plan(req, &self.settings, &source, &is_llm)?;
+        // Register of the source, sent to every LLM hop so the rewrite keeps its voice.
+        let profile = crate::core::register::detect(&req.text);
+        let register_meta = serde_json::json!({
+            "register": profile.register.as_str(),
+            "markers": profile.markers,
+        });
 
         let mut hops: Vec<Hop> = Vec::new();
         // Languages visited; a repair pass shows as `fix`.
@@ -405,6 +412,7 @@ impl Engine {
                     STYLE_KEY.into(),
                     if fix { "fix" } else { "humanize" }.into(),
                 );
+                metadata.insert(REGISTER_KEY.into(), register_meta.clone());
                 // The first hop's input is the original already. Without inline repair
                 // (standard), only the fix hop sees it.
                 if !hops.is_empty() && (fix || plan.inline_repair) {
@@ -414,6 +422,11 @@ impl Engine {
                 if fix {
                     let missing = crate::core::facts::missing_facts(&req.text, &text);
                     metadata.insert(MISSING_KEY.into(), serde_json::json!(missing));
+                    let terms = crate::core::drift::lost_terms(&req.text, &text);
+                    metadata.insert(TERMS_KEY.into(), serde_json::json!(terms));
+                    if let Some(word) = crate::core::drift::lost_opening(&req.text, &text) {
+                        metadata.insert(OPENING_KEY.into(), word.into());
+                    }
                 }
                 if let (false, Some((input, output))) = (fix, &llm_history) {
                     metadata.insert(
@@ -470,16 +483,27 @@ impl Engine {
             };
             // An LLM sometimes answers a hop back to a Latin-script language in
             // the pivot's script; retry once, then fail rather than pass it on.
-            let out = if llm_hop && !fix && cjk_for_latin_target(&to, &out.response.text) {
+            // A model that answers "nothing to translate" gets the same retry.
+            let unusable = |t: &str| {
+                let why = if cjk_for_latin_target(&to, t) {
+                    Some(format!("output is not in {to}"))
+                } else if crate::core::drift::looks_like_refusal(&text, t) {
+                    Some("output is a refusal, not a rewrite".to_string())
+                } else {
+                    None
+                };
+                why
+            };
+            let out = if let (true, Some(why)) = (llm_hop && !fix, unusable(&out.response.text)) {
                 let again = self.translate(&hop_req).await?;
-                if cjk_for_latin_target(&to, &again.response.text) {
+                if let Some(again_why) = unusable(&again.response.text) {
                     return Err(Error::Upstream {
                         provider: again.response.provider.clone(),
                         status: 502,
-                        body: format!("hop {}: output is not in {to}", i + 1),
+                        body: format!("hop {}: {again_why}", i + 1),
                     });
                 }
-                warnings.push(format!("hop {}: output was not in {to}; retried", i + 1));
+                warnings.push(format!("hop {}: {why}; retried", i + 1));
                 again
             } else {
                 out
@@ -548,6 +572,26 @@ impl Engine {
             text = hop_text;
             from = to;
             i += 1;
+        }
+
+        // Finish: keep the source's punctuation, casing and full-stop habits (hops
+        // tidy them), then fall back to the original where the rewrite changed
+        // meaning. Every preset ends in a fix hop.
+        let finished = if plan.hops.iter().any(|h| h.to == Target::Fix) {
+            let habits = crate::core::drift::ascii_habits(&req.text, &text);
+            let habits = crate::core::register::expand_contractions(&req.text, &habits);
+            let surface = crate::core::register::restore_surface(&req.text, &habits);
+            let (guarded, drift) = crate::core::drift::guard(&req.text, &surface);
+            warnings.extend(drift);
+            guarded
+        } else {
+            crate::core::register::restore_surface(&req.text, &text)
+        };
+        if finished != text {
+            if let Some(last) = hops.last_mut() {
+                last.text.clone_from(&finished);
+            }
+            text = finished;
         }
 
         let missing_facts = crate::core::facts::missing_facts(&req.text, &text);
@@ -1930,6 +1974,44 @@ mod tests {
             );
             let last = calls.last().unwrap();
             assert_eq!(last.1["not-a-bot.original"], "Ask Aroha", "{preset}");
+        }
+    }
+
+    #[tokio::test]
+    async fn llm_hops_carry_the_register_of_the_original() {
+        let home = dir();
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let mut reg = Registry::new();
+        reg.register(Arc::new(MetaRecorder {
+            name: "llm-a",
+            kind: ProviderKind::Llm,
+            calls: calls.clone(),
+        }));
+        let settings = Settings {
+            rewrite_llm: Some("llm-a".into()),
+            ..test_settings()
+        };
+        let engine = Engine::new(
+            Arc::new(reg),
+            CredentialStore::default(),
+            Some(home.path().to_path_buf()),
+            settings,
+        );
+        let casual = include_str!("../../tests/fixtures/register/casual-dictation.txt");
+        let formal = include_str!("../../tests/fixtures/register/formal-notice.txt");
+        for (text, class) in [(casual, "casual"), (formal, "formal")] {
+            calls.lock().unwrap().clear();
+            let mut req = rewrite_req("en", "auto");
+            req.text = text.into();
+            req.preset = Some("standard".into());
+            engine.rewrite(&req).await.expect("rewrite");
+
+            let calls = calls.lock().unwrap().clone();
+            assert_eq!(calls.len(), 3, "{class}");
+            for (_, meta) in &calls {
+                assert_eq!(meta["not-a-bot.register"]["register"], class);
+                assert!(meta["not-a-bot.register"]["markers"].is_array());
+            }
         }
     }
 

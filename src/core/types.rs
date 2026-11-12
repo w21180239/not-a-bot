@@ -113,13 +113,18 @@ pub struct Hop {
     pub edits: Option<Vec<HopEdit>>,
 }
 
-/// What a `fix` hop edit repairs. Fact edits skip the copy-back budget.
+/// What a `fix` hop edit repairs. Fact edits skip the copy-back budget;
+/// term edits put back a term, sentence form or condition the rewrite changed and are
+/// exempt from the budget when small; register edits restore a voice marker (casing, a filler, a hedge) of the
+/// original and have a copy-back budget of their own.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum EditKind {
     Fact,
     #[default]
     Meaning,
+    Term,
+    Register,
 }
 
 /// One meaning repair from a `fix` hop: replace `from` (a span of the hop

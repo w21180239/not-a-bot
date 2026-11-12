@@ -1,0 +1,3 @@
+hey, Grace Hughes here. it's Monday 1 Dec today
+
+so I need you to dig into INC-2291 for me, the coalescing one. ... coalescing is back on at 25% now, it came back with 4.19... 4.19.0 I think? ... Olivia's booking the review for Thursday, oh actually no, she hasn't confirmed yet, so sometime later this week. ... with a diff, like a unified diff I mean, against the relay-dispatcher code as it is in the export. times in UTC please. ... Sam will check every single one haha
