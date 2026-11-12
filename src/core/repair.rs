@@ -2,7 +2,8 @@
 //! this module decides which to apply, so a repair cannot quietly turn into
 //! copying the original back.
 
-use crate::core::facts::{missing_facts, FUNCTION_WORDS};
+use crate::core::drift::drift_count;
+use crate::core::facts::FUNCTION_WORDS;
 use crate::core::types::{EditKind, HopEdit};
 use serde::Deserialize;
 use std::collections::HashSet;
@@ -11,12 +12,20 @@ use std::collections::HashSet;
 /// non-fact edits of one fix hop may cause together.
 pub const MAX_STYLE_OVERLAP_RISE: f64 = 0.10;
 
+/// Words that pinpoint edits may bring back from the original, as a share of
+/// the rewrite's word count.
+pub const MAX_PINPOINT_SHARE: f64 = 0.30;
+
 #[derive(Debug, Deserialize)]
 struct RawEdit {
     from: String,
     to: String,
     #[serde(default)]
     why: String,
+    /// `register` marks a voice repair, `term` a changed term, form or condition put
+    /// back; anything else is a meaning repair.
+    #[serde(default)]
+    kind: String,
 }
 
 /// Edits from model output: tolerates a code fence or prose around the
@@ -36,7 +45,11 @@ pub fn parse_edits(raw: &str) -> Result<Vec<HopEdit>, String> {
             from: e.from,
             to: e.to,
             why: e.why,
-            kind: EditKind::Meaning,
+            kind: match e.kind.to_lowercase().as_str() {
+                "register" => EditKind::Register,
+                "term" => EditKind::Term,
+                _ => EditKind::Meaning,
+            },
             applied: false,
             reason: None,
         })
@@ -49,11 +62,17 @@ pub fn parse_edits(raw: &str) -> Result<Vec<HopEdit>, String> {
 /// longer than max(40 chars, 25% of the text), or when `to` exceeds 3x `from`
 /// + 80 chars.
 ///
-/// 1. Fact edits (applying one shrinks [`missing_facts`] against `original`)
+/// 1. Fact edits (applying one shrinks [`drift_count`] against `original`: lost
+///    facts, flipped negations, changed hedges and the like)
 ///    always apply and spend no budget.
 /// 2. The rest share one budget: content-word overlap with `original` may
 ///    rise at most [`MAX_STYLE_OVERLAP_RISE`] above the text after pass 1, so
 ///    many small edits cannot together copy the original back.
+///    Pinpoint `term` edits (see [`pinpoint_words`]) are exempt up to
+///    [`MAX_PINPOINT_SHARE`] of the text's words.
+/// 3. Register edits (`kind: register`, restoring voice markers) get the same
+///    budget again, counted from the text after pass 2, and are skipped when
+///    they would lose a fact.
 pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, Vec<HopEdit>) {
     let max_from = 40.max(text.chars().count() / 4);
     let mut ordered: Vec<(usize, HopEdit)> = edits
@@ -66,7 +85,9 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
     for edit in &mut edits {
         let from_len = edit.from.chars().count();
         edit.applied = false;
-        edit.kind = EditKind::Meaning;
+        if !matches!(edit.kind, EditKind::Register | EditKind::Term) {
+            edit.kind = EditKind::Meaning;
+        }
         edit.reason = if edit.from.is_empty() {
             Some("empty from".to_string())
         } else if edit.from == edit.to {
@@ -88,10 +109,13 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
     };
 
     let mut current = text.to_string();
-    let mut missing = missing_facts(original, &current).len();
-    for edit in edits.iter_mut().filter(|e| e.reason.is_none()) {
+    let mut missing = drift_count(original, &current);
+    for edit in edits
+        .iter_mut()
+        .filter(|e| e.reason.is_none() && e.kind != EditKind::Register)
+    {
         if let Ok(candidate) = replace(&current, edit) {
-            let left = missing_facts(original, &candidate).len();
+            let left = drift_count(original, &candidate);
             if left < missing {
                 missing = left;
                 current = candidate;
@@ -101,15 +125,25 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
         }
     }
 
-    let baseline = overlap(&current, original);
+    let mut baseline = overlap(&current, original);
+    let max_pinpoint = (MAX_PINPOINT_SHARE * current.split_whitespace().count() as f64) as usize;
+    let mut pinpointed = 0;
     for edit in edits
         .iter_mut()
-        .filter(|e| e.reason.is_none() && !e.applied)
+        .filter(|e| e.reason.is_none() && !e.applied && e.kind != EditKind::Register)
     {
         match replace(&current, edit) {
             Err(reason) => edit.reason = Some(reason.into()),
             Ok(candidate) => {
-                if overlap(&candidate, original) - baseline > MAX_STYLE_OVERLAP_RISE {
+                let pin = (edit.kind == EditKind::Term)
+                    .then(|| pinpoint_words(edit, original))
+                    .flatten();
+                if pin.is_some_and(|n| pinpointed + n <= max_pinpoint) {
+                    pinpointed += pin.unwrap_or(0);
+                    current = candidate;
+                    baseline = overlap(&current, original);
+                    edit.applied = true;
+                } else if overlap(&candidate, original) - baseline > MAX_STYLE_OVERLAP_RISE {
                     edit.reason = Some("copies the original back".into());
                 } else {
                     current = candidate;
@@ -118,7 +152,54 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
             }
         }
     }
+
+    // Register edits bring voice markers back, so they must not starve the
+    // meaning edits above: own budget, and never at the cost of a fact.
+    let baseline = overlap(&current, original);
+    let mut missing = drift_count(original, &current);
+    for edit in edits
+        .iter_mut()
+        .filter(|e| e.reason.is_none() && e.kind == EditKind::Register)
+    {
+        match replace(&current, edit) {
+            Err(reason) => edit.reason = Some(reason.into()),
+            Ok(candidate) => {
+                let left = drift_count(original, &candidate);
+                if left > missing {
+                    edit.reason = Some("drops a fact".into());
+                } else if overlap(&candidate, original) - baseline > MAX_STYLE_OVERLAP_RISE {
+                    edit.reason = Some("copies the original back".into());
+                } else {
+                    missing = left;
+                    current = candidate;
+                    edit.applied = true;
+                }
+            }
+        }
+    }
     (current, edits)
+}
+
+/// Words an edit brings back, when it is a pinpoint repair: `from` of at most
+/// 3 words, `to` of at most 4, and every word `to` adds appears in `original`
+/// (a changed term put back). `None` for any other edit.
+fn pinpoint_words(edit: &HopEdit, original: &str) -> Option<usize> {
+    let norm = |s: &str| -> Vec<String> {
+        s.split_whitespace()
+            .map(|w| {
+                w.trim_matches(|c: char| !c.is_alphanumeric())
+                    .to_lowercase()
+            })
+            .filter(|w| !w.is_empty())
+            .collect()
+    };
+    let (from, to) = (norm(&edit.from), norm(&edit.to));
+    if from.len() > 3 || to.len() > 4 {
+        return None;
+    }
+    let known = norm(original);
+    let added: Vec<_> = to.iter().filter(|w| !from.contains(w)).collect();
+    (!added.is_empty() && added.iter().all(|w| known.contains(w))).then_some(added.len())
 }
 
 /// Jaccard similarity of lowercase content words (function words dropped).
@@ -141,6 +222,7 @@ pub fn overlap(a: &str, b: &str) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::facts::missing_facts;
 
     const ORIGINAL: &str = "This update is not just a bug fix, it's a fundamental shift. \
         Aroha needs approval from Tom by Friday for NZD 18,900, before the board meets. \
@@ -310,6 +392,158 @@ mod tests {
         );
         assert!(edits[0].applied, "{:?}", edits[0].reason);
         assert!(text.contains("NZD 18,000, before the board meets."));
+    }
+
+    fn register_edit(from: &str, to: &str) -> HopEdit {
+        HopEdit {
+            kind: EditKind::Register,
+            ..edit(from, to)
+        }
+    }
+
+    #[test]
+    fn register_kind_is_parsed_and_defaults_to_meaning() {
+        let raw = r#"[{"from": "Hey", "to": "hey", "kind": "register"},
+            {"from": "Aloha", "to": "Aroha", "kind": "meaning"}, {"from": "a", "to": "b"}]"#;
+        let kinds: Vec<_> = parse_edits(raw).unwrap().iter().map(|e| e.kind).collect();
+        assert_eq!(
+            kinds,
+            vec![EditKind::Register, EditKind::Meaning, EditKind::Meaning]
+        );
+    }
+
+    #[test]
+    fn register_edits_have_their_own_budget_and_keep_their_kind() {
+        let original = "hey, we ship alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima for Aroha";
+        let rewrite = "Hey, we ship red orange yellow green blue indigo violet black white grey brown pink for Aroha.";
+        let (text, edits) = apply_edits(
+            rewrite,
+            original,
+            vec![
+                edit("red", "alpha"),
+                edit("orange", "bravo"),
+                edit("yellow", "charlie"),
+                register_edit("Hey,", "hey,"),
+                register_edit("Aroha.", "Aroha"),
+            ],
+        );
+        // The third style edit is over budget, the register edits are not.
+        let got: Vec<_> = edits
+            .iter()
+            .map(|e| (e.from.as_str(), e.applied, e.kind))
+            .collect();
+        use EditKind::{Meaning as M, Register as R};
+        assert_eq!(
+            got,
+            vec![
+                ("Hey,", true, R),
+                ("red", true, M),
+                ("orange", true, M),
+                ("yellow", false, M),
+                ("Aroha.", true, R)
+            ]
+        );
+        assert!(text.starts_with("hey, we ship alpha bravo yellow"));
+        assert!(text.ends_with("for Aroha"));
+    }
+
+    #[test]
+    fn register_edit_that_drops_a_fact_is_skipped() {
+        let original = "hey, pay NZD 18,900 to Aroha";
+        let rewrite = "Hey, pay NZD 18,900 to Aroha.";
+        let (text, edits) = apply_edits(
+            rewrite,
+            original,
+            vec![
+                register_edit("NZD 18,900", "money"),
+                register_edit("Hey", "hey"),
+            ],
+        );
+        assert_eq!(text, "hey, pay NZD 18,900 to Aroha.");
+        assert_eq!(edits[0].reason.as_deref(), None);
+        assert_eq!(edits[1].reason.as_deref(), Some("drops a fact"));
+    }
+
+    fn term_edit(from: &str, to: &str) -> HopEdit {
+        HopEdit {
+            kind: EditKind::Term,
+            ..edit(from, to)
+        }
+    }
+
+    #[test]
+    fn small_term_edits_skip_the_budget_but_untagged_ones_do_not() {
+        let original = "we ship alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima after 6 attempts";
+        let rewrite = "we ship red orange yellow green blue indigo violet black white grey brown pink after 6 retries";
+        let (text, edits) = apply_edits(
+            rewrite,
+            original,
+            vec![
+                edit("red", "alpha"),
+                edit("orange", "bravo"),
+                edit("yellow", "charlie"),
+                term_edit("retries", "attempts"),
+            ],
+        );
+        let got: Vec<_> = edits.iter().map(|e| (e.from.as_str(), e.applied)).collect();
+        assert_eq!(
+            got,
+            vec![
+                ("red", true),
+                ("orange", true),
+                ("yellow", false),
+                ("retries", true)
+            ]
+        );
+        assert!(text.ends_with("6 attempts"));
+        assert_eq!(edits[3].kind, EditKind::Term);
+        // The same edit untagged shares the exhausted budget.
+        let (_, edits) = apply_edits(
+            rewrite,
+            original,
+            vec![
+                edit("red", "alpha"),
+                edit("orange", "bravo"),
+                edit("yellow", "charlie"),
+                edit("retries", "attempts"),
+            ],
+        );
+        assert!(!edits[2].applied && !edits[3].applied);
+    }
+
+    #[test]
+    fn term_edits_that_bring_in_words_not_in_the_original_use_the_budget() {
+        let original = "we ship alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima after 6 attempts";
+        assert_eq!(
+            pinpoint_words(&term_edit("retries", "tries"), original),
+            None
+        );
+        assert_eq!(
+            pinpoint_words(&term_edit("retries", "attempts"), original),
+            Some(1)
+        );
+        assert_eq!(
+            pinpoint_words(&term_edit("a b c d", "attempts"), original),
+            None,
+            "from of four words"
+        );
+    }
+
+    #[test]
+    fn restoring_a_flipped_negation_is_a_free_fact_style_edit() {
+        let original = "Do not push the change before the window opens on Wednesday";
+        let rewrite = "Push the change once the window opens on Wednesday";
+        let (text, edits) = apply_edits(
+            rewrite,
+            original,
+            vec![edit(
+                "Push the change once",
+                "Do not push the change before",
+            )],
+        );
+        assert!(edits[0].applied, "{:?}", edits[0].reason);
+        assert_eq!(edits[0].kind, EditKind::Fact);
+        assert!(text.starts_with("Do not push the change before the window"));
     }
 
     #[test]
