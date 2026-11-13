@@ -2,9 +2,15 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
-## Unreleased
+## 0.3.0 — 2026-11-14
+
+### Added
+
+- `batch --kind rewrite` and `batch --kind lint` run many rewrite or lint requests in one process; `--parallel` sets rewrite concurrency. Each input line may carry an `id` that is echoed in its output line, and batch flags (`--from`, `--preset`, `--preserve`, ...) act as per-line defaults. Lint items are checked in isolation, so cross-item tells never span lines.
 
 ### Changed
+
+- A malformed batch line yields an `ok: false` error object in its slot instead of being skipped, so output always has one line per input, in input order.
 
 - Rewrites keep the source's register. The source is classed as casual, formal or neither from cheap signals (lowercase sentence starts, missing final full stops, fillers, self-corrections, ellipses, contractions, sentence length); every LLM hop and the fix hop get that class and the markers seen as a prompt directive. A casual source keeps its lowercase starts, missing full stops, fillers, hedges, self-corrections, "haha" and its questions; a formal source gets no contractions or chat. After the last fix hop, casual sources get their casing and full-stop habits back deterministically (proper nouns, acronyms, IDs and `I` keep their case).
 - The fix hop compares voice as well as meaning: it may return `kind: "register"` edits that restore lost voice markers (own copy-back budget, never at the cost of a fact) and `kind: "term"` edits of at most 3 words that put back a swapped term, sentence form, condition or modality (exempt from the budget up to 30% of the text's words). Edits that restore a flipped negation, limit, quantifier or hedge count as fact edits.
