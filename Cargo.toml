@@ -1,6 +1,6 @@
 [package]
 name = "not-a-bot"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.89"
 description = "Get AI-assisted writing past readers, reviewers and AI detectors, with every fact intact: LLM round-trip rewrite, fact check and offline AI-tell lint. Also a keyless translator."
