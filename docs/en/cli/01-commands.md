@@ -100,16 +100,20 @@ Tells carry a `kind`: `vocab` (word with its plain replacement), a phrase family
 ```bash
 not-a-bot batch --file jobs.ndjson --parallel 4
 cat jobs.ndjson | not-a-bot batch --parallel 8
+cat texts.ndjson | not-a-bot batch --kind rewrite --from en --preset standard --preserve @code --parallel 6
+cat drafts.ndjson | not-a-bot batch --kind lint
 ```
 
-Input is one `TranslateRequest` per line. Output is one object per line, sorted back into input order even though execution is concurrent:
+`--kind` picks the request type per line: `translate` (default, one `TranslateRequest`), `rewrite` (one `RewriteRequest`) or `lint` (`{"text": "...", "source": "..."}`, `source` optional; offline, and each item is linted on its own so no tell spans two items). A line may carry an `id` of any JSON type; it is echoed back. `--to`, `--from`, `--preset`, `--pivot`, `--chain`, `--depth`, `--provider`, `--fallback`, `--preserve` and `--timeout-ms` set defaults for `translate` and `rewrite` lines; fields on a line replace them. `--parallel` bounds concurrent requests (`lint` is offline and ignores it).
+
+Output is one object per line, sorted back into input order even though execution is concurrent. `index` is the 0-based input line number (blank lines count):
 
 ```json
-{"index":0,"ok":true,"result":{…}}
-{"index":1,"ok":false,"error":{"code":"RATE_LIMITED",…}}
+{"index":0,"id":"a","ok":true,"result":{…}}
+{"index":1,"id":"b","ok":false,"error":{"code":"RATE_LIMITED",…}}
 ```
 
-Malformed lines are skipped with a stderr warning; the batch continues.
+A line that is not valid JSON, is not an object or has an unknown field yields an `INVALID_INPUT` error object for that line; the batch continues and exits `0`. Input with no lines exits `1`.
 
 ## `providers`
 

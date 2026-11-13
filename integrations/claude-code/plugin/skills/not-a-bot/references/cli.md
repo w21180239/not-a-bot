@@ -10,7 +10,7 @@
 | Text in another language | `nab translate "<text>" -t <lang> --preserve @code --format json` |
 | The same language, rewritten by a round trip | `nab rewrite "<text>" --from <lang> --preset standard --preserve @code --format json` |
 | The same, quickly and with no subscription | `nab rewrite "<text>" --from <lang> --preset light --format json` |
-| Many strings | `nab batch --file jobs.ndjson --format json` |
+| Many strings | `nab batch --file jobs.ndjson --format json` (`--kind rewrite` or `--kind lint` for many rewrites or lints, `--parallel N`, optional `id` per line) |
 | What can serve a language pair | `nab providers --format json` |
 | Whether anything is broken | `nab health --format json` |
 
