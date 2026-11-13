@@ -68,11 +68,16 @@ All field names are camelCase. Unknown fields are rejected with `INVALID_INPUT`,
 }
 ```
 
-**Batch NDJSON** — one request per line, one result per line, input order preserved:
+**Batch NDJSON** — one request per line, one result per line, input order preserved. `--kind translate|rewrite|lint` picks the request type; an optional `id` on a line is echoed back; a bad line becomes an error object and the batch continues:
 
 ```json
-{"index":0,"ok":true,"result":{…}}
-{"index":1,"ok":false,"error":{…}}
+{"index":0,"id":"a","ok":true,"result":{…}}
+{"index":1,"id":"b","ok":false,"error":{…}}
+```
+
+```bash
+not-a-bot batch --kind rewrite --from en --preset standard --preserve @code --parallel 6 < texts.ndjson
+not-a-bot batch --kind lint < drafts.ndjson   # each item linted in isolation
 ```
 
 ### 2. JSON Schema

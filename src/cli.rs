@@ -22,6 +22,8 @@ use std::sync::Arc;
       not-a-bot translate -t zh --json '{\"text\":\"Hello\",\"sourceLang\":\"en\"}'\n  \
       echo 'Hello' | not-a-bot translate -t ja\n  \n\
       not-a-bot batch --file jobs.ndjson --parallel 4\n  \
+      not-a-bot batch --kind rewrite --from en --preset standard --parallel 6\n  \
+      not-a-bot batch --kind lint < drafts.ndjson\n  \
       not-a-bot providers --json\n  \n\
       not-a-bot languages --provider baidu\n  \
       not-a-bot keys deepl --json\n  \n\
@@ -69,6 +71,13 @@ pub struct Cli {
 pub enum Format {
     Json,
     Text,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, clap::ValueEnum)]
+pub enum BatchKind {
+    Translate,
+    Rewrite,
+    Lint,
 }
 
 #[derive(Subcommand)]
@@ -177,15 +186,61 @@ pub enum Command {
         json: Option<String>,
     },
 
-    /// Translate many requests from an NDJSON file or stdin.
+    /// Run many independent translate, rewrite or lint requests from NDJSON.
     Batch {
-        /// NDJSON input, one TranslateRequest per line. Defaults to stdin.
+        /// NDJSON input, one request object per line. Defaults to stdin.
         #[arg(short, long)]
         file: Option<String>,
 
         /// Requests to run at once.
         #[arg(long, default_value_t = 4)]
         parallel: usize,
+
+        /// Request type per line: translate (TranslateRequest), rewrite
+        /// (RewriteRequest) or lint (`{"text","source"?}`, offline, each item
+        /// linted in isolation). An optional `id` on a line is echoed back.
+        #[arg(long, value_enum, default_value = "translate")]
+        kind: BatchKind,
+
+        /// Default `targetLang` for lines that omit it (translate).
+        #[arg(short, long)]
+        to: Option<String>,
+
+        /// Default `sourceLang` (translate, rewrite).
+        #[arg(short = 's', long)]
+        from: Option<String>,
+
+        /// Default `preset` (rewrite).
+        #[arg(long)]
+        preset: Option<String>,
+
+        /// Default `pivot` (rewrite).
+        #[arg(long)]
+        pivot: Option<String>,
+
+        /// Default `chain` (rewrite).
+        #[arg(long, value_delimiter = ',')]
+        chain: Vec<String>,
+
+        /// Default `depth`, 1-3 (rewrite).
+        #[arg(long, value_parser = clap::value_parser!(u8).range(1..=3))]
+        depth: Option<u8>,
+
+        /// Default `provider` (translate, rewrite).
+        #[arg(short, long)]
+        provider: Option<String>,
+
+        /// Default `fallbackChain` (translate, rewrite).
+        #[arg(long, value_delimiter = ',')]
+        fallback: Vec<String>,
+
+        /// Default `preserve` regexes; a line's own `preserve` replaces them.
+        #[arg(long)]
+        preserve: Vec<String>,
+
+        /// Default `timeoutMs` (translate, rewrite).
+        #[arg(long)]
+        timeout_ms: Option<u64>,
     },
 
     /// List providers with capability and configuration state.
@@ -268,6 +323,12 @@ pub async fn main() -> i32 {
     init_tracing(cli.log.as_deref());
     let outcome = match &cli.command {
         Command::Lint { .. } => cmd_lint(&cli).map_err(Failure::from),
+        Command::Batch {
+            kind: BatchKind::Lint,
+            ..
+        } => cmd_batch_lint(&cli)
+            .map(|()| exit::OK)
+            .map_err(Failure::from),
         _ => dispatch(&cli).await.map(|()| exit::OK),
     };
     match outcome {
@@ -668,69 +729,251 @@ fn render_success(cli: &Cli, out: &crate::core::engine::Outcome) -> serde_json::
     root
 }
 
-async fn cmd_batch(cli: &Cli, ctx: &Ctx) -> Result<()> {
-    let Command::Batch { file, parallel } = &cli.command else {
-        unreachable!()
-    };
-    let raw = match file {
-        Some(path) => std::fs::read_to_string(path)
-            .map_err(|e| Error::InvalidInput(format!("{path}: {e}")))?,
+/// A parsed batch line; `Bad` carries the parse error for that line.
+enum BatchJob {
+    Translate(TranslateRequest),
+    Rewrite(crate::core::types::RewriteRequest),
+    Lint {
+        text: String,
+        source: Option<String>,
+    },
+    Bad(Error),
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LintItem {
+    text: String,
+    #[serde(default)]
+    source: Option<String>,
+}
+
+type BatchLine = (usize, Option<serde_json::Value>, BatchJob);
+
+fn read_batch_input(file: &Option<String>) -> Result<String> {
+    match file {
+        Some(path) => {
+            std::fs::read_to_string(path).map_err(|e| Error::InvalidInput(format!("{path}: {e}")))
+        }
         None => {
             let mut buf = String::new();
             std::io::Read::read_to_string(&mut std::io::stdin(), &mut buf)
                 .map_err(|e| Error::InvalidInput(format!("read stdin: {e}")))?;
-            buf
+            Ok(buf)
         }
-    };
+    }
+}
 
-    let mut lines: Vec<(usize, TranslateRequest)> = Vec::new();
-    let mut warnings: Vec<String> = Vec::new();
+/// Defaults from the batch flags as request fields; a line's own fields win.
+fn batch_defaults(cmd: &Command) -> serde_json::Map<String, serde_json::Value> {
+    use serde_json::json;
+    let mut d = serde_json::Map::new();
+    let Command::Batch {
+        to,
+        from,
+        preset,
+        pivot,
+        chain,
+        depth,
+        provider,
+        fallback,
+        preserve,
+        timeout_ms,
+        ..
+    } = cmd
+    else {
+        return d;
+    };
+    let mut put = |k: &str, v: serde_json::Value| {
+        d.insert(k.into(), v);
+    };
+    if let Some(v) = to {
+        put("targetLang", json!(v));
+    }
+    if let Some(v) = from {
+        put("sourceLang", json!(v));
+    }
+    if let Some(v) = preset {
+        put("preset", json!(v));
+    }
+    if let Some(v) = pivot {
+        put("pivot", json!(v));
+    }
+    if !chain.is_empty() {
+        put("chain", json!(chain));
+    }
+    if let Some(v) = depth {
+        put("depth", json!(v));
+    }
+    if let Some(v) = provider {
+        if let Some(p) = normalize_provider(v) {
+            put("provider", json!(p));
+        }
+    }
+    if !fallback.is_empty() {
+        put("fallbackChain", json!(fallback));
+    }
+    if !preserve.is_empty() {
+        put("preserve", json!(preserve));
+    }
+    if let Some(v) = timeout_ms {
+        put("timeoutMs", json!(v));
+    }
+    d
+}
+
+/// Parse NDJSON into `(line index, id, job)`. A bad line becomes a `Bad` job
+/// so it yields an error object instead of aborting the batch.
+fn parse_batch(
+    raw: &str,
+    kind: BatchKind,
+    defaults: &serde_json::Map<String, serde_json::Value>,
+) -> Vec<BatchLine> {
+    let mut jobs = Vec::new();
     for (i, line) in raw.lines().enumerate() {
-        // Strip BOM (U+FEFF) that may appear at the start of the first line
+        // Strip a BOM (U+FEFF) that may start the first line.
         let line = line.trim_start_matches('\u{FEFF}').trim();
         if line.is_empty() {
             continue;
         }
-        match serde_json::from_str::<TranslateRequest>(line) {
-            Ok(req) => lines.push((i, req)),
-            Err(e) => warnings.push(format!("line {}: {e}", i + 1)),
+        let bad = |e: &dyn std::fmt::Display| {
+            BatchJob::Bad(Error::InvalidInput(format!("line {}: {e}", i + 1)))
+        };
+        let mut obj = match serde_json::from_str::<serde_json::Value>(line) {
+            Ok(serde_json::Value::Object(m)) => m,
+            Ok(_) => {
+                jobs.push((i, None, bad(&"not a JSON object")));
+                continue;
+            }
+            Err(e) => {
+                jobs.push((i, None, bad(&e)));
+                continue;
+            }
+        };
+        let id = obj.remove("id");
+        if kind != BatchKind::Lint {
+            for (k, v) in defaults {
+                obj.entry(k.clone()).or_insert_with(|| v.clone());
+            }
         }
+        let value = serde_json::Value::Object(obj);
+        let job = match kind {
+            BatchKind::Translate => serde_json::from_value(value)
+                .map(BatchJob::Translate)
+                .unwrap_or_else(|e| bad(&e)),
+            BatchKind::Rewrite => serde_json::from_value(value)
+                .map(BatchJob::Rewrite)
+                .unwrap_or_else(|e| bad(&e)),
+            BatchKind::Lint => serde_json::from_value::<LintItem>(value)
+                .map(|l| BatchJob::Lint {
+                    text: l.text,
+                    source: l.source,
+                })
+                .unwrap_or_else(|e| bad(&e)),
+        };
+        jobs.push((i, id, job));
     }
-    for w in &warnings {
-        tracing::warn!("{w}");
-    }
-    if lines.is_empty() {
-        return Err(Error::InvalidInput("no valid requests".into()));
-    }
+    jobs
+}
 
-    use futures::StreamExt;
-    let engine = &ctx.engine;
+fn batch_body(
+    idx: usize,
+    id: Option<serde_json::Value>,
+    outcome: Result<serde_json::Value>,
+) -> serde_json::Value {
+    let mut body = match outcome {
+        Ok(result) => serde_json::json!({ "index": idx, "ok": true, "result": result }),
+        Err(e) => serde_json::json!({ "index": idx, "ok": false, "error": e.wire() }),
+    };
+    if let (Some(id), Some(obj)) = (id, body.as_object_mut()) {
+        obj.insert("id".into(), id);
+    }
+    body
+}
+
+fn run_lint_job(job: BatchJob) -> Result<serde_json::Value> {
+    match job {
+        BatchJob::Lint { text, source } => {
+            let report = crate::core::lint::lint(&text, source.as_deref());
+            serde_json::to_value(&report.response).map_err(|e| Error::Internal(e.to_string()))
+        }
+        BatchJob::Bad(e) => Err(e),
+        _ => Err(Error::Internal("unexpected batch job".into())),
+    }
+}
+
+/// Write results in input order, one JSON object per line.
+fn write_batch(mut results: Vec<serde_json::Value>) -> Result<()> {
+    results.sort_by_key(|v| v.get("index").and_then(|i| i.as_u64()).unwrap_or(0));
     let out = std::io::stdout();
     let mut out = out.lock();
-
-    let results = futures::stream::iter(lines)
-        .map(|(idx, req)| async move {
-            let body = match engine.translate(&req).await {
-                Ok(o) => serde_json::json!({
-                    "index": idx, "ok": true, "result": o.response,
-                }),
-                Err(e) => serde_json::json!({
-                    "index": idx, "ok": false, "error": e.wire(),
-                }),
-            };
-            body
-        })
-        .buffer_unordered(*parallel)
-        .collect::<Vec<_>>()
-        .await;
-
-    // Keep input order in the output regardless of completion order.
-    let mut results = results;
-    results.sort_by_key(|v| v.get("index").and_then(|i| i.as_u64()).unwrap_or(0));
     for body in results {
         writeln!(out, "{body}").map_err(|e| Error::Internal(format!("write: {e}")))?;
     }
     Ok(())
+}
+
+/// `batch --kind lint`: offline, so no config or credentials are loaded.
+/// Each item is linted on its own, so no tell spans two items.
+fn cmd_batch_lint(cli: &Cli) -> Result<()> {
+    let Command::Batch { file, .. } = &cli.command else {
+        unreachable!()
+    };
+    let jobs = parse_batch(
+        &read_batch_input(file)?,
+        BatchKind::Lint,
+        &Default::default(),
+    );
+    if jobs.is_empty() {
+        return Err(Error::InvalidInput("no requests".into()));
+    }
+    let results = jobs
+        .into_iter()
+        .map(|(idx, id, job)| batch_body(idx, id, run_lint_job(job)))
+        .collect();
+    write_batch(results)
+}
+
+async fn cmd_batch(cli: &Cli, ctx: &Ctx) -> Result<()> {
+    let Command::Batch {
+        file,
+        parallel,
+        kind,
+        ..
+    } = &cli.command
+    else {
+        unreachable!()
+    };
+    let jobs = parse_batch(
+        &read_batch_input(file)?,
+        *kind,
+        &batch_defaults(&cli.command),
+    );
+    if jobs.is_empty() {
+        return Err(Error::InvalidInput("no requests".into()));
+    }
+
+    use futures::StreamExt;
+    let engine = &ctx.engine;
+    let results = futures::stream::iter(jobs)
+        .map(|(idx, id, job)| async move {
+            let outcome = match job {
+                BatchJob::Translate(req) => engine
+                    .translate(&req)
+                    .await
+                    .map(|o| serde_json::to_value(o.response).unwrap_or_default()),
+                BatchJob::Rewrite(req) => engine
+                    .rewrite(&req)
+                    .await
+                    .map(|o| serde_json::to_value(o.response).unwrap_or_default()),
+                other => run_lint_job(other),
+            };
+            batch_body(idx, id, outcome)
+        })
+        .buffer_unordered((*parallel).max(1))
+        .collect::<Vec<_>>()
+        .await;
+    write_batch(results)
 }
 
 fn cmd_providers(cli: &Cli, ctx: &Ctx) -> Result<()> {

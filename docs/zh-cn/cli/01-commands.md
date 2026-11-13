@@ -93,14 +93,21 @@ not-a-bot batch --file jobs.ndjson --parallel 4
 cat jobs.ndjson | not-a-bot batch --parallel 8
 ```
 
-输入为每行一个 `TranslateRequest`。输出每行一个对象，虽然并发执行，但会按输入顺序排好：
-
-```json
-{"index":0,"ok":true,"result":{…}}
-{"index":1,"ok":false,"error":{"code":"RATE_LIMITED",…}}
+```bash
+cat texts.ndjson | not-a-bot batch --kind rewrite --from en --preset standard --preserve @code --parallel 6
+cat drafts.ndjson | not-a-bot batch --kind lint
 ```
 
-格式错误的行会跳过并在 stderr 警告，批次继续执行。
+`--kind` 决定每行的请求类型：`translate`（默认，一个 `TranslateRequest`）、`rewrite`（一个 `RewriteRequest`）或 `lint`（`{"text": "...", "source": "..."}`，`source` 可选；离线运行，每条单独检查，tell 不会跨条目）。每行可带任意 JSON 类型的 `id`，原样回传。`--to`、`--from`、`--preset`、`--pivot`、`--chain`、`--depth`、`--provider`、`--fallback`、`--preserve`、`--timeout-ms` 为 `translate`/`rewrite` 行设默认值，行内字段优先。`--parallel` 限制并发请求数（`lint` 离线，忽略该项）。
+
+输出每行一个对象，虽然并发执行，但会按输入顺序排好；`index` 为输入行号（从 0 起，空行也计数）：
+
+```json
+{"index":0,"id":"a","ok":true,"result":{…}}
+{"index":1,"id":"b","ok":false,"error":{"code":"RATE_LIMITED",…}}
+```
+
+非法 JSON、非对象或含未知字段的行会产生该行的 `INVALID_INPUT` 错误对象，批次继续并以 `0` 退出。输入没有任何行时退出 `1`。
 
 ## `providers`
 
