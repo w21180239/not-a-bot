@@ -337,8 +337,8 @@ impl Engine {
     async fn rewrite_once(&self, req: &RewriteRequest) -> Result<RewriteOutcome> {
         use crate::core::chain::{plan, resolve_source, Target};
         use crate::providers::cli_llm::{
-            HISTORY_KEY, MISSING_KEY, OPENING_KEY, ORIGINAL_KEY, ORIGINAL_LANG_KEY, REGISTER_KEY,
-            STYLE_KEY, TERMS_KEY,
+            HISTORY_KEY, MISSING_KEY, ORIGINAL_KEY, ORIGINAL_LANG_KEY, REGISTER_KEY, STYLE_KEY,
+            TERMS_KEY,
         };
 
         let started = Instant::now();
@@ -413,6 +413,9 @@ impl Engine {
                     if fix { "fix" } else { "humanize" }.into(),
                 );
                 metadata.insert(REGISTER_KEY.into(), register_meta.clone());
+                if spec.to == Target::Source {
+                    metadata.insert(crate::providers::cli_llm::BACK_KEY.into(), true.into());
+                }
                 // The first hop's input is the original already. Without inline repair
                 // (standard), only the fix hop sees it.
                 if !hops.is_empty() && (fix || plan.inline_repair) {
@@ -420,13 +423,13 @@ impl Engine {
                     metadata.insert(ORIGINAL_LANG_KEY.into(), detected.clone().into());
                 }
                 if fix {
-                    let missing = crate::core::facts::missing_facts(&req.text, &text);
+                    let missing = crate::core::facts::missing_facts(
+                        &crate::core::drift::content(&req.text),
+                        &text,
+                    );
                     metadata.insert(MISSING_KEY.into(), serde_json::json!(missing));
                     let terms = crate::core::drift::lost_terms(&req.text, &text);
                     metadata.insert(TERMS_KEY.into(), serde_json::json!(terms));
-                    if let Some(word) = crate::core::drift::lost_opening(&req.text, &text) {
-                        metadata.insert(OPENING_KEY.into(), word.into());
-                    }
                 }
                 if let (false, Some((input, output))) = (fix, &llm_history) {
                     metadata.insert(
@@ -577,13 +580,21 @@ impl Engine {
         // Finish: keep the source's punctuation, casing and full-stop habits (hops
         // tidy them), then fall back to the original where the rewrite changed
         // meaning. Every preset ends in a fix hop.
+        let casual = profile.register == crate::core::register::Register::Casual;
         let finished = if plan.hops.iter().any(|h| h.to == Target::Fix) {
-            let habits = crate::core::drift::ascii_habits(&req.text, &text);
-            let habits = crate::core::register::expand_contractions(&req.text, &habits);
-            let surface = crate::core::register::restore_surface(&req.text, &habits);
+            // Surface habits are restored only for casual sources.
+            let surface = if !casual {
+                text.clone()
+            } else {
+                let habits = crate::core::drift::ascii_habits(&req.text, &text);
+                let habits = crate::core::register::expand_contractions(&req.text, &habits);
+                crate::core::register::restore_surface(&req.text, &habits)
+            };
             let (guarded, drift) = crate::core::drift::guard(&req.text, &surface);
             warnings.extend(drift);
             guarded
+        } else if !casual {
+            text.clone()
         } else {
             crate::core::register::restore_surface(&req.text, &text)
         };
@@ -594,7 +605,8 @@ impl Engine {
             text = finished;
         }
 
-        let missing_facts = crate::core::facts::missing_facts(&req.text, &text);
+        let missing_facts =
+            crate::core::facts::missing_facts(&crate::core::drift::content(&req.text), &text);
         if !missing_facts.is_empty() {
             warnings.push(format!("fact check: missing {}", missing_facts.join(", ")));
         }
