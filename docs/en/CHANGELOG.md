@@ -2,6 +2,14 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.3.5 — 2026-11-17
+
+### Changed
+
+- The drift guard no longer reads a capitalised word as a name when every use of it in the original sits at the start of a sentence, line, heading or list item ("Your", "Use", "Plan"). Such words missing from a rewrite no longer put the original paragraph back.
+- A rewrite that gains an obligation word ("must", "need to") no longer falls back; only one that loses an obligation the original states does.
+- A courtesy-shaped sentence that announces something ("We're excited to share that the dashboard is live in staging") counts as content: its facts are checked and the rewrite may not cut it.
+
 ## 0.3.4 — 2026-11-17
 
 ### Changed
