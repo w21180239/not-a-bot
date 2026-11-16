@@ -2,6 +2,13 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.3.2 — 2026-11-17
+
+### Fixed
+
+- The drift guard no longer restores an original salutation ("Dear Dana,") right after the rewrite's own greeting ("Hi Dana,"), which left two greetings when it fell back on a merged paragraph.
+- A fix-hop edit that turns a sentence end into a comma lowercases the next word ("Yep, it always", not "Yep, It always"); names, acronyms and "I" keep their capital.
+
 ## 0.3.1 — 2026-11-17
 
 ### Changed
