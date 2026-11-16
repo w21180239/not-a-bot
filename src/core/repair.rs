@@ -104,7 +104,7 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
     let replace = |current: &str, edit: &HopEdit| match current.matches(edit.from.as_str()).count()
     {
         0 => Err("from not found"),
-        1 => Ok(current.replacen(edit.from.as_str(), &edit.to, 1)),
+        1 => Ok(replace_once(current, edit, &[original, text])),
         _ => Err("from not unique"),
     };
 
@@ -187,6 +187,62 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
         }
     }
     (current, edits)
+}
+
+/// Replace the single `from` with `to`. When that turns a sentence end into a
+/// non-terminal ending, lowercase the next word's capital unless it is a
+/// proper noun, acronym or "I" (judged against `sources`).
+fn replace_once(current: &str, edit: &HopEdit, sources: &[&str]) -> String {
+    let out = current.replacen(edit.from.as_str(), &edit.to, 1);
+    let terminal =
+        |s: &str, set: &str| s.trim_end().chars().last().is_some_and(|c| set.contains(c));
+    if !terminal(&edit.from, ".!?") || terminal(&edit.to, ".!?…\"')") {
+        return out;
+    }
+    let Some(at) = current.find(edit.from.as_str()) else {
+        return out;
+    };
+    let tail_at = at + edit.to.len();
+    let tail = &out[tail_at..];
+    let skipped = tail.len() - tail.trim_start().len();
+    let word_at = tail_at + skipped;
+    let word: String = out[word_at..]
+        .chars()
+        .take_while(|c| c.is_alphanumeric() || *c == '\'')
+        .collect();
+    let mut chars = word.chars();
+    let (Some(first), true) = (chars.next(), skipped > 0) else {
+        return out;
+    };
+    let caps = word.chars().filter(|c| c.is_uppercase()).count();
+    let keep = !first.is_uppercase()
+        || word == "I"
+        || word.starts_with("I'")
+        || caps >= 2
+        || sources.iter().any(|s| capitalised_mid_sentence(s, &word));
+    if keep {
+        return out;
+    }
+    let lower: String = first.to_lowercase().collect();
+    format!(
+        "{}{}{}",
+        &out[..word_at],
+        lower,
+        &out[word_at + first.len_utf8()..]
+    )
+}
+
+/// True when `word` appears capitalised somewhere other than a sentence start.
+fn capitalised_mid_sentence(text: &str, word: &str) -> bool {
+    let mut prev: Option<&str> = None;
+    for tok in text.split_whitespace() {
+        let bare = tok.trim_matches(|c: char| !c.is_alphanumeric() && c != '\'');
+        if bare == word && prev.is_some_and(|p| !p.ends_with(['.', '!', '?'])) {
+            return true;
+        }
+        prev = Some(tok);
+    }
+    false
 }
 
 /// Lowercase content words in `to` that `from` lacks.
@@ -349,6 +405,54 @@ mod tests {
     const WORDS: &str = "we ship alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima for Aroha.";
     const COLOURS: &str =
         "we ship red orange yellow green blue indigo violet black white grey brown pink for Aloha.";
+
+    fn case_fix(text: &str, from: &str, to: &str) -> String {
+        let edit = HopEdit {
+            from: from.into(),
+            to: to.into(),
+            kind: EditKind::Meaning,
+            why: String::new(),
+            applied: false,
+            reason: None,
+        };
+        let (out, edits) = apply_edits(text, text, vec![edit]);
+        assert!(edits[0].applied, "{:?}", edits[0].reason);
+        out
+    }
+
+    #[test]
+    fn lowercases_next_word_when_sentence_end_becomes_comma() {
+        let text =
+            "No worries, asking was the right call. It always runs off the site's business hours.";
+        assert_eq!(
+            case_fix(
+                text,
+                "No worries, asking was the right call.",
+                "No worries, thanks for checking. Yep,"
+            ),
+            "No worries, thanks for checking. Yep, it always runs off the site's business hours."
+        );
+    }
+
+    #[test]
+    fn keeps_proper_noun_and_acronym_after_comma_join() {
+        assert_eq!(
+            case_fix(
+                "It was fine. Dana left early, ask Dana.",
+                "It was fine.",
+                "It was fine,"
+            ),
+            "It was fine, Dana left early, ask Dana."
+        );
+        assert_eq!(
+            case_fix(
+                "It was fine. API calls failed.",
+                "It was fine.",
+                "It was fine,"
+            ),
+            "It was fine, API calls failed."
+        );
+    }
 
     fn applied(edits: &[HopEdit]) -> Vec<(&str, bool, EditKind)> {
         edits
