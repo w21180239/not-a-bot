@@ -439,8 +439,10 @@ fn guard_issues(original: &str, text: &str) -> Vec<String> {
             (!GROUPS.iter().any(|(g, _)| *g == group) || GUARD_GROUPS.contains(&group))
                 && !only_gained(i)
         }));
+        // A lost question can drop an ask; a gained one recasts a claim
+        // ("Why does it matter? Because ..."), so only losses fall back.
         let (x, y) = (oc.matches('?').count(), tc.matches('?').count());
-        if x != y {
+        if y < x {
             out.push(format!(
                 "question marks: {x} in the original, {y} in the rewrite"
             ));
@@ -1016,6 +1018,16 @@ mod tests {
         let s = sentences(t);
         assert_eq!(s.concat(), t);
         assert_eq!(s.len(), 4, "{s:?}");
+    }
+
+    #[test]
+    fn guard_keeps_a_gained_question_but_not_a_lost_one() {
+        let o = "Repair cafes matter because they keep phones out of landfill.";
+        let t = "Why do repair cafes matter? They keep phones out of landfill.";
+        assert!(guard_issues(o, t).is_empty(), "{:?}", guard_issues(o, t));
+        assert!(guard_issues(t, o)
+            .iter()
+            .any(|i| i.starts_with("question marks")));
     }
 
     #[test]
