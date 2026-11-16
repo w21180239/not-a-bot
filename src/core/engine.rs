@@ -337,8 +337,8 @@ impl Engine {
     async fn rewrite_once(&self, req: &RewriteRequest) -> Result<RewriteOutcome> {
         use crate::core::chain::{plan, resolve_source, Target};
         use crate::providers::cli_llm::{
-            HISTORY_KEY, MISSING_KEY, ORIGINAL_KEY, ORIGINAL_LANG_KEY, REGISTER_KEY, STYLE_KEY,
-            TERMS_KEY,
+            DRIFT_KEY, HISTORY_KEY, MISSING_KEY, ORIGINAL_KEY, ORIGINAL_LANG_KEY, REGISTER_KEY,
+            STYLE_KEY, TERMS_KEY,
         };
 
         let started = Instant::now();
@@ -590,7 +590,68 @@ impl Engine {
                 let habits = crate::core::register::expand_contractions(&req.text, &habits);
                 crate::core::register::restore_surface(&req.text, &habits)
             };
-            let (guarded, drift) = crate::core::drift::guard(&req.text, &surface);
+            let (mut guarded, mut drift) = crate::core::drift::guard(&req.text, &surface);
+            // One repair hop on what the guard would put back, then guard again.
+            let passages = restored_passages(&surface, &guarded);
+            let fix_spec = plan
+                .hops
+                .iter()
+                .rev()
+                .find(|h| h.to == Target::Fix && h.engine.as_deref().is_some_and(is_llm))
+                .cloned();
+            if let (false, Some(spec)) = (passages.is_empty(), fix_spec) {
+                let mut metadata = req.metadata.clone();
+                metadata.insert(STYLE_KEY.into(), "fix".into());
+                metadata.insert(REGISTER_KEY.into(), register_meta.clone());
+                metadata.insert(ORIGINAL_KEY.into(), req.text.clone().into());
+                metadata.insert(ORIGINAL_LANG_KEY.into(), detected.clone().into());
+                let missing = crate::core::facts::missing_facts(
+                    &crate::core::drift::content(&req.text),
+                    &surface,
+                );
+                metadata.insert(MISSING_KEY.into(), serde_json::json!(missing));
+                let reasons: Vec<&str> = drift
+                    .iter()
+                    .filter_map(|w| w.strip_prefix("drift: "))
+                    .collect();
+                metadata.insert(
+                    DRIFT_KEY.into(),
+                    serde_json::json!({ "passages": passages, "reasons": reasons }),
+                );
+                let hop_req = TranslateRequest {
+                    text: surface.clone(),
+                    source_lang: "auto".into(),
+                    target_lang: from.clone(),
+                    provider: spec.engine.clone().or_else(|| req.provider.clone()),
+                    fallback_chain: req.fallback_chain.clone(),
+                    preserve: req.preserve.clone(),
+                    timeout_ms: req.timeout_ms,
+                    idempotency_key: Some(request_id.clone()),
+                    metadata,
+                };
+                match self.translate(&hop_req).await {
+                    Ok(out) => match crate::core::repair::parse_edits(&out.response.text) {
+                        Ok(proposed) => {
+                            let (fixed, edits) =
+                                crate::core::repair::apply_edits(&surface, &req.text, proposed);
+                            if edits.iter().any(|e| e.applied) {
+                                let (g2, d2) = crate::core::drift::guard(&req.text, &fixed);
+                                warnings.push(format!(
+                                    "drift repair: {} of {} put-backs left",
+                                    d2.len(),
+                                    drift.len()
+                                ));
+                                if d2.len() <= drift.len() {
+                                    guarded = g2;
+                                    drift = d2;
+                                }
+                            }
+                        }
+                        Err(reason) => warnings.push(format!("drift repair: no edits: {reason}")),
+                    },
+                    Err(err) => warnings.push(format!("drift repair: hop failed: {}", err.code())),
+                }
+            }
             warnings.extend(drift);
             guarded
         } else if !casual {
@@ -842,6 +903,22 @@ impl Engine {
 
 /// True when `text` is mostly Chinese, Japanese or Korean script although
 /// `target` is written in Latin script.
+/// Paragraphs of the guarded text that the rewrite did not have: where the
+/// drift guard put original text back.
+fn restored_passages(rewrite: &str, guarded: &str) -> Vec<String> {
+    let had: std::collections::HashSet<&str> = rewrite
+        .split("\n\n")
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect();
+    guarded
+        .split("\n\n")
+        .map(str::trim)
+        .filter(|p| !p.is_empty() && !had.contains(p))
+        .map(String::from)
+        .collect()
+}
+
 fn cjk_for_latin_target(target: &str, text: &str) -> bool {
     let base = target.split('-').next().unwrap_or(target);
     let non_latin = [
@@ -866,6 +943,14 @@ mod tests {
     use async_trait::async_trait;
     use std::collections::BTreeMap;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn restored_passages_are_the_guarded_paragraphs_the_rewrite_lacked() {
+        let rw = "Kept paragraph.\n\nRewritten one.";
+        let g = "Kept paragraph.\n\nOriginal one, put back.";
+        assert_eq!(restored_passages(rw, g), vec!["Original one, put back."]);
+        assert!(restored_passages(rw, rw).is_empty());
+    }
 
     struct Stub {
         name: &'static str,

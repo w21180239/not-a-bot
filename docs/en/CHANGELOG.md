@@ -2,6 +2,12 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.3.6 — 2026-11-17
+
+### Changed
+
+- Before the drift guard puts an original paragraph back, the fix hop gets one pass at repairing that paragraph in the rewrite, given the list of what would be restored. The guard runs again and the repaired rewrite is kept only when it puts back no more than before. A failed or empty repair leaves the guarded text as it was and adds a "drift repair" warning.
+
 ## 0.3.5 — 2026-11-17
 
 ### Changed
