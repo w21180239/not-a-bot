@@ -2,6 +2,12 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.3.4 — 2026-11-17
+
+### Changed
+
+- The fix hop now restores every token the fact check lists, heading words and sentence openers included, instead of skipping ordinary words. The drift guard checks those same tokens and put the whole original paragraph back when one was missing; restoring the word inside the rewritten sentence keeps the rewrite.
+
 ## 0.3.3 — 2026-11-17
 
 ### Fixed

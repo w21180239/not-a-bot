@@ -362,7 +362,7 @@ pub fn build_prompt(req: &TranslateRequest) -> Result<String> {
             String::new()
         } else {
             format!(
-                "- A fact check found these tokens of the ORIGINAL absent from the REWRITE: {}. Restore each exactly as written (numbers as digits, not words); skip one only when it is an ordinary word such as a heading or sentence opener.\n",
+                "- A fact check found these tokens of the ORIGINAL absent from the REWRITE: {}. Restore each exactly as written, with the same capitalisation (numbers as digits, not words); a later check puts the ORIGINAL paragraph back wherever one is still missing, so work an ordinary word such as a heading word or sentence opener into the rewritten sentence rather than skip it.\n",
                 missing.join(", ")
             )
         };
