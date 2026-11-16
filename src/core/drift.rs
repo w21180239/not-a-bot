@@ -621,8 +621,8 @@ fn trailing_space(s: &str) -> &str {
 }
 
 /// A paragraph of the rewrite checked against its original: the rewrite when
-/// clean; else, sentence by sentence when both have as many sentences, the
-/// original sentences that drifted; else the whole original paragraph.
+/// clean; else the original sentences (or aligned sentence groups) that
+/// drifted; else the whole original paragraph.
 fn guard_paragraph(original: &str, text: &str, warnings: &mut Vec<String>) -> String {
     let found = guard_issues(original, text);
     if found.is_empty() {
@@ -650,6 +650,49 @@ fn guard_paragraph(original: &str, text: &str, warnings: &mut Vec<String>) -> St
         }
         // Sentences that are fine alone can still disagree together.
         if guard_issues(original, &out).is_empty() {
+            return out;
+        }
+    } else if os.len() > 1 && ts.len() > 1 {
+        // Counts differ (a merge or split): align sentence groups and put back only the groups that drifted.
+        let (mut out, mut kept) = (String::new(), Vec::new());
+        let mut at = 1;
+        for (o, t) in align_paragraphs(&os, &ts) {
+            let (oj, tj) = (o.concat(), t.concat());
+            let first = at;
+            at += o.len();
+            if o.is_empty() {
+                out.push_str(&tj);
+                continue;
+            }
+            let bad = if t.is_empty() {
+                if o.iter().all(|s| is_filler(s)) {
+                    continue;
+                }
+                vec!["dropped from the rewrite".to_string()]
+            } else {
+                guard_issues(oj.trim(), tj.trim())
+            };
+            if bad.is_empty() {
+                out.push_str(&tj);
+                continue;
+            }
+            kept.push(format!(
+                "drift: kept original sentence {first} ({})",
+                bad.join("; ")
+            ));
+            let oc = content(&oj);
+            if !oc.trim().is_empty() {
+                out.push_str(oc.trim_end());
+                out.push_str(if t.is_empty() {
+                    " "
+                } else {
+                    trailing_space(&tj)
+                });
+            }
+        }
+        let out = format!("{}{}", out.trim_end(), trailing_space(text));
+        if guard_issues(original, &out).is_empty() {
+            warnings.extend(kept);
             return out;
         }
     }
@@ -923,6 +966,19 @@ mod tests {
             "The order ships Monday. We value you as part of the Waikato farming community.";
         assert_eq!(drift_count(original, "The order ships Monday."), 0);
         assert_eq!(drift_count(original, "The order ships soon."), 1);
+    }
+
+    #[test]
+    fn a_merged_paragraph_puts_back_only_the_sentence_that_drifted() {
+        let o = "The museum opens at 9 am. Entry costs NZD 40 for adults. Tours leave before noon.";
+        let t = "The museum opens at 9 am and adult entry costs NZD 40. Tours leave around lunch.";
+        let mut w = Vec::new();
+        let out = guard_paragraph(o, t, &mut w);
+        assert_eq!(
+            out,
+            "The museum opens at 9 am and adult entry costs NZD 40. Tours leave before noon."
+        );
+        assert!(w.iter().all(|x| x.contains("sentence")), "{w:?}");
     }
 
     #[test]
