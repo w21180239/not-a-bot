@@ -622,19 +622,25 @@ pub fn guard(original: &str, text: &str) -> (String, Vec<String>) {
             .collect::<Vec<_>>()
             .join("\n\n")
     } else if op.len() > 1 && tp.len() > 1 {
-        align_paragraphs(&op, &tp)
-            .into_iter()
-            .filter_map(|(o, t)| match (o.is_empty(), t.is_empty()) {
-                (_, true) => None,
-                (true, false) => Some(t.join("\n\n")),
-                _ => Some(guard_paragraph(
+        let mut parts = Vec::new();
+        let mut greeted = false;
+        for (mut o, t) in align_paragraphs(&op, &tp) {
+            // The rewrite's own salutation stays; the original's must not return beside it.
+            if greeted && o.first().is_some_and(|p| is_salutation(p)) {
+                o.remove(0);
+            }
+            greeted = o.is_empty() && t.len() == 1 && is_salutation(t[0]);
+            match (o.is_empty(), t.is_empty()) {
+                (_, true) => {}
+                (true, false) => parts.push(t.join("\n\n")),
+                _ => parts.push(guard_paragraph(
                     &o.join("\n\n"),
                     &t.join("\n\n"),
                     &mut warnings,
                 )),
-            })
-            .collect::<Vec<_>>()
-            .join("\n\n")
+            }
+        }
+        parts.join("\n\n")
     } else {
         guard_paragraph(original, text, &mut warnings)
     };
@@ -649,9 +655,13 @@ fn is_courtesy_paragraph(p: &str) -> bool {
         || sentences(t)
             .iter()
             .all(|s| s.trim().is_empty() || is_filler(s))
-        || (t.ends_with(',')
-            && t.split_whitespace().count() <= 4
-            && !t.chars().any(|c| c.is_ascii_digit()))
+        || is_salutation(t)
+}
+
+/// A short greeting or sign-off line ending in a comma.
+fn is_salutation(p: &str) -> bool {
+    let t = p.trim();
+    t.ends_with(',') && t.split_whitespace().count() <= 4 && !t.chars().any(|c| c.is_ascii_digit())
 }
 
 /// Monotone alignment of original and rewrite paragraphs when their counts
@@ -1006,5 +1016,17 @@ mod tests {
         let s = sentences(t);
         assert_eq!(s.concat(), t);
         assert_eq!(s.len(), 4, "{s:?}");
+    }
+
+    #[test]
+    fn restored_original_does_not_sit_beside_the_rewrite_greeting() {
+        let original = "Dear Dana,\n\nThank you so much for reaching out, and I sincerely apologize for any inconvenience this may have caused! I completely understand how frustrating this must be. Rest assured that we are committed to delivering a seamless experience.\n\nOur team has identified that the issue is not a data loss \u{2014} rather, it is a display filter problem. Your invoices from 15 October are safe. The Finance tab was defaulting to \"Today\" after our update on 16 October. To resolve this, simply change the date filter to \"Last 7 days\".\n\nWe have also logged this as ACME-1301 and a fix is expected in the next release (v12.7). Please don't hesitate to reach out if you require further assistance!\n\nWarm regards,\nAcme Clinic Cloud Support";
+        let rewrite = "Hi Dana,\n\nSorry for the hassle. Nothing's been lost. It's a display filter problem, and your invoices from 15 October are all still there. After our update on 16 October, the date filter on the \"Finance\" tab started defaulting to \"Today\". Switch it to \"Last 7 days\" and you'll see them.\n\nWe've logged it as ACME-1301, and it should be fixed in the next version (v12.7).\n\nAcme Clinic Cloud Support";
+        let (out, _) = guard(original, rewrite);
+        let salutations = out
+            .split("\n\n")
+            .filter(|p| p.trim_end().ends_with(',') && p.contains("Dana"))
+            .count();
+        assert_eq!(salutations, 1, "{out}");
     }
 }
