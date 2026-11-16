@@ -458,14 +458,15 @@ fn guard_issues(original: &str, text: &str) -> Vec<String> {
     out
 }
 
-/// A negation or limit the rewrite gains is how idiomatic English restates a
-/// claim ("difficult" -> "not easy", "simply because" -> "only because"); a
-/// lost one can drop a condition, so only losses fall back.
+/// A negation, limit or obligation the rewrite gains is how idiomatic English
+/// restates a claim ("difficult" -> "not easy", "subject to approval" -> "a
+/// manager has to approve"); a lost one can drop a condition, so only losses
+/// fall back.
 fn only_gained(issue: &str) -> bool {
     let Some((group, rest)) = issue.split_once(": ") else {
         return false;
     };
-    if !matches!(group, "negation" | "limit") {
+    if !matches!(group, "negation" | "limit" | "obligation") {
         return false;
     }
     let n: Vec<usize> = rest
@@ -479,7 +480,47 @@ fn only_gained(issue: &str) -> bool {
 /// that is an AI-flavoured word. Facts with digits always count: a number moved
 /// elsewhere can change meaning.
 fn keeps_fact_missing(fact: &str) -> bool {
-    fact.chars().any(|c| c.is_ascii_digit()) || !is_ai_word(&fact.to_lowercase())
+    (fact.chars().any(|c| c.is_ascii_digit()) || !is_ai_word(&fact.to_lowercase()))
+        && !GUARD_DOC.with(|d| only_at_starts(fact, &d.borrow()))
+}
+
+thread_local! {
+    /// The whole original during [`guard`], so paragraph and sentence checks see every use of a word.
+    static GUARD_DOC: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+}
+
+/// A capitalised word that `doc` only ever uses to open a sentence, line,
+/// heading or list item ("Use", "Plan"): capitalised by position, not a name.
+fn only_at_starts(word: &str, doc: &str) -> bool {
+    if doc.is_empty()
+        || !word.chars().all(char::is_alphabetic)
+        || !word.chars().next().is_some_and(char::is_uppercase)
+    {
+        return false;
+    }
+    let mut seen = false;
+    for (pos, _) in doc.match_indices(word) {
+        let after = doc[pos + word.len()..].chars().next();
+        if after.is_some_and(|c| c.is_alphanumeric()) {
+            continue;
+        }
+        let before = &doc[..pos];
+        if before
+            .chars()
+            .next_back()
+            .is_some_and(|c| c.is_alphanumeric())
+        {
+            continue;
+        }
+        let lead = before.trim_end_matches(|c: char| {
+            matches!(c, ' ' | '\t' | '#' | '*' | '-' | '>' | '"' | '(' | '_')
+        });
+        if !(lead.is_empty() || lead.ends_with(['\n', '.', '!', '?', ':'])) {
+            return false;
+        }
+        seen = true;
+    }
+    seen
 }
 
 /// A word on the lint list of AI-flavoured vocabulary or a filler marker: the
@@ -612,6 +653,13 @@ fn guard_paragraph(original: &str, text: &str, warnings: &mut Vec<String>) -> St
 /// meaning-carrying surface disagrees with the original fall back to the
 /// original text. Returns the text and one warning per fallback.
 pub fn guard(original: &str, text: &str) -> (String, Vec<String>) {
+    GUARD_DOC.with(|d| *d.borrow_mut() = original.to_string());
+    let (out, warnings) = guard_inner(original, text);
+    GUARD_DOC.with(|d| d.borrow_mut().clear());
+    (out, warnings)
+}
+
+fn guard_inner(original: &str, text: &str) -> (String, Vec<String>) {
     let mut warnings = Vec::new();
     let (op, tp): (Vec<&str>, Vec<&str>) = (
         original.split("\n\n").collect(),
@@ -1031,6 +1079,18 @@ mod tests {
     }
 
     #[test]
+    fn guard_keeps_a_gained_obligation_but_not_a_lost_one() {
+        let o = "Approval is subject to a manager's sign-off and the team's workload.";
+        let t = "A manager has to sign off, and the team's workload still sets a limit, so approval needs both.";
+        assert!(!guard_issues(o, t)
+            .iter()
+            .any(|i| i.starts_with("obligation")));
+        assert!(guard_issues(t, o)
+            .iter()
+            .any(|i| i.starts_with("obligation")));
+    }
+
+    #[test]
     fn restored_original_does_not_sit_beside_the_rewrite_greeting() {
         let original = "Dear Dana,\n\nThank you so much for reaching out, and I sincerely apologize for any inconvenience this may have caused! I completely understand how frustrating this must be. Rest assured that we are committed to delivering a seamless experience.\n\nOur team has identified that the issue is not a data loss \u{2014} rather, it is a display filter problem. Your invoices from 15 October are safe. The Finance tab was defaulting to \"Today\" after our update on 16 October. To resolve this, simply change the date filter to \"Last 7 days\".\n\nWe have also logged this as ACME-1301 and a fix is expected in the next release (v12.7). Please don't hesitate to reach out if you require further assistance!\n\nWarm regards,\nAcme Clinic Cloud Support";
         let rewrite = "Hi Dana,\n\nSorry for the hassle. Nothing's been lost. It's a display filter problem, and your invoices from 15 October are all still there. After our update on 16 October, the date filter on the \"Finance\" tab started defaulting to \"Today\". Switch it to \"Last 7 days\" and you'll see them.\n\nWe've logged it as ACME-1301, and it should be fixed in the next version (v12.7).\n\nAcme Clinic Cloud Support";
@@ -1040,5 +1100,19 @@ mod tests {
             .filter(|p| p.trim_end().ends_with(',') && p.contains("Dana"))
             .count();
         assert_eq!(salutations, 1, "{out}");
+    }
+
+    #[test]
+    fn a_word_capitalised_only_by_position_is_not_a_name() {
+        let doc = "## Plan\n\nPlan the week on Sunday. Use the Sonata app.\n\n- Use a timer.";
+        assert!(only_at_starts("Plan", doc));
+        assert!(only_at_starts("Use", doc));
+        assert!(!only_at_starts("Sonata", doc));
+        assert!(!only_at_starts("Sunday", doc));
+        let o = "Plan meals on Sunday so the week runs on autopilot.";
+        let (out, w) = guard(o, "Sort out meals on Sunday and the week runs itself.");
+        assert!(w.is_empty(), "{w:?} {out}");
+        let (_, w) = guard("Book the Sonata room.", "Book the big room.");
+        assert!(!w.is_empty());
     }
 }
