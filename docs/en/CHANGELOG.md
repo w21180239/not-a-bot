@@ -2,6 +2,15 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.3.1 — 2026-11-17
+
+### Changed
+
+- The `standard` preset keeps the 0.3.0 voice-keeping only for casual sources. Formal and neutral sources get the 0.2.0 rewrite and fix briefs again (no register clause, no term or opening hints, no casing restore); the drift guard still runs on every source. On the public benches (sonnet, desklib detector, lower is more human) the mean AI probability drops from 0.985 to 0.55-0.61 on the 30-text corpus, from 0.998 to 0.90-0.94 on 40 ai-humanizer-benchmark texts and from 0.32 to 0.24-0.26 on 30 Enron emails; a second detector (SuperAnnotate) moves the same way.
+- The fix hop rejects a repair that brings in lint-list or filler vocabulary, or that adds more than two words beyond each fact it restores.
+- The drift guard no longer falls back when a rewrite only gains a negation or limit ("difficult" -> "not easy"); a lost one still falls back. A courtesy sentence that routes the reader to a named contact or asks a real question is kept as content, not cut as filler.
+- The hop that rewrites back into English asks every source for one person's own wording: plainer words than an AI's default, uneven rhythm, no tidy summary lines.
+
 ## 0.3.0 — 2026-11-14
 
 ### Added
