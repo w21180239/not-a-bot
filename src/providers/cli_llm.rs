@@ -31,6 +31,9 @@ pub const MISSING_KEY: &str = "not-a-bot.missing";
 pub const TERMS_KEY: &str = "not-a-bot.terms";
 /// First word of the original when the text to repair no longer opens with it (fix hops).
 pub const OPENING_KEY: &str = "not-a-bot.opening";
+/// JSON object `{passages, reasons}` (fix hops): ORIGINAL passages the drift
+/// guard would put back, and why, so the repair can fix the rewrite instead.
+pub const DRIFT_KEY: &str = "not-a-bot.drift";
 /// JSON array of spans the output must carry verbatim (`--preserve` matches,
 /// sent unmasked because LLMs mangle opaque placeholders).
 pub const PRESERVE_KEY: &str = "not-a-bot.preserve";
@@ -91,6 +94,34 @@ pub fn register_clause(req: &TranslateRequest) -> String {
         ),
         _ => "Register: match the source's register and voice, whatever it is; a technical text stays technical, a formal one formal, a casual one casual. Remove only machine-flavoured phrasing and never tidy, polish, formalise or casualise the rest.".to_string(),
     }
+}
+
+/// Repair-brief clause from [`DRIFT_KEY`]: the passages a drift check would
+/// put back and its reasons, so the repair keeps the rewrite there instead.
+fn drift_clause(req: &TranslateRequest) -> String {
+    let Some(d) = req.metadata.get(DRIFT_KEY) else {
+        return String::new();
+    };
+    let list = |k: &str| -> Vec<String> {
+        d.get(k)
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let (passages, reasons) = (list("passages"), list("reasons"));
+    if passages.is_empty() {
+        return String::new();
+    }
+    let quoted: Vec<String> = passages.iter().map(|p| format!("  <<<{p}>>>")).collect();
+    format!(
+        "- A drift check found the REWRITE's version of these ORIGINAL passages unsafe and will paste the ORIGINAL passage back over it unless you repair it:\n{}\n  Reasons: {}.\n  Repair the REWRITE's matching sentences so the check passes: keep every fact token, negation, limit, obligation and question of the ORIGINAL passage, invent nothing, and stay within its length. Keep the REWRITE's own wording everywhere else; do not copy the ORIGINAL passage back wholesale.\n",
+        quoted.join("\n"),
+        reasons.join("; ")
+    )
 }
 
 /// Hints of the repair brief from the term check and the opening check.
@@ -366,6 +397,7 @@ pub fn build_prompt(req: &TranslateRequest) -> Result<String> {
                 missing.join(", ")
             )
         };
+        let drift = drift_clause(req);
         let register = if not_casual(req) {
             String::new()
         } else {
@@ -389,7 +421,7 @@ pub fn build_prompt(req: &TranslateRequest) -> Result<String> {
                  - Repair meaning, not style: never restore a cut feeling, pledge or pleasantry sentence, never move wording or structure back toward the original, and leave anything already correct in meaning untouched. Fewer edits are better.\n\
                  - Names must match the original letter for letter.\n\
                  - When a fact is missing, set \"from\" to the word right before where it belongs and \"to\" to that word plus the fact, written in the REWRITE's style; a fact from a cut sentence goes into the nearest kept sentence.\n\
-                 {missing}{hints}{register}\
+                 {missing}{drift}{hints}{register}\
                  ORIGINAL ({orig_lang}):\n<<<\n{original}\n>>>\nREWRITE ({target}):\n<<<\n{}\n>>>\n",
                 req.text
             ));
@@ -406,7 +438,7 @@ pub fn build_prompt(req: &TranslateRequest) -> Result<String> {
              - Add \"kind\": \"term\" to an edit of at most 3 words that puts back a swapped term, a changed sentence form, condition, quantifier or modality, or deletes an invented word or clause; put the ORIGINAL's own words in \"to\".\n\
              - Names must match the original letter for letter.\n\
              - When a fact is missing, set \"from\" to the word right before where it belongs and \"to\" to that word plus the fact, written in the REWRITE's style; a fact from a cut sentence goes into the nearest kept sentence.\n\
-             {missing}{hints}{register}\
+             {missing}{drift}{hints}{register}\
              ORIGINAL ({orig_lang}):\n<<<\n{original}\n>>>\nREWRITE ({target}):\n<<<\n{}\n>>>\n",
             req.text
         ));
@@ -796,6 +828,25 @@ Aroha owes NZD 18,900.
         let p = build_prompt(&with(req(Some("fix"), None), ORIGINAL_KEY, "Ask Aroha.")).unwrap();
         assert!(!p.contains("Register pass") && !p.contains("register"));
         assert!(p.contains("Repair meaning, not style"));
+    }
+
+    #[test]
+    fn fix_prompt_lists_drift_put_backs_in_every_register() {
+        let base = with(req(Some("fix"), None), ORIGINAL_KEY, "Do not restart it.");
+        for reg in ["casual", "formal"] {
+            let mut r = with_register(base.clone(), reg, &[]);
+            assert!(!build_prompt(&r).unwrap().contains("A drift check"));
+            r.metadata.insert(
+                DRIFT_KEY.into(),
+                serde_json::json!({"passages": ["Do not restart it."], "reasons": ["kept original paragraph (negation: 1 in the original, 0 in the rewrite)"]}),
+            );
+            let p = build_prompt(&r).unwrap();
+            assert!(p.contains("<<<Do not restart it.>>>"), "{reg}: {p}");
+            assert!(
+                p.contains("Reasons: kept original paragraph (negation"),
+                "{reg}"
+            );
+        }
     }
 
     #[test]
