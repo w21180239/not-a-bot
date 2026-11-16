@@ -2,6 +2,12 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.3.3 — 2026-11-17
+
+### Fixed
+
+- The drift guard no longer falls back to the original paragraph when the rewrite gains a question mark; it still falls back when one is lost. A gained question mark usually comes from a reworded line, and restoring the original there put AI phrasing back in the final text.
+
 ## 0.3.2 — 2026-11-17
 
 ### Fixed
