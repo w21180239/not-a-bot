@@ -380,7 +380,18 @@ fn carries_content(sentence: &str) -> bool {
                 .any(|q| rest.starts_with(q) || rest.starts_with(&q[..q.len() - 1]))
             })
         });
-    (named && routes) || ask
+    // "excited to share that X" wraps a real claim in cheer.
+    let announces = [
+        "to share",
+        "to announce",
+        "to report",
+        "to confirm",
+        "to let you know",
+        "to inform",
+    ]
+    .iter()
+    .any(|m| l.contains(m));
+    (named && routes) || ask || announces
 }
 
 /// The original without its courtesy sentences ([`is_filler`]); the original
@@ -849,6 +860,19 @@ mod tests {
             "Please let me know how you want to handle the copy."
         ));
         assert!(!carries_content("Let me know if you have any questions."));
+        assert!(carries_content(
+            "We're excited to share that the new billing dashboard is now live in staging."
+        ));
+        assert!(!carries_content("We're excited about this one."));
+    }
+
+    #[test]
+    fn a_claim_wrapped_in_cheer_is_not_cut() {
+        let o = "Quick update on 2.8.0. We're excited to share that the new billing dashboard is now live in staging. We closed 14 of 17 tickets.";
+        let t = "Quick update on 2.8.0. We closed 14 of 17 tickets.";
+        let (out, w) = guard(o, t);
+        assert!(!w.is_empty(), "{out}");
+        assert!(out.contains("billing dashboard"), "{out}");
     }
 
     #[test]
