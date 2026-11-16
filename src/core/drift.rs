@@ -117,6 +117,16 @@ fn tokens(text: &str) -> Vec<String> {
     for (k, w) in words.iter().enumerate() {
         if w == "think" && k > 0 && words[k - 1] == "i" {
             out.push("i_think".to_string());
+        } else if matches!(w.as_str(), "need" | "needs")
+            && words.get(k + 1).is_some_and(|n| {
+                matches!(
+                    n.as_str(),
+                    "help" | "support" | "assistance" | "anything" | "more"
+                )
+            })
+        {
+            // "if you need help" offers, it does not oblige.
+            out.push("need_help".to_string());
         } else {
             out.push(w.clone());
         }
@@ -138,9 +148,11 @@ fn group_counts(text: &str) -> BTreeMap<&'static str, usize> {
 
 fn first_person_commitments(text: &str) -> usize {
     let t = tokens(text);
+    // "we are committed to X" promises as much as "we will X".
     t.windows(2)
         .filter(|w| matches!(w[0].as_str(), "i" | "we") && w[1] == "will")
         .count()
+        + t.iter().filter(|w| *w == "committed").count()
 }
 
 /// Logic-word disagreements between `original` and `text`, English only.
@@ -199,7 +211,14 @@ pub fn issues(original: &str, text: &str) -> Vec<String> {
 /// Number of logic and fact disagreements, used by the repair to decide
 /// whether an edit moves the text back toward the original's meaning.
 pub fn drift_count(original: &str, text: &str) -> usize {
-    missing_facts(original, text).len() + logic_issues(original, text).len()
+    let original = content(original);
+    let tc = strip_filler(text);
+    let tc = if tc.trim().is_empty() {
+        text.to_string()
+    } else {
+        tc
+    };
+    missing_facts(&original, text).len() + logic_issues(&original, &tc).len()
 }
 
 /// Most terms listed for the repair hop.
@@ -233,6 +252,7 @@ pub fn lost_terms(original: &str, text: &str) -> Vec<String> {
         let lower = w.to_lowercase();
         if lower.chars().count() < 6
             || FUNCTION_WORDS.contains(&lower.as_str())
+            || is_ai_word(&lower)
             || kept.contains(&stem(&lower))
             || out.contains(&lower)
         {
@@ -265,6 +285,249 @@ pub fn lost_opening(original: &str, text: &str) -> Option<String> {
 
 /// Spans of `text` split after `.`, `!`, `?` or a newline, trailing
 /// whitespace kept, so the spans concatenate back to `text`.
+/// Courtesy and filler markers. A sentence of the original with one of these
+/// and no number, code, link or handle is one the rewrite may cut, names in it
+/// included, so fact checks ignore it.
+const FILLER_MARKERS: &[&str] = &[
+    "hesitate",
+    "reach out",
+    "reaching out",
+    "happy to help",
+    "glad to help",
+    "appreciate",
+    "patience",
+    "thank you",
+    "thanks",
+    "hope this",
+    "hope you",
+    "look forward",
+    "looking forward",
+    "feel free",
+    "excited",
+    "thrilled",
+    "proud",
+    "committed",
+    "valued",
+    "inconvenience",
+    "any questions",
+    "any further questions",
+    "let me know",
+    "warm regards",
+    "best regards",
+    "delighted",
+    "pleased to",
+    "we value",
+    "trusted partner",
+    "partnership",
+    "welcoming you",
+    "completely understand",
+    "understand how",
+    "we understand",
+];
+
+/// Logic groups whose count change triggers a fallback. Quantifier and hedge
+/// counts ("any questions", "may have caused") ride on cut filler too often.
+const GUARD_GROUPS: &[&str] = &["negation", "limit", "obligation"];
+
+fn is_filler(sentence: &str) -> bool {
+    let l = sentence.to_lowercase();
+    FILLER_MARKERS.iter().any(|m| l.contains(m))
+        && !sentence
+            .chars()
+            .any(|c| c.is_ascii_digit() || matches!(c, '`' | '@' | '/' | '#'))
+        && !carries_content(sentence)
+}
+
+/// A courtesy-shaped sentence that routes the reader to a named contact
+/// ("reach out to Priya") or asks a real question ("let me know how ...")
+/// carries content the rewrite must keep. Names in thanks or cheer do not.
+fn carries_content(sentence: &str) -> bool {
+    let named = sentence
+        .split_whitespace()
+        .skip(1)
+        .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
+        .any(|w| w.len() > 1 && w.chars().next().is_some_and(char::is_uppercase));
+    let l = sentence.to_lowercase();
+    let routes = [
+        "reach out to",
+        "contact ",
+        "talk to",
+        "speak to",
+        "speak with",
+        "get in touch",
+        "ask ",
+        "email ",
+        "call ",
+        "ping ",
+    ]
+    .iter()
+    .any(|m| l.contains(m));
+    let ask = ["let me know", "let us know", "tell me", "tell us"]
+        .iter()
+        .any(|m| {
+            l.find(m).is_some_and(|i| {
+                let rest = &l[i + m.len()..];
+                [
+                    " how ",
+                    " what ",
+                    " whether ",
+                    " when ",
+                    " which ",
+                    " who ",
+                    " where ",
+                ]
+                .iter()
+                .any(|q| rest.starts_with(q) || rest.starts_with(&q[..q.len() - 1]))
+            })
+        });
+    (named && routes) || ask
+}
+
+/// The original without its courtesy sentences ([`is_filler`]); the original
+/// itself when nothing else is left. Facts are checked against this.
+pub fn content(original: &str) -> String {
+    let c = strip_filler(original);
+    if c.trim().is_empty() {
+        original.to_string()
+    } else {
+        c
+    }
+}
+
+/// The original without its courtesy sentences.
+fn strip_filler(original: &str) -> String {
+    original
+        .split("\n\n")
+        .map(|p| {
+            sentences(p)
+                .into_iter()
+                .filter(|s| !is_filler(s))
+                .collect::<String>()
+        })
+        .filter(|p| !p.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+/// Disagreements that make the guard fall back: facts, negation, limits,
+/// obligation, first-person commitments, question marks and length, measured
+/// against the original minus its fact-free filler.
+/// Courtesy sentences are set aside on both sides, so a logic word kept or cut
+/// with them ("need support", "must be disappointing") does not count. Growth
+/// is measured against the whole original: a rewrite may keep a courtesy
+/// sentence's facts without its cheer.
+fn guard_issues(original: &str, text: &str) -> Vec<String> {
+    let (n, m) = (word_count(original) as f64, word_count(text) as f64);
+    let longer = m > n * MAX_GROWTH + 3.0;
+    let mut out = Vec::new();
+    let oc = strip_filler(original);
+    if !oc.trim().is_empty() {
+        let tc = strip_filler(text);
+        let tc = if tc.trim().is_empty() {
+            text.to_string()
+        } else {
+            tc
+        };
+        out.extend(
+            missing_facts(&oc, text)
+                .into_iter()
+                .filter(|f| keeps_fact_missing(f))
+                .map(|f| format!("fact {f} is missing")),
+        );
+        out.extend(logic_issues(&oc, &tc).into_iter().filter(|i| {
+            let group = i.split(':').next().unwrap_or("");
+            (!GROUPS.iter().any(|(g, _)| *g == group) || GUARD_GROUPS.contains(&group))
+                && !only_gained(i)
+        }));
+        let (x, y) = (oc.matches('?').count(), tc.matches('?').count());
+        if x != y {
+            out.push(format!(
+                "question marks: {x} in the original, {y} in the rewrite"
+            ));
+        }
+        let (k, l) = (word_count(&oc) as f64, word_count(&tc) as f64);
+        if !longer && k >= 6.0 && l < k * MIN_KEEP {
+            out.push("much shorter than the original (dropped content)".into());
+        }
+    }
+    if longer {
+        out.push("much longer than the original (invented content)".into());
+    }
+    out
+}
+
+/// A negation or limit the rewrite gains is how idiomatic English restates a
+/// claim ("difficult" -> "not easy", "simply because" -> "only because"); a
+/// lost one can drop a condition, so only losses fall back.
+fn only_gained(issue: &str) -> bool {
+    let Some((group, rest)) = issue.split_once(": ") else {
+        return false;
+    };
+    if !matches!(group, "negation" | "limit") {
+        return false;
+    }
+    let n: Vec<usize> = rest
+        .split(|c: char| !c.is_ascii_digit())
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    matches!(n.as_slice(), [x, y] if y > x)
+}
+
+/// A fact missing from a paragraph still counts unless it is a word-only fact
+/// that is an AI-flavoured word. Facts with digits always count: a number moved
+/// elsewhere can change meaning.
+fn keeps_fact_missing(fact: &str) -> bool {
+    fact.chars().any(|c| c.is_ascii_digit()) || !is_ai_word(&fact.to_lowercase())
+}
+
+/// A word on the lint list of AI-flavoured vocabulary or a filler marker: the
+/// rewrite is meant to drop it, so it is never a lost term to restore.
+pub(crate) fn is_ai_word(lower: &str) -> bool {
+    super::lint_data::VOCAB.iter().any(|(w, _)| *w == lower)
+        || FILLER_MARKERS.contains(&lower)
+        || matches!(
+            lower,
+            "seamless"
+                | "seamlessly"
+                | "transform"
+                | "transformative"
+                | "discover"
+                | "journey"
+                | "empower"
+                | "empowers"
+                | "unlock"
+                | "elevate"
+                | "streamline"
+                | "streamlined"
+                | "effortless"
+                | "effortlessly"
+                | "experience"
+                | "exciting"
+                | "incredible"
+                | "amazing"
+                | "sincerely"
+                | "truly"
+                | "genuinely"
+                | "dedicated"
+                | "delighted"
+                | "pleased"
+                | "thrilled"
+                | "excited"
+                | "encouraging"
+                | "hesitate"
+                | "committed"
+                | "trusted"
+                | "valued"
+                | "exceptional"
+                | "fantastic"
+                | "huge"
+                | "shoutout"
+                | "smooth"
+                | "collaborative"
+                | "partnership"
+        )
+}
+
 fn sentences(text: &str) -> Vec<&str> {
     let chars: Vec<(usize, char)> = text.char_indices().collect();
     let mut out = Vec::new();
@@ -307,7 +570,7 @@ fn trailing_space(s: &str) -> &str {
 /// clean; else, sentence by sentence when both have as many sentences, the
 /// original sentences that drifted; else the whole original paragraph.
 fn guard_paragraph(original: &str, text: &str, warnings: &mut Vec<String>) -> String {
-    let found = issues(original, text);
+    let found = guard_issues(original, text);
     if found.is_empty() {
         return text.to_string();
     }
@@ -315,7 +578,7 @@ fn guard_paragraph(original: &str, text: &str, warnings: &mut Vec<String>) -> St
     if os.len() == ts.len() && os.len() > 1 {
         let mut out = String::new();
         for (n, (o, t)) in os.iter().zip(&ts).enumerate() {
-            let bad = issues(o.trim(), t.trim());
+            let bad = guard_issues(o.trim(), t.trim());
             if bad.is_empty() {
                 out.push_str(t);
             } else {
@@ -324,12 +587,15 @@ fn guard_paragraph(original: &str, text: &str, warnings: &mut Vec<String>) -> St
                     n + 1,
                     bad.join("; ")
                 ));
-                out.push_str(o.trim_end());
-                out.push_str(trailing_space(t));
+                // Cutting a courtesy sentence is allowed; a fallback must not bring it back.
+                if !is_filler(o) {
+                    out.push_str(o.trim_end());
+                    out.push_str(trailing_space(t));
+                }
             }
         }
         // Sentences that are fine alone can still disagree together.
-        if issues(original, &out).is_empty() {
+        if guard_issues(original, &out).is_empty() {
             return out;
         }
     }
@@ -337,7 +603,7 @@ fn guard_paragraph(original: &str, text: &str, warnings: &mut Vec<String>) -> St
         "drift: kept original paragraph ({})",
         found.join("; ")
     ));
-    format!("{}{}", original.trim_end(), trailing_space(text))
+    format!("{}{}", content(original).trim_end(), trailing_space(text))
 }
 
 /// Drift guard for a finished rewrite: paragraphs (and sentences) whose
@@ -355,10 +621,95 @@ pub fn guard(original: &str, text: &str) -> (String, Vec<String>) {
             .map(|(o, t)| guard_paragraph(o, t, &mut warnings))
             .collect::<Vec<_>>()
             .join("\n\n")
+    } else if op.len() > 1 && tp.len() > 1 {
+        align_paragraphs(&op, &tp)
+            .into_iter()
+            .filter_map(|(o, t)| match (o.is_empty(), t.is_empty()) {
+                (_, true) => None,
+                (true, false) => Some(t.join("\n\n")),
+                _ => Some(guard_paragraph(
+                    &o.join("\n\n"),
+                    &t.join("\n\n"),
+                    &mut warnings,
+                )),
+            })
+            .collect::<Vec<_>>()
+            .join("\n\n")
     } else {
         guard_paragraph(original, text, &mut warnings)
     };
     (out, warnings)
+}
+
+/// A paragraph the rewrite may drop or add freely: blank, all courtesy
+/// sentences, or a short greeting or sign-off line ending in a comma.
+fn is_courtesy_paragraph(p: &str) -> bool {
+    let t = p.trim();
+    t.is_empty()
+        || sentences(t)
+            .iter()
+            .all(|s| s.trim().is_empty() || is_filler(s))
+        || (t.ends_with(',')
+            && t.split_whitespace().count() <= 4
+            && !t.chars().any(|c| c.is_ascii_digit()))
+}
+
+/// Monotone alignment of original and rewrite paragraphs when their counts
+/// differ: 1:1, k:1 and 1:k (k <= MAX_MERGE) matches scored by content-word overlap; a
+/// courtesy paragraph may go unmatched cheaply, any other one at full cost.
+/// Returns (original group, rewrite group) pairs in order; one side may be empty.
+const MAX_MERGE: usize = 4;
+
+fn align_paragraphs<'a>(op: &[&'a str], tp: &[&'a str]) -> Vec<(Vec<&'a str>, Vec<&'a str>)> {
+    use crate::core::repair::overlap;
+    let (n, m) = (op.len(), tp.len());
+    let skip = |p: &str| if is_courtesy_paragraph(p) { 0.3 } else { 1.0 };
+    let mut cost = vec![vec![f64::INFINITY; m + 1]; n + 1];
+    let mut back = vec![vec![(0usize, 0usize); m + 1]; n + 1];
+    cost[0][0] = 0.0;
+    for i in 0..=n {
+        for j in 0..=m {
+            let here = cost[i][j];
+            if here.is_infinite() {
+                continue;
+            }
+            let mut relax = |di: usize, dj: usize, c: f64| {
+                if i + di <= n && j + dj <= m && here + c < cost[i + di][j + dj] {
+                    cost[i + di][j + dj] = here + c;
+                    back[i + di][j + dj] = (di, dj);
+                }
+            };
+            if i < n {
+                relax(1, 0, skip(op[i]));
+            }
+            if j < m {
+                relax(0, 1, skip(tp[j]));
+            }
+            if i < n && j < m {
+                relax(1, 1, 1.0 - overlap(op[i], tp[j]));
+            }
+            // k:1 and 1:k merges, so a split or joined paragraph is checked whole.
+            for k in 2..=MAX_MERGE {
+                let extra = 0.1 * k as f64 + 1.0;
+                if i + k <= n && j < m {
+                    relax(k, 1, extra - overlap(&op[i..i + k].join("\n\n"), tp[j]));
+                }
+                if i < n && j + k <= m {
+                    relax(1, k, extra - overlap(op[i], &tp[j..j + k].join("\n\n")));
+                }
+            }
+        }
+    }
+    let (mut i, mut j) = (n, m);
+    let mut out = Vec::new();
+    while i > 0 || j > 0 {
+        let (di, dj) = back[i][j];
+        out.push((op[i - di..i].to_vec(), tp[j - dj..j].to_vec()));
+        i -= di;
+        j -= dj;
+    }
+    out.reverse();
+    out
 }
 
 /// Replace typographic punctuation the original does not use: a source typed
@@ -406,6 +757,98 @@ pub fn looks_like_refusal(input: &str, output: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn courtesy_sentences_are_set_aside_on_both_sides() {
+        // "need" moves from a courtesy sentence in the original to the rewrite.
+        let o = "We plan to finish testing by 21 November. Please reach out if you have questions or need support!";
+        let t = "We plan to finish testing by 21 November. If you have questions or need support, contact us.";
+        assert!(guard_issues(o, t).is_empty(), "{:?}", guard_issues(o, t));
+        // Epistemic "must" inside sympathy is not an obligation.
+        let o = "Your trip on 14 November was cancelled. We completely understand how disappointing this must be.";
+        assert!(guard_issues(o, "Your trip on 14 November was cancelled.").is_empty());
+        // Keeping a courtesy sentence's facts without its cheer is not invented content.
+        let o = "We're thrilled to announce a milestone at Acme, a Hamilton-based company. On 3 November we launched v2 to 14 clinics.";
+        let t = "Acme is a Hamilton-based company. On 3 November we launched v2 to 14 clinics.";
+        assert!(guard_issues(o, t).is_empty(), "{:?}", guard_issues(o, t));
+        // An all-courtesy paragraph may shrink to one line.
+        let o = "If you have any questions, our support team is always happy to help. We look forward to a successful partnership!";
+        assert!(guard_issues(o, "Questions go to our support team.").is_empty());
+        // A real obligation outside courtesy still counts.
+        let o = "You must restart the gateway. Thanks for your patience.";
+        assert!(!guard_issues(o, "Restart the gateway.").is_empty());
+    }
+
+    #[test]
+    fn courtesy_sentences_with_a_name_or_an_ask_are_content() {
+        assert!(!carries_content("Thanks so much for your patience, Sarah."));
+        assert!(carries_content(
+            "If you are still stuck, reach out to Priya Nair."
+        ));
+        assert!(carries_content(
+            "Please let me know how you want to handle the copy."
+        ));
+        assert!(!carries_content("Let me know if you have any questions."));
+    }
+
+    #[test]
+    fn a_split_single_paragraph_is_checked_whole() {
+        let o = "You are invited on Monday, October 8, at the Four Seasons.\nCocktails are at 6:45 p.m.\nPlease RSVP to Kelly at extension 36485 by Thursday.";
+        let t = "You're invited on Monday, October 8, at the Four Seasons.\n\nCocktails start at 6:45 p.m.\n\nRSVP to Kelly by Thursday.";
+        let (out, w) = guard(o, t);
+        assert!(!w.is_empty());
+        // One fallback for the whole text, never the original pasted beside rewrite paragraphs.
+        for fact in ["Four Seasons", "6:45", "Thursday"] {
+            assert_eq!(out.matches(fact).count(), 1, "{fact}: {out}");
+        }
+        assert!(out.contains("36485"));
+        // Multi-paragraph splits align 1:3 instead of leaving rewrite paragraphs unmatched.
+        let o2 = format!("Intro line about the 2.8.0 release.\n\n{o}");
+        let t2 = format!("Intro line about the 2.8.0 release.\n\n{t}");
+        let (out2, _) = guard(&o2, &t2);
+        for fact in ["Four Seasons", "6:45", "Thursday"] {
+            assert_eq!(out2.matches(fact).count(), 1, "{fact}: {out2}");
+        }
+    }
+
+    #[test]
+    fn fallbacks_leave_courtesy_sentences_out() {
+        // Paragraph fallback: the flagged rewrite reverts, its thanks does not come back.
+        let o = "Thank you all for the great collaboration this sprint. You must restart the gateway before 5 pm.";
+        let mut w = Vec::new();
+        let out = guard_paragraph(o, "Restart the gateway when you can.", &mut w);
+        assert_eq!(out, "You must restart the gateway before 5 pm.");
+        assert!(!w.is_empty());
+    }
+
+    #[test]
+    fn dropped_courtesy_paragraphs_do_not_revert_the_rest() {
+        let original = "Hi Sarah,\n\nThank you for reaching out, we appreciate your patience.\n\n\
+            The refund for INV-20481 was approved on 11 November. It will not be reversed.\n\n\
+            If you have any further questions, please do not hesitate to reply.\n\nWarm regards,\n\nJames";
+        let rewrite = "Hi Sarah,\n\nWe approved the refund for INV-20481 on 11 November. \
+            It won't be reversed.\n\nJames";
+        let (text, warnings) = guard(original, rewrite);
+        assert!(warnings.is_empty(), "{warnings:?}");
+        assert_eq!(text, rewrite);
+    }
+
+    #[test]
+    fn names_inside_courtesy_sentences_are_not_facts() {
+        let original =
+            "The order ships Monday. We value you as part of the Waikato farming community.";
+        assert_eq!(drift_count(original, "The order ships Monday."), 0);
+        assert_eq!(drift_count(original, "The order ships soon."), 1);
+    }
+
+    #[test]
+    fn misaligned_paragraph_with_lost_fact_still_falls_back() {
+        let original = "Intro line here.\n\nPay NZD 18,900 by Friday.\n\nThanks for your patience.";
+        let rewrite = "Pay soon please.\n\nIntro.";
+        let (text, warnings) = guard(original, rewrite);
+        assert!(!warnings.is_empty());
+        assert!(text.contains("18,900"), "{text}");
+    }
 
     #[test]
     fn flipped_condition_and_added_hedge_are_drift() {

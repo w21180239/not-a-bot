@@ -2,7 +2,7 @@
 //! this module decides which to apply, so a repair cannot quietly turn into
 //! copying the original back.
 
-use crate::core::drift::drift_count;
+use crate::core::drift::{drift_count, is_ai_word};
 use crate::core::facts::FUNCTION_WORDS;
 use crate::core::types::{EditKind, HopEdit};
 use serde::Deserialize;
@@ -116,7 +116,10 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
     {
         if let Ok(candidate) = replace(&current, edit) {
             let left = drift_count(original, &candidate);
-            if left < missing {
+            if left < missing
+                && !adds_ai_wording(edit)
+                && added_words(edit).len() <= 2 + 2 * (missing - left)
+            {
                 missing = left;
                 current = candidate;
                 edit.kind = EditKind::Fact;
@@ -132,6 +135,10 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
         .iter_mut()
         .filter(|e| e.reason.is_none() && !e.applied && e.kind != EditKind::Register)
     {
+        if adds_ai_wording(edit) {
+            edit.reason = Some("adds AI wording".into());
+            continue;
+        }
         match replace(&current, edit) {
             Err(reason) => edit.reason = Some(reason.into()),
             Ok(candidate) => {
@@ -167,6 +174,8 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
                 let left = drift_count(original, &candidate);
                 if left > missing {
                     edit.reason = Some("drops a fact".into());
+                } else if adds_ai_wording(edit) {
+                    edit.reason = Some("adds AI wording".into());
                 } else if overlap(&candidate, original) - baseline > MAX_STYLE_OVERLAP_RISE {
                     edit.reason = Some("copies the original back".into());
                 } else {
@@ -178,6 +187,27 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
         }
     }
     (current, edits)
+}
+
+/// Lowercase content words in `to` that `from` lacks.
+fn added_words(edit: &HopEdit) -> Vec<String> {
+    let words = |s: &str| -> Vec<String> {
+        s.split(|c: char| !c.is_alphanumeric() && c != '\'')
+            .filter(|w| w.chars().count() > 1)
+            .map(str::to_lowercase)
+            .filter(|w| !FUNCTION_WORDS.contains(&w.as_str()))
+            .collect()
+    };
+    let from = words(&edit.from);
+    words(&edit.to)
+        .into_iter()
+        .filter(|w| !from.contains(w))
+        .collect()
+}
+
+/// True when the edit brings in lint-list or filler vocabulary.
+fn adds_ai_wording(edit: &HopEdit) -> bool {
+    added_words(edit).iter().any(|w| is_ai_word(w))
 }
 
 /// Words an edit brings back, when it is a pinpoint repair: `from` of at most
@@ -230,6 +260,24 @@ mod tests {
     const REWRITE: &str = "This release reshapes how the product works at a basic level. \
         Aloha needs Tom's sign-off by Friday for NZD 18,000. \
         The team will ship once that lands.";
+
+    #[test]
+    fn edits_adding_ai_wording_or_bloat_are_rejected() {
+        let original = "We are delighted to confirm Aroha pays NZD 18,900.";
+        let rewrite = "Aroha pays.";
+        let (text, edits) = apply_edits(
+            rewrite,
+            original,
+            vec![edit(
+                "Aroha pays.",
+                "We are delighted to confirm Aroha pays NZD 18,900.",
+            )],
+        );
+        assert_eq!(text, rewrite);
+        assert_eq!(edits[0].reason.as_deref(), Some("adds AI wording"));
+        let (text, _) = apply_edits(rewrite, original, vec![edit("pays.", "pays NZD 18,900.")]);
+        assert_eq!(text, "Aroha pays NZD 18,900.");
+    }
 
     fn edit(from: &str, to: &str) -> HopEdit {
         HopEdit {

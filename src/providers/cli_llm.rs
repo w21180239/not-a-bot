@@ -56,6 +56,8 @@ pub fn preserve_clause(req: &TranslateRequest) -> Option<String> {
 /// Detected register of the original, as `{"register": "casual", "markers": [..]}`
 /// (see [`crate::core::register`]).
 pub const REGISTER_KEY: &str = "not-a-bot.register";
+/// Set on the hop that returns to the source language.
+pub const BACK_KEY: &str = "not-a-bot.back";
 
 /// Register class and marker list from [`REGISTER_KEY`]; `neutral` and no
 /// markers when absent.
@@ -81,11 +83,11 @@ pub fn register_clause(req: &TranslateRequest) -> String {
     let seen = markers.join("; ");
     match class {
         "casual" => format!(
-            "Register, which outranks the shape rules above (they apply to machine-flavoured phrasing, not to the source's own voice): the source is casual, spoken or dictated text. Markers seen: {seen}. Keep every one of them. Do not capitalise a sentence start the source leaves lowercase, add a full stop the source leaves off, expand contractions, merge fragments, smooth the text into tidy prose, or turn a question or request into an imperative ('can you go through' stays a question). Keep fillers, hedges, self-corrections, false starts, trailing-off pauses and laughter ('hey', 'oh actually no', 'like ... I mean', 'honestly', 'haha') where they are, rendered naturally in {}. Casing and punctuation habits carry over only where the script has them. Add no marker the source lacks.",
+            "Register, which outranks the shape rules above (they apply to machine-flavoured phrasing, not to the source's own voice): the source is casual, spoken or dictated text. Markers seen: {seen}. Keep every one of them. Keep its own short greeting, thanks, apology or acknowledgement ('hey', 'thanks for flagging this early', 'sorry', 'ack'). Do not capitalise a sentence start the source leaves lowercase, add a full stop the source leaves off, expand contractions, merge fragments, smooth the text into tidy prose, or turn a question or request into an imperative ('can you go through' stays a question). Keep fillers, hedges, self-corrections, false starts, trailing-off pauses and laughter ('hey', 'oh actually no', 'like ... I mean', 'honestly', 'haha') where they are, rendered naturally in {}. Casing and punctuation habits carry over only where the script has them. Add no marker the source lacks.",
             language_label(&req.target_lang)
         ),
         "formal" => format!(
-            "Register: the source is formal ({seen}). Keep it formal and precise: complete sentences, its courtesy and terminology, its salutation and sign-off. Add no contractions, slang, fillers or chatty asides."
+            "Register: the source is formal ({seen}). Keep it formal and precise: complete sentences, its terminology, its salutation and sign-off. Add no contractions, slang, fillers or chatty asides."
         ),
         _ => "Register: match the source's register and voice, whatever it is; a technical text stays technical, a formal one formal, a casual one casual. Remove only machine-flavoured phrasing and never tidy, polish, formalise or casualise the rest.".to_string(),
     }
@@ -319,6 +321,16 @@ impl Provider for CliLlm {
     }
 }
 
+/// The hop back into the source language takes the voice brief in place of the shape rules.
+fn voice_back(req: &TranslateRequest) -> bool {
+    req.metadata.contains_key(BACK_KEY)
+}
+
+/// Voice-keeping prompts apply to casual sources only; others get the plain brief.
+fn not_casual(req: &TranslateRequest) -> bool {
+    register_of(req).0 != "casual"
+}
+
 /// The full prompt sent on stdin. Pure, so tests need no process.
 pub fn build_prompt(req: &TranslateRequest) -> Result<String> {
     let source = match req.source_lang.as_str() {
@@ -354,17 +366,43 @@ pub fn build_prompt(req: &TranslateRequest) -> Result<String> {
                 missing.join(", ")
             )
         };
-        let register = fix_register_clause(req);
-        let hints = fix_hints(req);
+        let register = if not_casual(req) {
+            String::new()
+        } else {
+            fix_register_clause(req)
+        };
+        let hints = if not_casual(req) {
+            String::new()
+        } else {
+            fix_hints(req)
+        };
+        if not_casual(req) {
+            // Plain fix brief for non-casual sources.
+            return Ok(format!(
+                "Below are an ORIGINAL text and a REWRITE of it in {target}. The rewrite deliberately changed wording and structure and cut sentences that only express feelings, pledges or pleasantries; that is correct, do not undo it. \
+                 Find every place where the REWRITE's meaning differs from the ORIGINAL: a missing or altered name, place, product, number, date, amount, currency, ID, version, path or code span; a flipped negation; a lost or added qualifier or certainty; a changed actor, cause or order (who did what to whom, and why); a dropped or invented claim. \
+                 List the smallest repairs that restore that meaning, as ONLY a JSON array with no prose and no code fence:\n\
+                 [{{\"from\": \"<exact substring of REWRITE>\", \"to\": \"<replacement>\", \"why\": \"<few words>\"}}]\n\
+                 Output [] when the meaning already matches.\n\
+                 Rules:\n\
+                 - Each \"from\" is the shortest span that contains the error, usually one word or number; a clause only when a whole claim is missing, invented or inverted.\n\
+                 - Repair meaning, not style: never restore a cut feeling, pledge or pleasantry sentence, never move wording or structure back toward the original, and leave anything already correct in meaning untouched. Fewer edits are better.\n\
+                 - Names must match the original letter for letter.\n\
+                 - When a fact is missing, set \"from\" to the word right before where it belongs and \"to\" to that word plus the fact, written in the REWRITE's style; a fact from a cut sentence goes into the nearest kept sentence.\n\
+                 {missing}{hints}{register}\
+                 ORIGINAL ({orig_lang}):\n<<<\n{original}\n>>>\nREWRITE ({target}):\n<<<\n{}\n>>>\n",
+                req.text
+            ));
+        }
         return Ok(format!(
             "Below are an ORIGINAL text and a REWRITE of it in {target}. The rewrite deliberately changed wording and structure and cut sentences that only express feelings, pledges or pleasantries; that is correct, do not undo it. \
-             Find every place where the REWRITE's meaning differs from the ORIGINAL: a missing or altered name, place, product, number, date, amount, currency, ID, version, path or code span; a flipped negation; a lost or added qualifier or certainty; a changed actor, cause or order (who did what to whom, and why); a dropped or invented claim; a domain term swapped for a synonym ('attempts' for 'retries', 'acquisition point' for 'collection point', 'commit' for 'commitment'); a changed sentence form (a lost leading verb, a request turned into a command or the reverse, a question turned into a statement); a changed condition, quantifier or modality ('not before', 'within one minute', 'any of the three', 'is used as' turned into 'will be used, maybe'); an invented clause, detail or commitment; a dropped short phrase such as a greeting, thanks or an aside. \
+             Find every place where the REWRITE's meaning differs from the ORIGINAL: a missing or altered name, place, product, number, date, amount, currency, ID, version, path or code span; a flipped negation; a lost or added qualifier or certainty; a changed actor, cause or order (who did what to whom, and why); a dropped or invented claim; a domain term swapped for a synonym ('attempts' for 'retries', 'acquisition point' for 'collection point', 'commit' for 'commitment'); a changed sentence form (a lost leading verb, a request turned into a command or the reverse, a question turned into a statement); a changed condition, quantifier or modality ('not before', 'within one minute', 'any of the three', 'is used as' turned into 'will be used, maybe'); an invented clause, detail or commitment. \
              List the smallest repairs that restore that meaning, as ONLY a JSON array with no prose and no code fence:\n\
              [{{\"from\": \"<exact substring of REWRITE>\", \"to\": \"<replacement>\", \"why\": \"<few words>\"}}]\n\
              Output [] when the meaning already matches.\n\
              Rules:\n\
              - Each \"from\" is the shortest span that contains the error, usually one word or number; a clause only when a whole claim is missing, invented or inverted.\n\
-             - Repair meaning, not style: never restore a cut feeling, pledge or pleasantry sentence (a short greeting, thanks or acknowledgement of the original is a phrase to restore, not such a sentence), never move wording or structure back toward the original beyond the term, form or condition that changed, and leave anything already correct in meaning untouched. Delete an invented clause with an empty \"to\". Fewer edits are better.\n\
+             - Repair meaning, not style: never restore a cut feeling, pledge or pleasantry sentence, never move wording or structure back toward the original beyond the term, form or condition that changed, and leave anything already correct in meaning untouched. Delete an invented clause with an empty \"to\". Fewer edits are better.\n\
              - Add \"kind\": \"term\" to an edit of at most 3 words that puts back a swapped term, a changed sentence form, condition, quantifier or modality, or deletes an invented word or clause; put the ORIGINAL's own words in \"to\".\n\
              - Names must match the original letter for letter.\n\
              - When a fact is missing, set \"from\" to the word right before where it belongs and \"to\" to that word plus the fact, written in the REWRITE's style; a fact from a cut sentence goes into the nearest kept sentence.\n\
@@ -405,8 +443,15 @@ First compare the text with the original. Wherever meaning was lost, changed or 
              formatting; keep every name, number, URL, code span, placeholder and markup exactly \
              as written. Output only the {target} translation, with no preamble or notes."
         ),
+        "humanize" if voice_back(req) => format!(
+            "Translate the text below from {source} into {target} the way one particular person would write it up in their own words, for people they know. Avoid the most predictable word or phrase at each point: where an AI would write 'significant', 'crucial', 'ensure', 'foster', 'enhance', 'seamless', 'landscape', 'navigate' or 'robust', pick the plainer or more idiomatic thing a person actually says.{} Let the rhythm be uneven: a short sentence, then a long one that runs on a bit, a fragment now and then. Prefer concrete verbs and idioms over abstract nouns. Do not make every paragraph the same shape, and do not end paragraphs on a neat summarising line. Hard rules: keep every claim, caveat, condition, negation, fact, term, name, number and date and the order of the argument; copy names, IDs, paths, URLs, code spans, placeholders and markup exactly; add no new fact, example or opinion; keep the certainty. Output only the {target} text, with no preamble or notes.",
+            if register_of(req).0 == "formal" { "" } else { " Use contractions." }
+        ),
+        "humanize" if not_casual(req) => format!(
+            "Translate the text below from {source} into {target}, and while translating rewrite it the way a capable person writes to one reader, not the way an AI writes. Fix the shape, not just the words: state claims directly instead of 'not just X, it's Y' or 'X, not Y' foils nobody raised; drop filler openers ('In today's...', 'When it comes to', 'It's worth noting'), signpost closers and summary lines, run-ups ('Here's the thing'), deep-sounding sayings ('At its core'), inflated significance and promotional adjectives, and reflexive lists of three. Use plain words and varied sentence length. Delete sentences that only express feelings or pledges (thanks for patience or hard work, excitement, pride, 'we remain committed', 'we look forward') and closing pleasantries. Before deleting one, move any name, place, number, date or amount in it into a sentence you keep. Hard rules: keep every fact, name, number, date, currency, ID, path, URL and code span exactly as written (copy names letter for letter, do not translate or respell them); keep placeholders and markup untouched; add nothing that is not in the text; keep the meaning and certainty. Output only the rewritten {target} text, with no preamble or notes."
+        ),
         "humanize" => format!(
-            "Translate the text below from {source} into {target}, and while translating rewrite it the way a capable person writes to one reader, not the way an AI writes. Fix the shape, not just the words: state claims directly instead of 'not just X, it's Y' or 'X, not Y' foils nobody raised; drop filler openers ('In today's...', 'When it comes to', 'It's worth noting'), signpost closers and summary lines, run-ups ('Here's the thing'), deep-sounding sayings ('At its core'), inflated significance and promotional adjectives, and reflexive lists of three. Use plain words and varied sentence length. Delete boilerplate sentences that only express feelings or pledges (thanks for patience or hard work, excitement, pride, 'we remain committed', 'we look forward') and closing pleasantries, but keep the source's own short greeting, thanks, apology or acknowledgement ('hey', 'thanks for flagging this early', 'sorry', 'ack'). Before deleting one, move any name, place, number, date or amount in it into a sentence you keep. Hard rules: keep every fact, name, number, date, currency, ID, path, URL and code span exactly as written (copy names letter for letter, do not translate or respell them); keep placeholders and markup untouched; add nothing that is not in the text (no clause, detail, example, reason or commitment of your own); keep the meaning and certainty. Keep every domain term as written and never swap it for a synonym ('attempts' stays 'attempts', 'rollback line' stays 'rollback line', 'page' stays 'page'). Keep conditions, quantifiers, negations, order and modality exactly: 'not before', 'within', 'at least', 'any of', 'will' versus 'may', and add no hedge. Keep the sentence form and mood: a leading verb stays ('Gives the times' is not 'Times are shown'), a request or question stays one, an imperative stays one. Keep the source's punctuation, plain ASCII hyphens and quotes included. Output only the rewritten {target} text, with no preamble or notes."
+            "Translate the text below from {source} into {target}, and while translating rewrite it the way a capable person writes to one reader, not the way an AI writes. Fix the shape, not just the words: state claims directly instead of 'not just X, it's Y' or 'X, not Y' foils nobody raised; drop filler openers ('In today's...', 'When it comes to', 'It's worth noting'), signpost closers and summary lines, run-ups ('Here's the thing'), deep-sounding sayings ('At its core'), inflated significance and promotional adjectives, and reflexive lists of three. Use plain words and varied sentence length. Delete boilerplate sentences that only express feelings or pledges (thanks for patience or hard work, excitement, pride, 'we remain committed', 'we look forward') and closing pleasantries. Before deleting one, move any name, place, number, date or amount in it into a sentence you keep. Hard rules: keep every fact, name, number, date, currency, ID, path, URL and code span exactly as written (copy names letter for letter, do not translate or respell them); keep placeholders and markup untouched; add nothing that is not in the text (no clause, detail, example, reason or commitment of your own); keep the meaning and certainty. Keep every domain term as written and never swap it for a synonym ('attempts' stays 'attempts', 'rollback line' stays 'rollback line', 'page' stays 'page'). Keep conditions, quantifiers, negations, order and modality exactly: 'not before', 'within', 'at least', 'any of', 'will' versus 'may', and add no hedge. Keep the sentence form and mood: a leading verb stays ('Gives the times' is not 'Times are shown'), a request or question stays one, an imperative stays one. Keep the source's punctuation, plain ASCII hyphens and quotes included. Output only the rewritten {target} text, with no preamble or notes."
         ),
         other => {
             return Err(Error::InvalidInput(format!(
@@ -415,7 +460,8 @@ First compare the text with the original. Wherever meaning was lost, changed or 
         }
     };
     prompt.push_str(&instructions);
-    if style == "humanize" {
+    // Only a casual source's markers need naming.
+    if style == "humanize" && !not_casual(req) {
         prompt.push_str("\n\n");
         prompt.push_str(&register_clause(req));
     }
@@ -723,11 +769,11 @@ Aroha owes NZD 18,900.
             &["capitalised complete sentences"],
         ))
         .unwrap();
-        assert!(formal.contains("the source is formal (capitalised complete sentences)"));
-        assert!(!formal.contains("casual, spoken"));
-        // No detection result: still told to mirror the source, whatever it is.
+        // Only a casual source gets a register clause; others get the plain brief.
+        assert!(!formal.contains("Register"));
+        assert!(formal.contains("Delete sentences that only express feelings or pledges"));
         let none = build_prompt(&req(Some("humanize"), None)).unwrap();
-        assert!(none.contains("match the source's register and voice, whatever it is"));
+        assert!(!none.contains("Register"));
         // Plain translation keeps its own brief.
         assert!(!build_prompt(&req(None, None)).unwrap().contains("Register"));
     }
@@ -746,17 +792,22 @@ Aroha owes NZD 18,900.
         ));
         assert!(p.contains("\"kind\": \"register\""));
         assert!(p.find("Register pass").unwrap() < p.find("ORIGINAL (").unwrap());
-        // Without a detection result the pass is the generic drift check.
+        // A non-casual source gets the plain meaning check, no register pass.
         let p = build_prompt(&with(req(Some("fix"), None), ORIGINAL_KEY, "Ask Aroha.")).unwrap();
-        assert!(p.contains("changed the ORIGINAL's register"));
+        assert!(!p.contains("Register pass") && !p.contains("register"));
+        assert!(p.contains("Repair meaning, not style"));
     }
 
     #[test]
     fn fix_prompt_lists_term_and_opening_hints_only_when_given() {
-        let r = with(
-            req(Some("fix"), None),
-            ORIGINAL_KEY,
-            "Gives the times after 6 attempts.",
+        let r = with_register(
+            with(
+                req(Some("fix"), None),
+                ORIGINAL_KEY,
+                "gives the times after 6 attempts",
+            ),
+            "casual",
+            &["lowercase sentence starts"],
         );
         let p = build_prompt(&r).unwrap();
         assert!(!p.contains("A term check found") && !p.contains("opens with"));
@@ -765,6 +816,11 @@ Aroha owes NZD 18,900.
             .insert(TERMS_KEY.into(), serde_json::json!(["attempts", "times"]));
         r.metadata
             .insert(OPENING_KEY.into(), serde_json::json!("Gives"));
+        // Hints are casual-only; a formal source with the same hints gets none.
+        let formal = with_register(r.clone(), "formal", &[]);
+        assert!(!build_prompt(&formal)
+            .unwrap()
+            .contains("absent from the REWRITE: attempts"));
         let p = build_prompt(&r).unwrap();
         assert!(
             p.contains("absent from the REWRITE: attempts, times. Where the REWRITE swapped one")
@@ -775,13 +831,15 @@ Aroha owes NZD 18,900.
 
     #[test]
     fn humanize_brief_forbids_synonym_swaps_and_inventions() {
-        let p = build_prompt(&req(Some("humanize"), None)).unwrap();
+        let casual = with_register(req(Some("humanize"), None), "casual", &[]);
+        let p = build_prompt(&casual).unwrap();
         assert!(p.contains("never swap it for a synonym"));
         assert!(p.contains("no clause, detail, example, reason or commitment of your own"));
         assert!(p.contains("a leading verb stays"));
-        assert!(
-            p.contains("keep the source's own short greeting, thanks, apology or acknowledgement")
-        );
+        // Greetings and thanks are kept only for casual sources (register clause).
+        let p = build_prompt(&req(Some("humanize"), None)).unwrap();
+        assert!(!p.contains("own short greeting"));
+        assert!(p.contains("copy names letter for letter"));
     }
 
     #[test]

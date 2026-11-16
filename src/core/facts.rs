@@ -27,6 +27,53 @@ static WORD: Lazy<Regex> =
 /// Capitalised words that are not names even mid-sentence.
 const STOP: &[&str] = &["OK", "Mr", "Mrs", "Ms", "Dr", "St", "AM", "PM", "The", "An"];
 
+/// Greeting, sign-off and cheer words: at a sentence start they are not names.
+const STARTERS: &[&str] = &[
+    "warm",
+    "kind",
+    "best",
+    "regards",
+    "thanks",
+    "thank",
+    "cheers",
+    "sincerely",
+    "yours",
+    "great",
+    "huge",
+    "early",
+    "quick",
+    "welcome",
+    "congratulations",
+    "together",
+    "overall",
+    "hi",
+    "hello",
+    "dear",
+    "team",
+    "many",
+    "please",
+    "happy",
+    "key",
+    "join",
+    "ready",
+    "meet",
+    "introducing",
+    "get",
+    "start",
+    "learn",
+    "explore",
+    "book",
+    "find",
+    "try",
+    "discover",
+    "imagine",
+    "say",
+    "enjoy",
+    "experience",
+    "unlock",
+    "elevate",
+];
+
 /// Lowercase English function words and common sentence starters. A
 /// sentence-initial capitalised word in this list is not a name. Weekdays and
 /// months are deliberately absent: they are facts.
@@ -336,7 +383,11 @@ pub fn missing_facts(source: &str, output: &str) -> Vec<String> {
                 // starter or appears lowercase elsewhere. Case-insensitive, so
                 // "Deployment" survives as "deployment".
                 let lower = word.to_lowercase();
-                if FUNCTION_WORDS.contains(&lower.as_str()) || contains_word(source, &lower) {
+                if FUNCTION_WORDS.contains(&lower.as_str())
+                    || STARTERS.contains(&lower.as_str())
+                    || participle_starter(source, m.end(), &lower)
+                    || contains_word(source, &lower)
+                {
                     continue;
                 }
                 if !contains_word(&output.to_lowercase(), &lower) {
@@ -352,8 +403,21 @@ pub fn missing_facts(source: &str, output: &str) -> Vec<String> {
     missing
 }
 
+/// A sentence-initial participle ("Getting started", "Designed to",
+/// "Updated 11 November"): -ing or -ed, six letters or more, followed by a
+/// lowercase word or a number, so not part of a capitalised name.
+fn participle_starter(source: &str, end: usize, lower: &str) -> bool {
+    (lower.ends_with("ing") || lower.ends_with("ed"))
+        && lower.chars().count() >= 6
+        && source[end..]
+            .trim_start()
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_lowercase() || c.is_ascii_digit())
+}
+
 /// `word` as a whole word, so `Tomi` does not vouch for `Tom` (`Tom's` does).
-fn contains_word(text: &str, word: &str) -> bool {
+pub(crate) fn contains_word(text: &str, word: &str) -> bool {
     text.match_indices(word).any(|(i, _)| {
         let before = text[..i].chars().next_back();
         let after = text[i + word.len()..].chars().next();
@@ -472,6 +536,23 @@ mod tests {
         // Its lowercase form elsewhere marks it as an ordinary word.
         let src = "Release notes. The release is late.";
         assert!(missing_facts(src, "It is late.").is_empty());
+    }
+
+    #[test]
+    fn sentence_initial_imperatives_and_participles_are_not_names() {
+        let src =
+            "Discover how it works. Getting started is easy. Designed to help. Key lessons follow.";
+        assert!(missing_facts(
+            src,
+            "See how it works. It is easy to start. It helps. Lessons follow."
+        )
+        .is_empty());
+        // A capitalised name after the participle keeps it a name.
+        let src = "Reading Station opens. Getting Started Guide ships.";
+        assert_eq!(
+            missing_facts(src, "It opens. It ships."),
+            vec!["Reading", "Station", "Getting", "Started", "Guide"]
+        );
     }
 
     #[test]
