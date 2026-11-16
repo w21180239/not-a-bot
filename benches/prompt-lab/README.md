@@ -51,3 +51,19 @@ Detector desklib/ai-text-detector-v1.01, mean P(AI); source texts score 0.999. F
 - `LAB_MEANING=0`: defer the meaning gate (Claude quota) from a run to a later `python lab.py meaning`.
 
 Screening round: run new variants with `--limit 12 --results results-screen` first, then run the survivors on all 30 texts.
+
+## Machine-translation depth (12 texts, one sample)
+
+`tx-mt2..5-endfix` chain 2 to 5 Google hops (`tx-mt4mix-endfix`: Google and Edge mixed) and end in one `claude-cli` fix hop. Every variant stays at mean P(AI) 0.995-0.999, and no text drops below 0.5. Adding hops does not lower the score; it only adds fact loss (`9:30am`, `5:00 pm`). Results: `results-mtdepth-screen/summary.md`. Set `LAB_TX_BIN` to the `nab` binary and `LAB_FIX_ENGINE` to choose the fix engine (default `claude-cli`).
+
+## Deterministic surface rewrites (30 texts)
+
+`surface.py` applies rule-based edits with no LLM, each switchable: strip markdown and bold labels, remove filler and courtesy sentences (kept when they hold a digit or a name), replace `VOCAB` words from `src/core/lint_data.rs`, drop intensifiers, turn dashes into commas, contract (`we are` -> `we're`), split long sentences.
+
+```sh
+python3 surface.py gen --out rows.jsonl
+../detector/.venv/bin/python ../detector/detect.py --batch rows.jsonl --out scored.jsonl
+python3 surface.py report scored.jsonl
+```
+
+All rules together move mean P(AI) from 0.999 to 0.995, no text drops below 0.5, and no single rule moves it by more than 0.003. A stricter filler cut that also deleted sentences holding names reached 0.986 but dropped 5 name tokens. The detector does not key on these surface features, which matches the machine-translation result: only an LLM hop that rebuilds sentences lowers the score. Results: `results-surface/summary.md`.

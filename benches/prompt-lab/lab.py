@@ -12,12 +12,12 @@ from concurrent.futures import ThreadPoolExecutor
 import llm
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DETECT_PY = os.path.join(HERE, "..", "detector", ".venv", "Scripts", "python.exe")
+DETECT_PY = os.path.join(HERE, "..", "detector", ".venv", *(("Scripts", "python.exe") if os.name == "nt" else ("bin", "python")))
 DETECT = os.path.join(HERE, "..", "detector", "detect.py")
 DET_CACHE = os.path.join(HERE, "cache", "detector.jsonl")
 LABEL = {"en": "English (en)", "zh": "Chinese (Simplified) (zh)", "ja": "Japanese (ja)"}
 WORKERS = int(os.environ.get("LAB_WORKERS", "4"))
-TX_BIN = os.path.join(HERE, "..", "..", "target", "release", "not-a-bot.exe")  # build under test
+TX_BIN = os.environ.get("LAB_TX_BIN") or os.path.join(HERE, "..", "..", "target", "release", "not-a-bot" + (".exe" if os.name == "nt" else ""))  # build under test
 
 # ---- prompt pieces: copied verbatim from src/providers/cli_llm.rs build_prompt ----
 HISTORY = ("The previous step turned this input:\n<<<\n{prev_in}\n>>>\ninto:\n<<<\n{prev_out}\n>>>\n"
@@ -142,6 +142,15 @@ VARIANTS = {
         "tx-llm-mt-llm-endfix": "opencode-cli:zh,google:ja,opencode-cli:en,opencode-cli:fix",
         "tx-llm-mt-llm-perhop": "opencode-cli:zh,google:ja,opencode-cli:fix,opencode-cli:en,opencode-cli:fix",
         "tx-mix-perhop": "opencode-cli:zh,opencode-cli:ja,google:fi,opencode-cli:fix,edge:en,opencode-cli:fix",
+    }.items()},
+    # Machine-only depth: 2-5 machine hops, then one final fix (LAB_FIX_ENGINE, default claude-cli).
+    **{name: [{"chain": chain.replace("FIX", os.environ.get("LAB_FIX_ENGINE", "claude-cli")), "model": "tx",
+               "from": "en", "to": "en"}] for name, chain in {
+        "tx-mt2-endfix": "google:zh,google:en,FIX:fix",
+        "tx-mt3-endfix": "google:zh,google:ja,google:en,FIX:fix",
+        "tx-mt4-endfix": "google:zh,google:ja,google:fi,google:en,FIX:fix",
+        "tx-mt5-endfix": "google:zh,google:ja,google:fi,google:de,google:en,FIX:fix",
+        "tx-mt4mix-endfix": "google:zh,edge:ja,google:fi,edge:en,FIX:fix",
     }.items()},
 }
 
