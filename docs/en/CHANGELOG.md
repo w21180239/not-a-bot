@@ -2,6 +2,12 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.3.9 — 2026-11-17
+
+### Fixed
+
+- When the drift guard puts back an original paragraph whose lead-in sentence the rewrite had moved into the paragraph before it, the copy in that earlier paragraph is dropped, so the sentence no longer appears twice.
+
 ## 0.3.8 — 2026-11-17
 
 ### Changed
