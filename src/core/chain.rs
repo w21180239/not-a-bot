@@ -227,6 +227,7 @@ fn expand_preset(
             hop(&llm, Target::Source),
             fix,
         ],
+        "standard" if std::env::var("NAB_EXP_NOFIX").is_ok() => vec![hop(&llm, lang(out)), hop(&llm, Target::Source)],
         "standard" => vec![hop(&llm, lang(out)), hop(&llm, Target::Source), fix],
         other => {
             return Err(Error::InvalidInput(format!(
