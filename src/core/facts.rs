@@ -370,12 +370,16 @@ pub fn missing_facts(source: &str, output: &str) -> Vec<String> {
     }
 
     if is_latin(source) && is_latin(output) {
+        let head_words = std::env::var("NAB_EXP_HEADWORDS").is_ok();
         for m in WORD.find_iter(source) {
             let word = m.as_str();
             if overlaps(&taken, &m.range())
                 || STOP.contains(&word)
                 || touches_word(source, &m.range())
             {
+                continue;
+            }
+            if head_words && in_heading(source, m.start()) && !capitalised_in_body(source, word) {
                 continue;
             }
             if sentence_initial(source, m.start()) {
@@ -401,6 +405,41 @@ pub fn missing_facts(source: &str, output: &str) -> Vec<String> {
         }
     }
     missing
+}
+
+/// The line holding `pos` is a heading: a markdown `#` line, or a short line
+/// with no closing punctuation whose words are mostly capitalised.
+fn in_heading(text: &str, pos: usize) -> bool {
+    let start = text[..pos].rfind('\n').map_or(0, |i| i + 1);
+    let end = text[pos..].find('\n').map_or(text.len(), |i| pos + i);
+    let line = text[start..end].trim().trim_matches('*').trim();
+    if line.starts_with('#') {
+        return true;
+    }
+    let words: Vec<&str> = line
+        .split_whitespace()
+        .filter(|w| w.chars().next().is_some_and(char::is_alphabetic))
+        .collect();
+    let caps = words
+        .iter()
+        .filter(|w| w.chars().next().is_some_and(char::is_uppercase))
+        .count();
+    !words.is_empty()
+        && words.len() <= 12
+        && !line.ends_with(['.', '!', '?', ',', ';'])
+        && caps * 2 > words.len()
+}
+
+/// `word` appears capitalised mid-sentence outside headings, so it is a name.
+fn capitalised_in_body(text: &str, word: &str) -> bool {
+    text.match_indices(word).any(|(i, _)| {
+        let before = text[..i].chars().next_back();
+        let after = text[i + word.len()..].chars().next();
+        !before.is_some_and(char::is_alphanumeric)
+            && !after.is_some_and(char::is_alphanumeric)
+            && !in_heading(text, i)
+            && !sentence_initial(text, i)
+    })
 }
 
 /// A sentence-initial participle ("Getting started", "Designed to",
@@ -553,6 +592,18 @@ mod tests {
             missing_facts(src, "It opens. It ships."),
             vec!["Reading", "Station", "Getting", "Started", "Guide"]
         );
+    }
+
+    #[test]
+    fn heading_words_are_names_only_when_capitalised_in_the_body() {
+        let src = "## Evening Touches\nAdd a coat at dusk.\n\nMorning Tips for Hub Sync\nAsk Tyler about Hub Sync.";
+        let at = |w: &str| src.find(w).unwrap();
+        assert!(in_heading(src, at("Evening")));
+        assert!(in_heading(src, at("Tips")));
+        assert!(!in_heading(src, at("Tyler")));
+        assert!(!capitalised_in_body(src, "Evening"));
+        assert!(!capitalised_in_body(src, "Tips"));
+        assert!(capitalised_in_body(src, "Hub"));
     }
 
     #[test]
