@@ -2,6 +2,12 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.3.8 — 2026-11-17
+
+### Changed
+
+- The drift guard now treats a rewritten passage as invented content only when it runs past 1.6 times the original word count (plus slack), up from 1.35. Spoken-style expansions in that range used to be put back as the original wording.
+
 ## 0.3.7 — 2026-11-17
 
 ### Changed

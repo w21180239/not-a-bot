@@ -68,7 +68,7 @@ const GROUPS: &[(&str, &[&str])] = &[
 
 /// Longest rewrite, as a multiple of the original word count (plus slack),
 /// before it counts as invented content; and the shortest, as a fraction.
-const MAX_GROWTH: f64 = 1.35;
+const MAX_GROWTH: f64 = 1.6;
 const MIN_KEEP: f64 = 0.5;
 
 /// Whether `text` can be checked as English: plain ASCII letters and, past a few
