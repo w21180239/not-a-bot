@@ -2,6 +2,16 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.3.7 — 2026-11-17
+
+### Changed
+
+- When a paragraph of the rewrite has a different number of sentences from the original (sentences merged or split), the drift guard aligns sentence groups and puts back only the groups that drifted. It used to put back the whole original paragraph.
+
+### Fixed
+
+- When the Claude Code or OpenCode CLI writes a draft, second-guesses it and restarts after a line such as "Here's the correct output:", only the text after that line is kept. The line is left alone when the prompt itself contains it.
+
 ## 0.3.6 — 2026-11-17
 
 ### Changed
