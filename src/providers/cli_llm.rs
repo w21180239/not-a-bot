@@ -90,7 +90,7 @@ pub fn register_clause(req: &TranslateRequest) -> String {
             language_label(&req.target_lang)
         ),
         "formal" => format!(
-            "Register: the source is formal ({seen}). Keep it formal and precise: complete sentences, its terminology, its salutation and sign-off. Add no contractions, slang, fillers or chatty asides."
+            "Register: the source is formal ({seen}). Keep it formal and precise: complete sentences, its terminology, its salutation and sign-off. Contractions are fine; add no slang, fillers or chatty asides."
         ),
         _ => "Register: match the source's register and voice, whatever it is; a technical text stays technical, a formal one formal, a casual one casual. Remove only machine-flavoured phrasing and never tidy, polish, formalise or casualise the rest.".to_string(),
     }
@@ -153,7 +153,7 @@ fn fix_register_clause(req: &TranslateRequest) -> String {
     let seen = markers.join("; ");
     let drift = match class {
         "casual" => format!("The ORIGINAL is casual, spoken or dictated text (markers: {seen}). The REWRITE may have tidied it: a capitalised sentence start the ORIGINAL keeps lowercase, a full stop the ORIGINAL leaves off, a dropped filler, hedge, self-correction, false start or laugh ('hey', 'oh actually no', 'like ... I mean', 'haha'), expanded contractions, a question or request turned into an imperative."),
-        "formal" => format!("The ORIGINAL is formal (markers: {seen}). The REWRITE may have turned chatty: contractions, slang, fillers, fragments, a lost salutation or sign-off."),
+        "formal" => format!("The ORIGINAL is formal (markers: {seen}). The REWRITE may have turned chatty: slang, fillers, fragments, a lost salutation or sign-off."),
         _ => "The REWRITE may have changed the ORIGINAL's register: casual text made polished, formal text made chatty, technical text made loose.".to_string(),
     };
     format!(
@@ -478,7 +478,7 @@ First compare the text with the original. Wherever meaning was lost, changed or 
         ),
         "humanize" if voice_back(req) => format!(
             "Translate the text below from {source} into {target} the way one particular person would write it up in their own words, for people they know. Avoid the most predictable word or phrase at each point: where an AI would write 'significant', 'crucial', 'ensure', 'foster', 'enhance', 'seamless', 'landscape', 'navigate' or 'robust', pick the plainer or more idiomatic thing a person actually says.{} Let the rhythm be uneven: a short sentence, then a long one that runs on a bit, a fragment now and then. Prefer concrete verbs and idioms over abstract nouns. Do not make every paragraph the same shape, and do not end paragraphs on a neat summarising line. Hard rules: keep every claim, caveat, condition, negation, fact, term, name, number and date and the order of the argument; copy names, IDs, paths, URLs, code spans, placeholders and markup exactly; add no new fact, example or opinion; keep the certainty. Output only the {target} text, with no preamble or notes.",
-            if register_of(req).0 == "formal" { "" } else { " Use contractions." }
+            if register_of(req).0 == "formal" { " Contractions are fine." } else { " Use contractions." }
         ),
         "humanize" if not_casual(req) => format!(
             "Translate the text below from {source} into {target}, and while translating rewrite it the way a capable person writes to one reader, not the way an AI writes. Fix the shape, not just the words: state claims directly instead of 'not just X, it's Y' or 'X, not Y' foils nobody raised; drop filler openers ('In today's...', 'When it comes to', 'It's worth noting'), signpost closers and summary lines, run-ups ('Here's the thing'), deep-sounding sayings ('At its core'), inflated significance and promotional adjectives, and reflexive lists of three. Use plain words and varied sentence length. Delete sentences that only express feelings or pledges (thanks for patience or hard work, excitement, pride, 'we remain committed', 'we look forward') and closing pleasantries. Before deleting one, move any name, place, number, date or amount in it into a sentence you keep. Hard rules: keep every fact, name, number, date, currency, ID, path, URL and code span exactly as written (copy names letter for letter, do not translate or respell them); keep placeholders and markup untouched; add nothing that is not in the text; keep the meaning and certainty. Output only the rewritten {target} text, with no preamble or notes."
