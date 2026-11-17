@@ -240,6 +240,7 @@ impl CliLlm {
 
     async fn run(&self, bin: &Path, prompt: String, timeout_ms: u64) -> Result<String> {
         use crate::process::{run_with_input, RunError};
+        let asked = prompt.clone();
         let output = match run_with_input(self.command(bin), prompt, timeout_ms).await {
             Ok(out) => out,
             Err(RunError::Spawn(e)) => {
@@ -280,7 +281,7 @@ impl CliLlm {
                 Err(message) => return Err(classify_failure(self.name(), &message)),
             },
         };
-        let text = strip_meta_line(&text);
+        let text = strip_restart(&strip_meta_line(&text), &asked);
         if text.is_empty() {
             return Err(Error::BadResponse {
                 provider: self.name().into(),
@@ -541,6 +542,29 @@ pub fn strip_meta_line(text: &str) -> String {
         rest.trim().to_string()
     } else {
         text.to_string()
+    }
+}
+
+/// Drop a false start: everything up to a mid-text "Here's the correct output:" line
+/// the model writes after second-guessing a draft. Kept when the prompt has that line.
+pub fn strip_restart(text: &str, prompt: &str) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let cut = lines.iter().enumerate().skip(1).rev().find(|(_, l)| {
+        let t = l.trim();
+        let lower = t.to_lowercase();
+        let last = lower.rsplit(". ").next().unwrap_or(&lower);
+        t.ends_with(':')
+            && (last.starts_with("here's the") || last.starts_with("here is the"))
+            && ["output", "version", "text", "rewrite", "translation"]
+                .iter()
+                .any(|w| last.contains(w))
+            && !prompt.contains(t)
+    });
+    match cut {
+        Some((i, _)) if lines[i + 1..].iter().any(|l| !l.trim().is_empty()) => {
+            lines[i + 1..].join("\n").trim().to_string()
+        }
+        _ => text.to_string(),
     }
 }
 
@@ -912,6 +936,15 @@ Aroha owes NZD 18,900.
             "Steps:\n1. one",
             "only meta openers go"
         );
+    }
+
+    #[test]
+    fn false_start_before_corrected_output_is_dropped() {
+        let out = "Draft with an invented VPN claim.\n\nWait, I shouldn't add anything. Here's the correct output:\n\nReal text.";
+        assert_eq!(strip_restart(out, "src"), "Real text.");
+        let doc = "Run it.\nHere is the output:\nok";
+        assert_eq!(strip_restart(doc, "Run it.\nHere is the output:\nok"), doc);
+        assert_eq!(strip_restart("a\nb", "p"), "a\nb");
     }
 
     #[test]
