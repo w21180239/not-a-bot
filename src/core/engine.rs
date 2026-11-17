@@ -430,6 +430,16 @@ impl Engine {
                     metadata.insert(MISSING_KEY.into(), serde_json::json!(missing));
                     let terms = crate::core::drift::lost_terms(&req.text, &text);
                     metadata.insert(TERMS_KEY.into(), serde_json::json!(terms));
+                    let mut tells: Vec<String> = crate::core::lint::lint(&text, None)
+                        .response
+                        .tells
+                        .into_iter()
+                        .filter(|t| !matches!(t.kind.as_str(), "us-spelling" | "bold-label-bullet" | "horizontal-rule" | "introduced-script"))
+                        .map(|t| t.matched)
+                        .collect();
+                    tells.sort();
+                    tells.dedup();
+                    metadata.insert(crate::providers::cli_llm::TELLS_KEY.into(), serde_json::json!(tells));
                 }
                 if let (false, Some((input, output))) = (fix, &llm_history) {
                     metadata.insert(

@@ -34,6 +34,8 @@ pub const OPENING_KEY: &str = "not-a-bot.opening";
 /// JSON object `{passages, reasons}` (fix hops): ORIGINAL passages the drift
 /// guard would put back, and why, so the repair can fix the rewrite instead.
 pub const DRIFT_KEY: &str = "not-a-bot.drift";
+/// JSON array of AI-tell spans `nab lint` still finds in the text to repair (fix hops).
+pub const TELLS_KEY: &str = "not-a-bot.tells";
 /// JSON array of spans the output must carry verbatim (`--preserve` matches,
 /// sent unmasked because LLMs mangle opaque placeholders).
 pub const PRESERVE_KEY: &str = "not-a-bot.preserve";
@@ -145,6 +147,23 @@ fn fix_hints(req: &TranslateRequest) -> String {
         ));
     }
     out
+}
+
+/// Lint pass of the repair brief: rephrase AI tells the rewrite kept.
+fn tells_clause(req: &TranslateRequest) -> String {
+    let tells: Vec<&str> = req
+        .metadata
+        .get(TELLS_KEY)
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+        .unwrap_or_default();
+    if tells.is_empty() {
+        return String::new();
+    }
+    format!(
+        "- A style check found these machine-flavoured spans in the REWRITE: {}. Rephrase each in plain words a person would use, with the smallest edit that keeps its meaning (a word swap, or a staged contrast stated directly); skip one that is a domain term, name or quoted text of the ORIGINAL.\n",
+        tells.iter().map(|t| format!("\"{t}\"")).collect::<Vec<_>>().join(", ")
+    )
 }
 
 /// Register pass of the repair brief: restore voice markers the rewrite lost.
@@ -399,6 +418,7 @@ pub fn build_prompt(req: &TranslateRequest) -> Result<String> {
             )
         };
         let drift = drift_clause(req);
+        let drift = format!("{drift}{}", tells_clause(req));
         let register = if not_casual(req) {
             String::new()
         } else {
@@ -759,6 +779,17 @@ Ask Aroha.
             .insert(MISSING_KEY.into(), serde_json::json!(["$24.95", "2"]));
         let p = build_prompt(&r).unwrap();
         assert!(p.contains("absent from the REWRITE: $24.95, 2. Restore each exactly as written"));
+    }
+
+    #[test]
+    fn fix_style_lists_lint_tells_only_when_given() {
+        let r = with(req(Some("fix"), None), ORIGINAL_KEY, "Pay by 2 May.");
+        assert!(!build_prompt(&r).unwrap().contains("A style check found"));
+        let mut r = r;
+        r.metadata
+            .insert(TELLS_KEY.into(), serde_json::json!(["crucial", "not just"]));
+        let p = build_prompt(&r).unwrap();
+        assert!(p.contains("spans in the REWRITE: \"crucial\", \"not just\". Rephrase each"));
     }
 
     #[test]
