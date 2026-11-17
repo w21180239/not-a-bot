@@ -413,7 +413,7 @@ pub fn build_prompt(req: &TranslateRequest) -> Result<String> {
             // Plain fix brief for non-casual sources.
             return Ok(format!(
                 "Below are an ORIGINAL text and a REWRITE of it in {target}. The rewrite deliberately changed wording and structure and cut sentences that only express feelings, pledges or pleasantries; that is correct, do not undo it. \
-                 Find every place where the REWRITE's meaning differs from the ORIGINAL: a missing or altered name, place, product, number, date, amount, currency, ID, version, path or code span; a flipped negation; a lost or added qualifier or certainty; a changed actor, cause or order (who did what to whom, and why); a dropped or invented claim. \
+                 Find every place where the REWRITE's meaning differs from the ORIGINAL: a missing or altered name, place, product, number, date, amount, currency, ID, version, path or code span; a flipped negation; a lost or added qualifier or certainty; a changed actor, cause or order (who did what to whom, and why); a dropped or invented claim. Check the ORIGINAL paragraph by paragraph: every claim, reason, example, credit, duration and condition in it must still be in the REWRITE; a dropped one is the most common error, so restore it as a short clause in the REWRITE's style. \
                  List the smallest repairs that restore that meaning, as ONLY a JSON array with no prose and no code fence:\n\
                  [{{\"from\": \"<exact substring of REWRITE>\", \"to\": \"<replacement>\", \"why\": \"<few words>\"}}]\n\
                  Output [] when the meaning already matches.\n\
