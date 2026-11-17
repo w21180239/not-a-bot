@@ -710,7 +710,38 @@ pub fn guard(original: &str, text: &str) -> (String, Vec<String>) {
     GUARD_DOC.with(|d| *d.borrow_mut() = original.to_string());
     let (out, warnings) = guard_inner(original, text);
     GUARD_DOC.with(|d| d.borrow_mut().clear());
-    (out, warnings)
+    (drop_repeats(original, &out), warnings)
+}
+
+/// Drops a sentence the output repeats more often than the original from a
+/// rewrite paragraph, when an original paragraph put back whole also holds it:
+/// the put-back restores a lead-in the rewrite had moved into its neighbour.
+fn drop_repeats(original: &str, out: &str) -> String {
+    let originals: std::collections::HashSet<&str> =
+        original.split("\n\n").map(str::trim).collect();
+    let mut paras: Vec<String> = out.split("\n\n").map(String::from).collect();
+    for i in 0..paras.len() {
+        if originals.contains(paras[i].trim()) {
+            continue;
+        }
+        let mut kept = String::new();
+        for s in sentences(&paras[i].clone()) {
+            let key = s.trim();
+            let doc = paras.join("\n\n");
+            let repeated = word_count(key) >= 4
+                && doc.matches(key).count() > original.matches(key).count()
+                && paras
+                    .iter()
+                    .enumerate()
+                    .any(|(j, p)| j != i && originals.contains(p.trim()) && p.contains(key));
+            if !repeated {
+                kept.push_str(s);
+            }
+        }
+        paras[i] = kept.trim_end().to_string();
+    }
+    paras.retain(|p| !p.trim().is_empty());
+    format!("{}{}", paras.join("\n\n").trim_end(), trailing_space(out))
 }
 
 fn guard_inner(original: &str, text: &str) -> (String, Vec<String>) {
@@ -1194,5 +1225,19 @@ mod tests {
         assert!(w.is_empty(), "{w:?} {out}");
         let (_, w) = guard("Book the Sonata room.", "Book the big room.");
         assert!(!w.is_empty());
+    }
+
+    #[test]
+    fn put_back_lead_in_is_not_repeated_in_the_rewrite_paragraph() {
+        let original =
+            "Intro line here.\n\nTo move forward, we would need:\n- **A:** one\n- **B:** two";
+        let out = "Intro line here. To move forward, we would need:\n\nTo move forward, we would need:\n- **A:** one\n- **B:** two";
+        assert_eq!(
+            drop_repeats(original, out),
+            "Intro line here.\n\nTo move forward, we would need:\n- **A:** one\n- **B:** two"
+        );
+        // A repeat the original also has stays.
+        let original = "Check the log again now.\n\nCheck the log again now.";
+        assert_eq!(drop_repeats(original, original), original);
     }
 }
