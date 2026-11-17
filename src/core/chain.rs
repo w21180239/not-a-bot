@@ -211,7 +211,8 @@ fn expand_preset(
         to,
     };
     let lang = |code: &str| Target::Lang(code.to_string());
-    let out = if is_chinese(source) { "en" } else { "zh" };
+    let exp_pivot = std::env::var("NAB_EXP_PIVOT").ok();
+    let out = if is_chinese(source) { "en" } else { exp_pivot.as_deref().unwrap_or("zh") };
     // Every preset ends with a minimal meaning repair against the original.
     let fix = hop(&llm, Target::Fix);
     if PRESETS.contains(&name.as_str()) && !is_llm(&llm) {
