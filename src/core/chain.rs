@@ -227,6 +227,14 @@ fn expand_preset(
             hop(&llm, Target::Source),
             fix,
         ],
+        // Experiment: a second round trip before the fix hop.
+        "standard" if std::env::var("NAB_EXP_TWICE").is_ok() => vec![
+            hop(&llm, lang(out)),
+            hop(&llm, Target::Source),
+            hop(&llm, lang(out)),
+            hop(&llm, Target::Source),
+            fix,
+        ],
         "standard" => vec![hop(&llm, lang(out)), hop(&llm, Target::Source), fix],
         other => {
             return Err(Error::InvalidInput(format!(
