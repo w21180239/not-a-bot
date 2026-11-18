@@ -171,6 +171,22 @@ Mean P(AI) from `desklib/ai-text-detector-v1.01`, lower is more human. Three set
 
 `standard` and `light` overlap within the run-to-run range on every set. `strong` is lower on all three, with the largest gap on corpus30 and a small one on hb40.
 
+### From 0.3.0 to 0.4.0
+
+Between 0.3.0 and 0.4.0 about 60 candidates ran on these three sets, each changing one thing and each checked against a same-day baseline, a held-out detector and a meaning review. The ones that lowered scores without adding meaning errors shipped as 0.3.1 to 0.3.9 and as the 0.4.0 presets. Means over repeat runs (2 to 4 per row):
+
+| Version | desklib corpus30 | desklib hb40 | desklib aeslc30 | held-out corpus30 | held-out hb40 | held-out aeslc30 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0.3.0 `standard` | 0.985 | 0.998 | 0.319 | - | - | - |
+| 0.3.8 `standard` | - | 0.88 | - | 0.573 | 0.681 | 0.127 |
+| 0.3.9 `standard` (now `light`) | 0.536 | 0.882 | 0.241 | - | - | - |
+| 0.4.0 `standard` | **0.509** | **0.877** | **0.208** | **0.504** | **0.672** | **0.064** |
+| 0.4.0 `strong` | **0.387** | **0.831** | **0.160** | **0.467** | **0.651** | **0.054** |
+
+Against 0.3.0 on desklib, `standard` is 48% lower on corpus30, 35% lower on aeslc30 and 12% lower on hb40; `strong` is 61%, 50% and 17% lower. The held-out detector (`SuperAnnotate/ai-detector`, never used to pick outputs) moves the same way for `standard`, which is why its gain is not tuned to desklib. Core facts lost outside pleasantry sentences: 0 on every set for both presets.
+
+0.3.0 scored close to the untouched source because its drift guard put whole original paragraphs back whenever a capitalised word seemed missing. Most of the 0.3.x gain comes from narrowing that guard: sentence-start verbs and positional capitals stopped counting as lost names, and it restores only the sentence group that drifted. 0.4.0 adds the second round trip, sentence reordering within a paragraph, and a paragraph-by-paragraph check for dropped claims in the fix hop.
+
 What this does not show:
 
 - It is one detector. Detectors disagree with each other and change between versions, and no tool makes text reliably undetectable. A score under 0.5 on this detector says nothing about another.
