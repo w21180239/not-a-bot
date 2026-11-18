@@ -227,14 +227,15 @@ fn expand_preset(
             hop(&llm, Target::Source),
             fix,
         ],
-        // Experiment: a second round trip before the fix hop.
-        "standard" if std::env::var("NAB_EXP_TWICE").is_ok() => vec![
-            hop(&llm, lang(out)),
-            hop(&llm, Target::Source),
-            hop(&llm, lang(out)),
-            hop(&llm, Target::Source),
-            fix,
-        ],
+        // Experiment: NAB_EXP_TWICE=<n> round trips before the fix hop (set but not a number: 2).
+        "standard" if std::env::var("NAB_EXP_TWICE").is_ok() => {
+            let n: usize = std::env::var("NAB_EXP_TWICE").ok().and_then(|v| v.parse().ok()).unwrap_or(2);
+            let mut v: Vec<HopSpec> = (0..n)
+                .flat_map(|_| [hop(&llm, lang(out)), hop(&llm, Target::Source)])
+                .collect();
+            v.push(fix);
+            v
+        }
         "standard" => vec![hop(&llm, lang(out)), hop(&llm, Target::Source), fix],
         other => {
             return Err(Error::InvalidInput(format!(
