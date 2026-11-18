@@ -46,7 +46,9 @@ not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:
 | `-s, --from` | `auto` | Source language |
 | `--pivot` | `auto` | Bridge language |
 | `--chain` | — | Hops `[engine:]lang`, comma-separated; a final hop back to the source is appended when missing; `<llm>:fix` repairs meaning against the original with small span edits |
-| `--preset` | config `rewrite_preset` (`standard`) | `light` (Google out, fix, one LLM rewrite back, fix), `standard` (LLM out, free LLM back, fix); every preset ends with a fix hop and needs an LLM `rewrite_llm`, else `INVALID_INPUT` |
+| `--preset` | config `rewrite_preset` (`standard`) | `light` (LLM out, free LLM back, fix; 3 LLM calls), `standard` (two such round trips, then fix; 5 calls), `strong` (the `standard` chain best-of-5 by a scorer, up to 25 calls; needs `--scorer` or `rewrite_scorer`, else `INVALID_INPUT`); every preset ends with a fix hop and needs an LLM `rewrite_llm`, else `INVALID_INPUT` |
+| `--scorer` | config `rewrite_scorer` | Detector command: text on stdin, score 0-1 (higher = more AI-like) on the last stdout line. Required by `strong`; the repo ships `benches/detector/scorer-e5raid.sh` (`.cmd` on Windows) |
+| `--best-of` | 1 (5 for `strong`) | Run the chain N times (1-5) and keep the best run; above 1 needs a scorer |
 | `--depth` | — | 1-3 machine-translation hops through zh, ja, fi (Chinese sources: en, ja, fi) |
 | `-p, --provider` | `auto` | Pin one provider for both hops |
 | `--fallback` | empty | Providers tried after the pinned one |

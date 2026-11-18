@@ -57,7 +57,7 @@ de     Our comprehensive solution leverages cutting-edge technology to empower
 | 非中文 | `zh` | 改写强度与日文相当，且所有 Provider 都支持（含只做中文对的） |
 | 中文（`zh`、`zh-TW`、`yue`） | `en` | 同一规则的镜像 |
 
-`auto` 就是这张表。它是 `light` 预设的第一跳，也是 `--pivot` 的唯一一跳；`--depth` 在它之后再加 ja 和 fi。
+`auto` 就是这张表。它决定所有预设的出去语言，也是 `--pivot` 的唯一一跳；`--depth` 在它之后再加 ja 和 fi。
 
 **日文是文档给出的备选。** 它改写略多、保留的语法结构更多，因此更适合技术类英文——以中文为中转会丢掉冠词和单复数：
 
@@ -101,7 +101,7 @@ rewrite_pivot = "zh"
 python benches/rewrite-depth/measure.py --bin target/release/not-a-bot.exe --out out --configs light,standard-opencode
 ```
 
-结果（2026-11-11 运行；每种配置 10 段文本，只跑一次；预设名为当次运行时的名称）：
+结果（2026-11-11 运行；每种配置 10 段文本，只跑一次；预设名为 0.4.0 之前当次运行时的名称，与现在的预设不同）：
 
 | 配置 | 重合度 | 剩余 AI 腔（共 10） | 丢失事实 | 延迟 |
 | --- | --- | --- | --- | --- |
@@ -119,7 +119,7 @@ python benches/rewrite-depth/measure.py --bin target/release/not-a-bot.exe --out
 - 第三跳机器翻译丢的事实（8 对 5）比多改写的部分（重合度 0.480 对 0.520）更多。所以默认从一跳改成两跳，三跳仍可用 `--depth 3`。
 - LLM 跳去掉了结构性 AI 腔，在这批语料上事实全部保留。
 - 放在 LLM 跳之后的机器翻译跳可能把对比句式带回来：芬兰语 "ei ainoastaan ... vaan myös" 回成 "not only ... but also"。所以没有修复跳的同一条链在部分运行里仍剩一处。
-- 修复跳把这条链的事实丢失从 3 到 5 个降到 1 个，并保留了大部分改写（重合度 0.369 和 0.396，没有修复跳时是 0.292 和 0.307）。这条带修复跳的链是早先的 `strong`，已被移除。现在的 `standard` 是 LLM 出去、LLM 自由回来、再一跳语义修复；`light` 是 Google 出去、一跳修复、一次 LLM 改写回来、最后再一跳修复。
+- 修复跳把这条链的事实丢失从 3 到 5 个降到 1 个，并保留了大部分改写（重合度 0.369 和 0.396，没有修复跳时是 0.292 和 0.307）。这条带修复跳的链是早先的 `strong`，与 0.4.0 的 `strong`（`standard` 的链在打分器下跑 best-of-5）不是同一个预设。0.4.0 之前的 `standard` 是 LLM 出去、LLM 自由回来、再一跳语义修复，也就是 0.4.0 的 `light`；旧的 `light`（Google 出去、一跳修复、一次 LLM 改写回来、最后再一跳修复）在 0.4.0 中已移除。见 [0.4.0 预设表](02-chains-presets-and-llm.md#预设)。
 
 局限：每种配置只有 10 段文本、只跑一次，样本很小；AI 腔清单和事实检查都是启发式；重合度奖励的是"改得多"，不是"改得好"；这里没有测任何 AI 检测器，也不能把任何结果读成"检测不出"。
 

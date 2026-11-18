@@ -2,6 +2,26 @@
 
 Documentation history. Application changes are recorded here as well while the project is pre-1.0.
 
+## 0.4.0 — 2026-11-19
+
+### Changed (breaking)
+
+- The old `light` preset (Google machine translation out, a fix hop, one LLM rewrite back, a final fix hop; chain `["zh","fix","en","fix"]`) is removed, with no alias. The name `light` now means the former `standard` chain: LLM out, LLM back rewriting freely, fix (chain `["zh","en","fix"]`, 3 LLM calls). Anyone with `--preset light` or `rewrite_preset = "light"` now gets that chain.
+- `standard` (still the default) is now two round trips and a fix hop: LLM out, LLM back, LLM out, LLM back, fix (chain `["zh","en","zh","en","fix"]`, 5 LLM calls, about 1.7x the cost of the new `light`). Anyone on `standard` now gets this chain at that cost.
+- No preset uses machine translation any more. All three presets need an LLM `rewrite_llm`, end in the fix hop, and none of their return hops sees the original; only the fix hops do. `nab translate` is unchanged.
+- The default `rewrite_ladder` stays `["light", "standard"]`.
+
+### Added
+
+- Preset `strong`: the `standard` chain run best-of-5, keeping the lowest-scoring run (fact loss first, then score). `bestOf` defaults to 5 when the request sets none; an explicit `--best-of` overrides it. It needs a scorer (`--scorer` or config `rewrite_scorer`) and fails with `INVALID_INPUT` before running anything when none is set. About 8.5x the cost of `light`, up to 25 LLM calls.
+- Scorer scripts `benches/detector/scorer-e5raid.sh` and `scorer-e5raid.cmd`: a stdin scorer that uses the e5-small RAID detector `MayZhou/e5-small-lora-ai-generated-detector` through `benches/detector/holdout.py --model e5raid --stdin`, in the same venv as the desklib `scorer.sh`. Example: `nab rewrite --from en --preset strong --scorer benches/detector/scorer-e5raid.sh < draft.md`.
+- Measurements with desklib `desklib/ai-text-detector-v1.01` (mean P(AI), lower is more human; corpus30 / hb40 / aeslc30): `light` ~0.54 / ~0.88 / ~0.24; `standard` 0.48-0.54 / 0.86-0.89 / 0.18-0.24; `strong` 0.37-0.41 / 0.80-0.86 / 0.15-0.17. `strong` used the e5raid scorer as its selector, so desklib was held out. `strong` is detector-targeted: the gains are mostly against the selecting detector, a second held-out detector moves much less, and meaning errors are somewhat higher.
+
+### Changed
+
+- The return hop may reorder sentences within a paragraph. It used to keep the argument order.
+- The fix hop checks the original paragraph by paragraph for dropped claims.
+
 ## 0.3.9 — 2026-11-17
 
 ### Fixed

@@ -49,7 +49,7 @@ pub struct Settings {
     /// Default pivot for `rewrite` when the request says `auto`.
     pub rewrite_pivot: Option<String>,
     /// Default `rewrite` preset when the request names no chain, preset,
-    /// depth or pivot (`light`, `standard`).
+    /// depth or pivot (`light`, `standard`, `strong`).
     pub rewrite_preset: Option<String>,
     /// Engine behind the LLM hops and repairs of the presets.
     pub rewrite_llm: Option<String>,
@@ -226,7 +226,7 @@ pub const CONFIG_TEMPLATE: &str = r#"# not-a-bot config
 # retries = 2
 # race_width = 3   # provider attempts in flight; 1 is strictly sequential
 # rewrite_pivot = "zh"   # "auto" picks zh for non-Chinese text, en for Chinese
-# rewrite_preset = "standard"  # light (machine out + repair, LLM back) | standard (LLM out, LLM back rewriting freely); both end in an LLM meaning repair
+# rewrite_preset = "standard"  # light (one LLM round trip) | standard (two) | strong (standard, best of 5; needs rewrite_scorer); all end in an LLM meaning repair| standard (LLM out, LLM back rewriting freely); both end in an LLM meaning repair
 # rewrite_llm = "opencode-cli"   # engine for preset LLM hops and the repair: opencode-cli | claude-cli
 # rewrite_scorer = "python score.py"   # detector: text on stdin, score 0-1 on the last stdout line
 # rewrite_ladder = ["light", "standard"]   # presets tried when --target-score is not met

@@ -43,7 +43,7 @@ The three stock words are gone, and so is the closing pledge, which says nothing
 
 <table>
 <tr>
-<td align="center" width="25%"><a href="#measured-results"><b>0.999 → 0.36</b><br/><sub>mean detector score, 30 texts</sub></a></td>
+<td align="center" width="25%"><a href="#from-030-to-040"><b>0.985 → 0.39</b><br/><sub>mean detector score, 30 texts, <code>strong</code> vs 0.3.0</sub></a></td>
 <td align="center" width="25%"><a href="#measured-results"><b>98%</b><br/><sub>of texts with no major meaning error</sub></a></td>
 <td align="center" width="25%"><a href="#lint-offline-and-deterministic"><b>0</b><br/><sub>network calls for <code>nab lint</code></sub></a></td>
 <td align="center" width="25%"><a href="#install"><b>1</b><br/><sub>binary, no runtime</sub></a></td>
@@ -82,8 +82,11 @@ Paths for each agent are in [integrations/README.md](./integrations/README.md).
 # Rewrite a draft (default preset: standard)
 nab rewrite --from en --preserve @code < draft.md
 
-# Lightest rewrite, highest fidelity
+# Cheapest rewrite: one round trip (3 LLM calls)
 nab rewrite --from en --preset light < draft.md
+
+# Lowest detector score: best of 5 standard runs, picked by a scorer (needs one)
+nab rewrite --from en --preset strong --scorer benches/detector/scorer-e5raid.sh < draft.md
 
 # Check a rewrite against its source; exit 1 on any tell or lost fact
 nab lint rewrite.md --source draft.md --strict
@@ -106,28 +109,35 @@ for f in $(git diff --cached --name-only -- '*.md'); do nab lint "$f" --strict |
 
 | Preset | What runs | Use it for |
 | --- | --- | --- |
-| `standard` (default) | LLM out to another language, LLM back rewriting freely (it does not see the original), then a minimal meaning-repair hop | Most text. Lowest detector score. |
-| `light` | Google machine translation out, a repair hop, one LLM rewrite back, then a final repair hop | The lightest rewrite and the highest fidelity. |
+| `light` | One round trip: LLM out to another language, LLM back rewriting freely, then a minimal meaning-repair hop. 3 LLM calls. | Short or low-stakes text, and the lowest cost. |
+| `standard` (default) | Two round trips: LLM out, LLM back, LLM out, LLM back, then the repair hop. 5 LLM calls, about 1.7x the cost of `light`. | Most text. |
+| `strong` | The `standard` chain run best-of-5, keeping the lowest-scoring run. Up to 25 LLM calls, about 8.5x the cost of `light`. Needs a scorer (`--scorer` or config `rewrite_scorer`), else it fails with `INVALID_INPUT` before running anything. | Text where the detector score matters most and you can run a scorer. |
 
-Both presets need an LLM (`rewrite_llm`, default `opencode-cli`, or `claude-cli`) and make several LLM calls, tens of seconds in total. In `light` only one call is a full rewrite; the two repair hops return short edit lists.
+All three presets need an LLM (`rewrite_llm`, default `opencode-cli`, or `claude-cli`) and make several LLM calls, tens of seconds to minutes in total. No return hop sees the original; only the repair hops do. No preset uses machine translation. `--best-of` overrides the default of 5 for `strong`.
+
+`strong` selects by a detector, so its gains are mostly against that detector. A second, held-out detector moves much less, and meaning errors are somewhat higher. The repo ships `benches/detector/scorer-e5raid.sh` and `scorer-e5raid.cmd`: a stdin scorer built on the e5-small RAID detector `MayZhou/e5-small-lora-ai-generated-detector`, using the same venv as the desklib `scorer.sh`. Presets before 0.4.0 differed: see the [changelog](./docs/en/CHANGELOG.md).
 
 Pass `--preserve @code` and `--preserve @url` to keep code spans and links verbatim. Do not round-trip legal text, API reference or numbers a reader will check line by line.
 
 ## How it works
 
-Translating into another language and back forces the sentences to be rebuilt, so the stock phrasing of generated text does not return unchanged. In `standard` both hops are LLM calls told to rewrite like a person. They also cut sentences that only express feelings, pledges or pleasantries, which is where much of a draft's AI voice sits.
+Translating into another language and back forces the sentences to be rebuilt, so the stock phrasing of generated text does not return unchanged. `standard` makes two round trips, so every hop is an LLM call told to rewrite like a person. The return hops do not see the original and may reorder sentences within a paragraph. They also cut sentences that only express feelings, pledges or pleasantries, which is where much of a draft's AI voice sits.
 
 ```mermaid
 flowchart LR
     A[AI-style draft] --> B[LLM hop: rewrite into zh]
     B --> C[LLM hop: rewrite back into en]
-    C --> D[Fix hop: minimal meaning repair against the draft]
+    C --> C2[LLM hop: rewrite into zh again]
+    C2 --> C3[LLM hop: rewrite back into en again]
+    C3 --> D[Fix hop: minimal meaning repair against the draft]
     D --> E{Fact check against the draft}
     E -->|all present| F[Result]
     E -->|tokens missing| G[Reported in missingFacts]
 ```
 
-Every preset ends with a fix hop: an LLM that sees the original and returns small JSON span edits restoring meaning that earlier hops lost or changed (names, numbers, dates, amounts, IDs, code spans, flipped negations, changed qualifiers or certainty, changed actor, cause or order, dropped or invented claims). Fact edits always apply; other edits share one copy-back budget. It never restores deliberately cut feeling, pledge or pleasantry sentences, and never moves wording back toward the original. It also receives the fact check's list of missing tokens.
+`light` skips the second round trip. `strong` runs the whole chain five times and keeps the run the scorer rates lowest.
+
+Every preset ends with a fix hop: an LLM that sees the original and returns small JSON span edits restoring meaning that earlier hops lost or changed (names, numbers, dates, amounts, IDs, code spans, flipped negations, changed qualifiers or certainty, changed actor, cause or order, dropped or invented claims). It checks the original paragraph by paragraph for dropped claims. Fact edits always apply; other edits share one copy-back budget. It never restores deliberately cut feeling, pledge or pleasantry sentences, and never moves wording back toward the original. It also receives the fact check's list of missing tokens.
 
 The fact check compares names, numbers, versions, paths, IDs and code spans with the source. Whatever is still missing at the end comes back in `missingFacts`, so a lost fact is reported rather than shipped silently.
 
@@ -142,18 +152,46 @@ The fact check compares names, numbers, versions, paths, IDs and code spans with
 | Configuration | Mean P(AI) | Fact loss (of 30) | No major meaning error |
 | --- | --- | --- | --- |
 | Source texts | 0.999 | n/a | n/a |
-| `standard` (LLM out, free LLM back, fix) | 0.364 | 0.5 | 98% |
-| `light` (Google out, fix, LLM back, fix) | 0.489 | 0 | 97% |
+| `light` (LLM out, free LLM back, fix; `standard` before 0.4.0) | 0.364 | 0.5 | 98% |
+| Google out, fix, LLM back, fix (`light` before 0.4.0, removed) | 0.489 | 0 | 97% |
 | Google out, LLM back, one final fix | 0.515 | 0 | 87% |
 | 2 machine-translation hops and a final fix | 0.930 | 5.0 | 80% |
 
-Machine translation changes words but keeps sentence structure, so machine-only chains stay near the source score even with repairs; the score drop comes from the LLM rewrite hop. No chain that costs more than `standard` scored lower. Method, the full table and failed experiments: [benches/prompt-lab](./benches/prompt-lab/README.md). A second bench on 8 texts is in [benches/rewrite-depth](./benches/rewrite-depth/README.md).
+Machine translation changes words but keeps sentence structure, so machine-only chains stay near the source score even with repairs; the score drop comes from the LLM rewrite hop. In this run no chain that cost more than the LLM-out, LLM-back, fix chain scored lower; the 0.4.0 presets below test that again. Method, the full table and failed experiments: [benches/prompt-lab](./benches/prompt-lab/README.md). A second bench on 8 texts is in [benches/rewrite-depth](./benches/rewrite-depth/README.md).
+
+### The 0.4.0 presets
+
+Mean P(AI) from `desklib/ai-text-detector-v1.01`, lower is more human. Three sets: corpus30 is the 30 `benches/prompt-lab` texts, hb40 is 40 AI-written workplace texts, aeslc30 is 30 human-written Enron emails. Ranges are across repeat runs. `strong` used the e5raid scorer as its selector, so desklib is a held-out detector for it.
+
+| Preset | corpus30 | hb40 | aeslc30 | Relative cost |
+| --- | --- | --- | --- | --- |
+| `light` | ~0.54 | ~0.88 | ~0.24 | 1x |
+| `standard` | 0.48-0.54 | 0.86-0.89 | 0.18-0.24 | ~1.7x |
+| `strong` | 0.37-0.41 | 0.80-0.86 | 0.15-0.17 | ~8.5x |
+
+`standard` and `light` overlap within the run-to-run range on every set. `strong` is lower on all three, with the largest gap on corpus30 and a small one on hb40.
+
+### From 0.3.0 to 0.4.0
+
+Between 0.3.0 and 0.4.0 about 60 candidates ran on these three sets, each changing one thing and each checked against a same-day baseline, a held-out detector and a meaning review. The ones that lowered scores without adding meaning errors shipped as 0.3.1 to 0.3.9 and as the 0.4.0 presets. Means over repeat runs (2 to 4 per row):
+
+| Version | desklib corpus30 | desklib hb40 | desklib aeslc30 | held-out corpus30 | held-out hb40 | held-out aeslc30 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0.3.0 `standard` | 0.985 | 0.998 | 0.319 | - | - | - |
+| 0.3.8 `standard` | - | 0.88 | - | 0.573 | 0.681 | 0.127 |
+| 0.3.9 `standard` (now `light`) | 0.536 | 0.882 | 0.241 | - | - | - |
+| 0.4.0 `standard` | **0.509** | **0.877** | **0.208** | **0.504** | **0.672** | **0.064** |
+| 0.4.0 `strong` | **0.387** | **0.831** | **0.160** | **0.467** | **0.651** | **0.054** |
+
+Against 0.3.0 on desklib, `standard` is 48% lower on corpus30, 35% lower on aeslc30 and 12% lower on hb40; `strong` is 61%, 50% and 17% lower. The held-out detector (`SuperAnnotate/ai-detector`, never used to pick outputs) moves the same way for `standard`, which is why its gain is not tuned to desklib. Core facts lost outside pleasantry sentences: 0 on every set for both presets.
+
+0.3.0 scored close to the untouched source because its drift guard put whole original paragraphs back whenever a capitalised word seemed missing. Most of the 0.3.x gain comes from narrowing that guard: sentence-start verbs and positional capitals stopped counting as lost names, and it restores only the sentence group that drifted. 0.4.0 adds the second round trip, sentence reordering within a paragraph, and a paragraph-by-paragraph check for dropped claims in the fix hop.
 
 What this does not show:
 
 - It is one detector. Detectors disagree with each other and change between versions, and no tool makes text reliably undetectable. A score under 0.5 on this detector says nothing about another.
 - The corpus is synthetic and in English only. The LLM hops shorten text because they cut pleasantries and pledges.
-- Latency depends on your model and plan. Each preset makes several LLM calls, tens of seconds in total.
+- Latency depends on your model and plan. `light` makes 3 LLM calls, `standard` 5 and `strong` up to 25, so `strong` can take minutes.
 
 ## How it compares
 
@@ -197,15 +235,16 @@ For agents, every command takes `--format json`, and every failure carries `code
 `~/.config/not-a-bot/config.toml`, or `NOT_A_BOT_CONFIG`:
 
 ```toml
-rewrite_preset = "standard"     # light, standard
+rewrite_preset = "standard"     # light, standard, strong
 rewrite_llm = "opencode-cli"    # or "claude-cli"
+# rewrite_scorer = "benches/detector/scorer-e5raid.sh"   # required by the strong preset
 ```
 
-Environment variables `NOT_A_BOT_REWRITE_PRESET` and `NOT_A_BOT_REWRITE_LLM` override both. More: [config files](./docs/en/cli/02-config-files.md), [environment variables](./docs/en/env/01-variables.md).
+Environment variables `NOT_A_BOT_REWRITE_PRESET` and `NOT_A_BOT_REWRITE_LLM` override the first two. More: [config files](./docs/en/cli/02-config-files.md), [environment variables](./docs/en/env/01-variables.md).
 
 ## Translate too
 
-`nab translate` is a keyless translator: 28 engines, 14 of them free web endpoints (Google, Edge, Papago, Sogou and others) that race three at a time, with JSON output and typed errors. `light` rewrites use the same engines. Providers, priorities and live status: [docs/en/providers](./docs/en/providers/01-supported-providers.md).
+`nab translate` is a keyless translator: 28 engines, 14 of them free web endpoints (Google, Edge, Papago, Sogou and others) that race three at a time, with JSON output and typed errors. Rewrite presets do not use them; they are LLM-only. Providers, priorities and live status: [docs/en/providers](./docs/en/providers/01-supported-providers.md).
 
 ## Documentation
 

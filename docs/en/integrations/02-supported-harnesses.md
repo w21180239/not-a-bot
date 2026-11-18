@@ -113,8 +113,10 @@ Both documents carry the same four rules, and nothing else is required:
 2. Read `text` from the JSON; `provider` and `detectedSource` come from the tool.
 3. Pass `--preserve` for code, paths, identifiers and URLs.
 4. For AI-sounding text, `rewrite --preset standard --preserve @code` rebuilds the
-   sentences; `--preset light` changes fewer, so delete AI filler
-   yourself before using it. Check `missingFacts` and `warnings`, and
+   sentences with two LLM round trips (5 calls); `--preset light` makes one
+   round trip (3 calls) and is cheaper; `--preset strong --scorer
+   benches/detector/scorer-e5raid.sh` runs the `standard` chain best-of-5 (up to
+   25 calls) and fails without a scorer. Check `missingFacts` and `warnings`, and
    report them.
 
 The full skill adds the error table and the retry rules; see

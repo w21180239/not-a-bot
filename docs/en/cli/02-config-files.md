@@ -26,7 +26,8 @@ retries = 1            # extra attempts for retryable errors (not timeouts)
 race_width = 3         # providers in flight at once; 1 is strictly sequential
 rewrite_pivot = "zh" # default bridge language for `not-a-bot rewrite --pivot auto`
 rewrite_preset = "standard" # default round trip when no chain, preset, depth or pivot is given
-rewrite_llm = "opencode-cli" # engine behind the LLM hops of `light` and `standard`; or "claude-cli"
+rewrite_llm = "opencode-cli" # engine behind the LLM hops of the presets; or "claude-cli"
+rewrite_scorer = "benches/detector/scorer-e5raid.sh" # detector command; required by the `strong` preset
 concurrency = 4        # reserved for batch sizing
 log = "warn"
 
@@ -56,7 +57,7 @@ Rules:
 - `timeout_ms` and `retries` set request defaults; `timeoutMs` in a request overrides the timeout.
 - `race_width` sets how many providers may be in flight; `1` restores the strict sequential walk. The `--race` flag overrides it for one invocation.
 - `rewrite_pivot` is the default bridge for `rewrite` when the request says `"pivot": "auto"`.
-- `rewrite_preset` picks the round trip when the request names no `chain`, `preset`, `depth` or `pivot`. `rewrite_llm` names the engine behind the LLM hops of `light` and `standard`.
+- `rewrite_preset` (`light`, `standard` or `strong`) picks the round trip when the request names no `chain`, `preset`, `depth` or `pivot`. `rewrite_llm` names the engine behind the LLM hops of every preset. `rewrite_scorer` is the detector command; `strong` fails with `INVALID_INPUT` without it. Before 0.4.0 `light` meant a Google-first chain; see the [changelog](../CHANGELOG.md).
 - `[provider.<name>]` accepts `base_url`, `model`, `region`, `instance`, `tier`, `bin`. Unknown keys there are rejected too.
 
 ## `credentials.toml`

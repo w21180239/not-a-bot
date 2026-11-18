@@ -37,24 +37,48 @@ not-a-bot rewrite "<text>" --from en --chain "opencode-cli:zh,google:ja,edge:en"
 
 | 预设 | 跳（英文原文） | 输出中显示的链 | 典型延迟 |
 | --- | --- | --- | --- |
-| `light` | Google 机器翻译到 zh，一跳修复（`<llm>:fix`，在 zh 里修机器翻译），一次 LLM 改写回 en（这一跳同时对照原文就地修复语义），最后再一跳修复 | `["zh","fix","en","fix"]` | 数次 LLM 调用，几十秒 |
-| `standard` | LLM 译到 zh，LLM 自由改写回 en（这一跳拿不到原文），最后一跳修复；前两跳"像人一样翻译并改写" | `["zh","en","fix"]` | 数次 LLM 调用，几十秒 |
+| `light` | 一次往返：LLM 译到 zh，LLM 自由改写回 en，最后一跳修复（`<llm>:fix`）；3 次 LLM 调用 | `["zh","en","fix"]` | 几十秒 |
+| `standard` | 两次往返：LLM 译到 zh，LLM 改写回 en，LLM 再译到 zh，LLM 再改写回 en，最后一跳修复；5 次 LLM 调用，成本约为 `light` 的 1.7 倍 | `["zh","en","zh","en","fix"]` | 比 `light` 长 |
+| `strong` | 把 `standard` 的链在打分器下跑 best-of-5，保留得分最低的一次；最多 25 次 LLM 调用，成本约为 `light` 的 8.5 倍 | `["zh","en","zh","en","fix"]`（选中的那次运行） | 数分钟 |
 
-中文原文的出去语言是 en。`light` 改写最轻、保真度最高：它调用三次 `rewrite_llm`，但只有一次是完整改写，两跳修复只返回简短的编辑列表。`standard` 是默认预设，检测器得分最低。
+每个 LLM 跳都"像人一样翻译并改写"。所有译回跳都拿不到原文，只有修复跳能看到。译回跳可以在段内调整句子顺序（0.4.0 之前它保持论证顺序）。没有任何预设使用机器翻译。
 
-每个预设都以一跳 LLM 最小语义修复（`<llm>:fix`）收尾。它能看到原文，只返回小的 JSON 片段编辑，恢复前面各跳丢失或改变的含义：缺失或被改动的名字、数字、日期、金额、ID 和代码片段；被翻转的否定；被改动的限定词或确定程度；被改动的行为主体、原因或顺序；被丢掉或凭空添加的论断。它还会收到事实检查列出的缺失 token。事实类编辑一律应用，其他编辑共用一份回填额度。它不会恢复被有意删掉的感受、承诺或客套句，也不会把措辞或结构往原文方向改回去。跳与跳之间也可以插入修复，例如 `--chain "google:zh,opencode-cli:fix,opencode-cli:en,opencode-cli:fix"`。
+中文原文的出去语言是 en。`light` 是成本最低的预设，`standard` 是默认预设。
 
-两个预设都需要 LLM 引擎（`rewrite_llm`，默认 `opencode-cli`，可选 `claude-cli`）：`rewrite_llm` 不是 LLM 引擎时返回 `INVALID_INPUT`。人性化跳会删掉只表达感受、承诺或客套的句子。
+`strong` 必须配打分器（`--scorer` 或配置项 `rewrite_scorer`）。没有打分器时，不论是请求里指定还是 `rewrite_preset` 设成了 `strong`，都会在运行任何一跳之前返回 `INVALID_INPUT`。请求没有设置 `bestOf` 时 `strong` 用 5；显式的 `--best-of` 会覆盖它。挑选规则同[多次取优](#检测器打分多次取优与目标分)：先看没丢事实的，再看分数最低的。仓库附带了配套打分器：
 
-没有任何方法能让文本稳定地检测不出，not-a-bot 也不做这个承诺。目标是读起来像人写的文字，事实保持不变。`--depth 1-3` 和 `--chain` 可以手动搭出其他链；只用机器翻译的 depth 路径没有修复跳，除非链里加上 `<llm>:fix`。其他预设名（包括已移除的 `strong`）会返回 `INVALID_INPUT`，并列出 `light, standard`。
+```bash
+not-a-bot rewrite --from en --preset strong --scorer benches/detector/scorer-e5raid.sh < draft.md
+```
 
-真实二进制实测（30 段英文 x 2 次采样、desklib 检测器、原文 0.999，`benches/prompt-lab`）：`standard` 平均 `p_ai` 0.364，30 段中平均 0.5 段丢事实片段，98% 的文本没有严重语义错误；`light` 为 0.489、0、97%。机器翻译只换词、保留句子结构，所以纯机器翻译的链即使加上修复，得分也接近原文；得分下降来自 LLM 改写跳。成本高于 `standard` 的链没有一条得分更低，因此没有 `strong`。
+`benches/detector/scorer-e5raid.sh` 和 `scorer-e5raid.cmd` 从 stdin 读文本，通过 `benches/detector/holdout.py --model e5raid --stdin`，用 e5-small RAID 检测器 `MayZhou/e5-small-lora-ai-generated-detector` 打分，与 desklib 的 `scorer.sh` 共用同一个 venv。`strong` 针对的是检测器：收益主要体现在参与择优的那个检测器上。换一个留出（held-out）的检测器，降幅小得多，语义错误也略多。
+
+每个预设都以一跳 LLM 最小语义修复（`<llm>:fix`）收尾。它能看到原文，只返回小的 JSON 片段编辑，恢复前面各跳丢失或改变的含义：缺失或被改动的名字、数字、日期、金额、ID 和代码片段；被翻转的否定；被改动的限定词或确定程度；被改动的行为主体、原因或顺序；被丢掉或凭空添加的论断。它会对照原文逐段检查有没有丢掉的论断。它还会收到事实检查列出的缺失 token。事实类编辑一律应用，其他编辑共用一份回填额度。它不会恢复被有意删掉的感受、承诺或客套句，也不会把措辞或结构往原文方向改回去。跳与跳之间也可以插入修复，例如 `--chain "google:zh,opencode-cli:fix,opencode-cli:en,opencode-cli:fix"`。
+
+三个预设都需要 LLM 引擎（`rewrite_llm`，默认 `opencode-cli`，可选 `claude-cli`）：`rewrite_llm` 不是 LLM 引擎时返回 `INVALID_INPUT`。人性化跳会删掉只表达感受、承诺或客套的句子。
+
+从 0.4.0 之前升级：旧的 `light`（Google 机器翻译译出、一跳修复、一次 LLM 改写译回、最后一跳修复）已移除，没有别名。新的 `light` 是旧 `standard` 的链，新的 `standard` 是两次往返的链。
+
+没有任何方法能让文本稳定地检测不出，not-a-bot 也不做这个承诺。目标是读起来像人写的文字，事实保持不变。`--depth 1-3` 和 `--chain` 可以手动搭出其他链；只用机器翻译的 depth 路径没有修复跳，除非链里加上 `<llm>:fix`。其他预设名会返回 `INVALID_INPUT`，并列出 `light, standard, strong`。
+
+0.4.0 之前的真实二进制实测（30 段英文 x 2 次采样、desklib 检测器、原文 0.999，`benches/prompt-lab`）：“LLM 译出，LLM 自由译回，修复”这条链（0.4.0 之前叫 `standard`，现在是 `light`）平均 `p_ai` 0.364，30 段中平均 0.5 段丢事实片段，98% 的文本没有严重语义错误；“Google 译出，修复，LLM 译回，修复”（0.4.0 之前的 `light`，已移除）为 0.489、0、97%。机器翻译只换词、保留句子结构，所以纯机器翻译的链即使加上修复，得分也接近原文；得分下降来自 LLM 改写跳。在那次测试中，成本高于“LLM 译出、LLM 译回、修复”这条链的链没有一条得分更低；下面的 0.4.0 表格会再测一次。
+
+0.4.0 的实测，平均 P(AI) 来自 `desklib/ai-text-detector-v1.01`（越低越像人写的）。corpus30 是 `benches/prompt-lab` 的 30 篇文本，hb40 是 40 篇 AI 写的职场文本，aeslc30 是 30 封人写的 Enron 邮件。范围来自多次重复运行。`strong` 用 e5raid 打分器择优，所以对它来说 desklib 是留出（held-out）检测器。
+
+| 预设 | corpus30 | hb40 | aeslc30 | 相对成本 |
+| --- | --- | --- | --- | --- |
+| `light` | ~0.54 | ~0.88 | ~0.24 | 1x |
+| `standard` | 0.48-0.54 | 0.86-0.89 | 0.18-0.24 | ~1.7x |
+| `strong` | 0.37-0.41 | 0.80-0.86 | 0.15-0.17 | ~8.5x |
+
+`standard` 与 `light` 在每组数据上都落在重复运行的波动范围内。`strong` 在三组上都更低，corpus30 差距最大，hb40 差距较小。
 
 默认值写在 `config.toml`：
 
 ```toml
-rewrite_preset = "standard"  # 默认：standard
+rewrite_preset = "standard"  # light, standard, strong；默认：standard
 rewrite_llm = "claude-cli"   # 默认：opencode-cli
+rewrite_scorer = "benches/detector/scorer-e5raid.sh"  # strong 必须配置
 ```
 
 环境变量：`NOT_A_BOT_REWRITE_PRESET`、`NOT_A_BOT_REWRITE_LLM`。
@@ -83,7 +107,7 @@ bin = "opencode"
 ## LLM 跳收到什么
 
 - 这一跳的指令：翻译，并像人一样改写。
-- 原文：`light` 的返回跳和每个 `fix` 跳都会收到。`light` 的返回跳先用最小的改动修复机器翻译改变的含义，再做改写。`standard` 的返回跳拿不到原文。
+- 原文：只有 `fix` 跳会收到。预设的返回跳拿不到原文，自由改写，并且可以在段内调整句子顺序；最后的修复跳会对照原文逐段检查有没有丢掉的论断。
 - 后面的 LLM 跳还会收到上一个 LLM 跳的结果作为历史。
 - 受保护片段原样传入。LLM 跳不使用占位符：提示词里列出要保留的片段，翻译完由 not-a-bot 检查输出。片段丢了会加一条 `preserve: <provider> dropped <span>` 警告。机器翻译跳仍然用占位符遮蔽。
 
@@ -142,12 +166,13 @@ LLM 跳每次输出都不一样，所以再跑一次可能读起来不同。配�
 
 ```bash
 not-a-bot rewrite "<text>" --from en --preset standard --best-of 3 --scorer "python score.py" --format json
+not-a-bot rewrite "<text>" --from en --preset strong --scorer benches/detector/scorer-e5raid.sh --format json
 not-a-bot rewrite "<text>" --from en --target-score 0.4 --scorer "python score.py" --format json
 ```
 
 - `--scorer "<command>"`（配置项 `rewrite_scorer`）：not-a-bot 把每个结果写进该命令的 stdin，从 stdout 最后一个非空行读一个 0 到 1 的分数（越高越像 AI）。命令按词切分（引号成组，反斜杠保持原样），不经过 shell；`PATH` 上的程序按 CLI provider 的同一套规则解析，包括 `.cmd` 包装脚本。每次调用的时限是 `--timeout-ms`，但不少于 120 秒，因为本地检测器每次调用都要加载模型。
 - 打分器失败、超时，或输出的不是 [0, 1] 内的数字时，加一条 `scorer: run <n> (<preset>) unscored: <reason>` 警告，这次运行记为未打分。所有运行都没有分数时，结果与不配打分器相同。
-- `--best-of N`（1-5，默认 1）把规划好的链独立跑 N 次。挑选顺序：先看没有丢事实的（都丢了就看丢得最少的），再看分数最低的，未打分的排在已打分的后面。N 大于 1 时必须配打分器，否则返回 `INVALID_INPUT`。
+- `--best-of N`（1-5，默认 1；`strong` 预设默认 5）把规划好的链独立跑 N 次。挑选顺序：先看没有丢事实的（都丢了就看丢得最少的），再看分数最低的，未打分的排在已打分的后面。N 大于 1 时必须配打分器，否则返回 `INVALID_INPUT`；`strong` 始终需要打分器。
 - `--target-score X`（0-1，需要打分器）：先跑请求的链（带上 `--best-of`），再依次跑 `rewrite_ladder`（默认 `["light", "standard"]`）里还没试过的预设。只要目前最好的运行分数不高于 X 就停下；全部试完仍未达到，就返回总体最好的运行，并加一条 `target score not met` 警告。
 
 响应新增 `score`（选中运行的分数，没有可用打分器时为 `null`）、`scorer`（程序名，不含参数），运行多于一次时还有 `candidates`：每次运行一条 `{presetOrChain, score, missingFacts}`，其中 `missingFacts` 是个数。只返回选中运行的文本和各跳。
@@ -163,8 +188,9 @@ rewrite_ladder = ["light", "standard"]
 
 | 场景 | 选择 |
 | --- | --- |
-| 把 AI 味的文字改得像人写的（检测器得分最低） | `--preset standard`（默认） |
-| 改写最轻，保真度最高 | `--preset light` |
+| 把 AI 味的文字改得像人写的 | `--preset standard`（默认） |
+| 成本最低，3 次 LLM 调用 | `--preset light` |
+| 检测器得分最低，且能运行打分器 | `--preset strong --scorer benches/detector/scorer-e5raid.sh`（best-of-5；收益主要体现在参与择优的检测器上） |
 | 只用机器翻译，不用 LLM | `--depth 1-3`；得分接近原文，事实丢失随深度上升 |
 | 带代码或 URL 的文本 | 任何预设都加 `--preserve @code --preserve @url` |
 | 合同、法律、读者要核对的数字 | 不要往返 |

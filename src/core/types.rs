@@ -55,7 +55,7 @@ pub struct RewriteRequest {
     /// Machine-translation hops before returning: 1-3 (zh, ja, fi; en, ja, fi for Chinese).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depth: Option<u8>,
-    /// Built-in chain: `light`, `standard`.
+    /// Built-in chain: `light`, `standard`, `strong` (`strong` needs a scorer).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preset: Option<String>,
     /// Provider for hops without an engine.

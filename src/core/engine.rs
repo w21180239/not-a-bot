@@ -2044,8 +2044,13 @@ mod tests {
         );
         // (preset, style per hop, index of the LLM return hop, does it see the original)
         let cases = [
-            ("standard", vec!["humanize", "humanize", "fix"], 1, false),
-            ("light", vec!["", "fix", "humanize", "fix"], 2, true),
+            (
+                "standard",
+                vec!["humanize", "humanize", "humanize", "humanize", "fix"],
+                1,
+                false,
+            ),
+            ("light", vec!["humanize", "humanize", "fix"], 1, false),
         ];
         for (preset, styles, back, back_sees_original) in cases {
             calls.lock().unwrap().clear();
@@ -2104,7 +2109,7 @@ mod tests {
             engine.rewrite(&req).await.expect("rewrite");
 
             let calls = calls.lock().unwrap().clone();
-            assert_eq!(calls.len(), 3, "{class}");
+            assert_eq!(calls.len(), 5, "{class}");
             for (_, meta) in &calls {
                 assert_eq!(meta["not-a-bot.register"]["register"], class);
                 assert!(meta["not-a-bot.register"]["markers"].is_array());

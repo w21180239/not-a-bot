@@ -104,7 +104,7 @@ Windows PowerShell：`New-Item -ItemType Directory -Force <dir>`，再用 `Get-C
 1. 调用 `not-a-bot`，不要自己翻译。
 2. 读 JSON 里的 `text`；`provider` 与 `detectedSource` 由工具给出。
 3. 代码、路径、标识符、URL 走 `--preserve`。
-4. 处理 AI 味文字用 `rewrite --preset standard --preserve @code`，LLM 跳会重建句子；`--preset light` 改动较少，用它之前要自己先删 AI 套话。检查 `missingFacts` 和 `warnings`，并如实报告。
+4. 处理 AI 味文字用 `rewrite --preset standard --preserve @code`，LLM 跳会重建句子；`standard` 做两次 LLM 往返（5 次调用）；`--preset light` 只做一次往返（3 次调用），成本更低；`--preset strong --scorer benches/detector/scorer-e5raid.sh` 把 `standard` 的链跑 best-of-5（最多 25 次调用），没有打分器会失败。检查 `missingFacts` 和 `warnings`，并如实报告。
 
 完整 skill 还包括错误表和重试规则：[`integrations/skill/not-a-bot/SKILL.md`](../../../integrations/skill/not-a-bot/SKILL.md)。
 
