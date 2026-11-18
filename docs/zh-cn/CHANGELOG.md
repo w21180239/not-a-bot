@@ -2,6 +2,26 @@
 
 文档修订历史。1.0 之前，应用变更也记录在此。
 
+## 0.4.0 — 2026-11-19
+
+### 调整（破坏性）
+
+- 旧的 `light` 预设（Google 机器翻译译出、一跳修复、一次 LLM 改写译回、最后再一跳修复；链为 `["zh","fix","en","fix"]`）已移除，没有别名。`light` 这个名字现在指原来的 `standard` 链：LLM 译出，LLM 自由改写译回，修复（链为 `["zh","en","fix"]`，3 次 LLM 调用）。使用 `--preset light` 或 `rewrite_preset = "light"` 的用户现在得到这条链。
+- `standard`（仍是默认）改为两次往返加一跳修复：LLM 译出、LLM 译回、LLM 译出、LLM 译回、修复（链为 `["zh","en","zh","en","fix"]`，5 次 LLM 调用，成本约为新 `light` 的 1.7 倍）。使用 `standard` 的用户现在得到这条链，成本也随之上升。
+- 没有任何预设再使用机器翻译。三个预设都需要 LLM 作为 `rewrite_llm`，都以修复跳收尾，所有译回跳都看不到原文，只有修复跳能看到。`nab translate` 不变。
+- 默认 `rewrite_ladder` 仍为 `["light", "standard"]`。
+
+### 新增
+
+- 预设 `strong`：把 `standard` 的链跑 best-of-5，保留得分最低的一次（先比事实丢失，再比分数）。请求没有设置 `bestOf` 时默认为 5，显式的 `--best-of` 会覆盖。必须提供打分器（`--scorer` 或配置 `rewrite_scorer`），没有时在运行任何一跳之前返回 `INVALID_INPUT`。成本约为 `light` 的 8.5 倍，最多 25 次 LLM 调用。
+- 打分器脚本 `benches/detector/scorer-e5raid.sh` 和 `scorer-e5raid.cmd`：stdin 打分器，通过 `benches/detector/holdout.py --model e5raid --stdin` 使用 e5-small RAID 检测器 `MayZhou/e5-small-lora-ai-generated-detector`，与 desklib 的 `scorer.sh` 共用同一个 venv。示例：`nab rewrite --from en --preset strong --scorer benches/detector/scorer-e5raid.sh < draft.md`。
+- 用 desklib `desklib/ai-text-detector-v1.01` 的实测（平均 P(AI)，越低越像人写的；corpus30 / hb40 / aeslc30）：`light` ~0.54 / ~0.88 / ~0.24；`standard` 0.48-0.54 / 0.86-0.89 / 0.18-0.24；`strong` 0.37-0.41 / 0.80-0.86 / 0.15-0.17。`strong` 用 e5raid 打分器择优，所以 desklib 是留出检测器。`strong` 针对检测器：收益主要体现在参与择优的检测器上，换一个留出的检测器降幅小得多，语义错误也略多。
+
+### 变更
+
+- 译回跳可以在段内调整句子顺序，以前它保持论证顺序。
+- 修复跳对照原文逐段检查有没有丢掉的论断。
+
 ## 0.3.9 — 2026-11-17
 
 ### 修复

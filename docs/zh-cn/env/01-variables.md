@@ -22,8 +22,8 @@
 | `NOT_A_BOT_CHAIN` | 替换内置链。未列出的 Provider 之后按优先级追加 | `edge,google,deepl` |
 | `NOT_A_BOT_TIMEOUT_MS` | 默认单次预算；请求里的 `timeoutMs` 覆盖它 | `8000` |
 | `NOT_A_BOT_REWRITE_PIVOT` | 请求写 `auto` 时 `rewrite` 的默认中转语言；`--pivot` 优先 | `ja` |
-| `NOT_A_BOT_REWRITE_PRESET` | 请求没给 chain、preset、depth、pivot 时 `rewrite` 的默认预设 | `standard` |
-| `NOT_A_BOT_REWRITE_LLM` | `light`、`standard` 预设里 LLM 跳所用的引擎 | `claude-cli` |
+| `NOT_A_BOT_REWRITE_PRESET` | 请求没给 chain、preset、depth、pivot 时 `rewrite` 的默认预设（`light`、`standard` 或 `strong`；`strong` 还需要打分器） | `standard` |
+| `NOT_A_BOT_REWRITE_LLM` | `light`、`standard`、`strong` 预设里 LLM 跳所用的引擎 | `claude-cli` |
 | `NOT_A_BOT_LOG` | stderr 日志级别 | `debug` |
 
 ## 凭据

@@ -82,8 +82,11 @@ mkdir -p ~/.claude/skills/not-a-bot && cp -r integrations/skill/not-a-bot/. ~/.c
 # 改写草稿（默认预设 standard）
 nab rewrite --from en --preserve @code < draft.md
 
-# 改写最轻，保真度最高
+# 成本最低：一次往返（3 次 LLM 调用）
 nab rewrite --from en --preset light < draft.md
+
+# 检测器得分最低：standard 跑 5 次，由打分器择优（必须提供打分器）
+nab rewrite --from en --preset strong --scorer benches/detector/scorer-e5raid.sh < draft.md
 
 # 拿改写结果对照原文检查；有 AI 味或丢事实就以退出码 1 结束
 nab lint rewrite.md --source draft.md --strict
@@ -106,28 +109,35 @@ for f in $(git diff --cached --name-only -- '*.md'); do nab lint "$f" --strict |
 
 | 预设 | 执行内容 | 适用场景 |
 | --- | --- | --- |
-| `standard`（默认） | LLM 译出到另一种语言，LLM 自由改写译回（这一跳看不到原文），最后一跳最小语义修复 | 大多数文本，检测器得分最低 |
-| `light` | Google 机器翻译译出，一跳修复，一次 LLM 改写译回，最后再一跳修复 | 改写最轻，保真度最高 |
+| `light` | 一次往返：LLM 译出到另一种语言，LLM 自由改写译回，最后一跳最小语义修复。3 次 LLM 调用 | 短文本或低风险文本，成本最低 |
+| `standard`（默认） | 两次往返：LLM 译出、LLM 译回、LLM 译出、LLM 译回，最后一跳修复。5 次 LLM 调用，成本约为 `light` 的 1.7 倍 | 大多数文本 |
+| `strong` | 把 `standard` 的链跑 5 次取最优，保留得分最低的一次。最多 25 次 LLM 调用，成本约为 `light` 的 8.5 倍。必须提供打分器（`--scorer` 或配置 `rewrite_scorer`），否则在运行前就以 `INVALID_INPUT` 失败 | 检测器得分最重要、且能运行打分器的文本 |
 
-两个预设都需要 LLM（`rewrite_llm`，默认 `opencode-cli`，可选 `claude-cli`），共调用数次 LLM，总计几十秒。`light` 里只有一次是完整改写，两跳修复只返回简短的编辑列表。
+三个预设都需要 LLM（`rewrite_llm`，默认 `opencode-cli`，可选 `claude-cli`），共调用数次 LLM，总计几十秒到数分钟。所有译回跳都看不到原文，只有修复跳能看到。没有任何预设使用机器翻译。`--best-of` 可以覆盖 `strong` 默认的 5 次。
+
+`strong` 按检测器择优，所以收益主要体现在被选用的那个检测器上；换一个留出（held-out）的检测器，降幅小得多，语义错误也略多。仓库附带 `benches/detector/scorer-e5raid.sh` 和 `scorer-e5raid.cmd`：基于 e5-small RAID 检测器 `MayZhou/e5-small-lora-ai-generated-detector` 的 stdin 打分器，与 desklib 的 `scorer.sh` 共用同一个 venv。0.4.0 之前的预设定义不同，见[更新日志](./docs/zh-cn/CHANGELOG.md)。
 
 `--preserve @code` 和 `--preserve @url` 让代码片段和链接原样保留。法律文本、API 参考，以及读者会逐行核对的数字，不要做往返改写。
 
 ## 原理
 
-译成另一种语言再译回来，句子会被重新组织，所以生成文本的套话不会原样回来。`standard` 的两跳都是 LLM 调用，要求它们像人一样改写，同时删掉只表达感受、表态或客套的句子，AI 味有不少就藏在这些句子里。
+译成另一种语言再译回来，句子会被重新组织，所以生成文本的套话不会原样回来。`standard` 做两次往返，每一跳都是 LLM 调用，要求它们像人一样改写。译回跳看不到原文，并且可以在段内调整句子顺序。它们同时删掉只表达感受、表态或客套的句子，AI 味有不少就藏在这些句子里。
 
 ```mermaid
 flowchart LR
     A[AI 味草稿] --> B[LLM 跳：改写成 zh]
     B --> C[LLM 跳：改写回 en]
-    C --> D[修复跳：对照草稿做最小语义修复]
+    C --> C2[LLM 跳：再次改写成 zh]
+    C2 --> C3[LLM 跳：再次改写回 en]
+    C3 --> D[修复跳：对照草稿做最小语义修复]
     D --> E{对照草稿核对事实}
     E -->|全部在| F[结果]
     E -->|有 token 丢失| G[列入 missingFacts]
 ```
 
-每个预设都以修复跳收尾：LLM 能看到原文，只返回小的 JSON 片段编辑，恢复前面各跳丢失或改变的含义（人名、数字、日期、金额、ID、代码片段，被翻转的否定，被改动的限定词或确定程度，被改动的行为主体、原因或顺序，被丢掉或凭空添加的论断）。事实类编辑一律应用，其他编辑共用一份回填额度。它不会恢复被有意删掉的感受、表态或客套句，也不会把措辞往原文方向改回去。它还会收到事实核对给出的缺失 token 列表。
+`light` 省掉第二次往返。`strong` 把整条链跑五次，保留打分器评分最低的一次。
+
+每个预设都以修复跳收尾：LLM 能看到原文，只返回小的 JSON 片段编辑，恢复前面各跳丢失或改变的含义（人名、数字、日期、金额、ID、代码片段，被翻转的否定，被改动的限定词或确定程度，被改动的行为主体、原因或顺序，被丢掉或凭空添加的论断）。它会对照原文逐段检查有没有丢掉的论断。事实类编辑一律应用，其他编辑共用一份回填额度。它不会恢复被有意删掉的感受、表态或客套句，也不会把措辞往原文方向改回去。它还会收到事实核对给出的缺失 token 列表。
 
 事实核对会拿人名、数字、版本号、路径、ID 和代码片段与原文比对。最后仍然缺的会出现在 `missingFacts` 里，丢了什么是明确报告的，不会悄悄交付。
 
@@ -142,18 +152,30 @@ flowchart LR
 | 配置 | 平均 P(AI) | 事实丢失（共 30） | 无严重语义错误 |
 | --- | --- | --- | --- |
 | 原文 | 0.999 | 无 | 无 |
-| `standard`（LLM 译出，LLM 自由译回，修复） | 0.364 | 0.5 | 98% |
-| `light`（Google 译出，修复，LLM 译回，修复） | 0.489 | 0 | 97% |
+| `light`（LLM 译出，LLM 自由译回，修复；0.4.0 之前叫 `standard`） | 0.364 | 0.5 | 98% |
+| Google 译出，修复，LLM 译回，修复（0.4.0 之前的 `light`，已移除） | 0.489 | 0 | 97% |
 | Google 译出，LLM 译回，只做最后一次修复 | 0.515 | 0 | 87% |
 | 两跳机器翻译加最后一次修复 | 0.930 | 5.0 | 80% |
 
-机器翻译只换词、保留句子结构，所以纯机器翻译的链即使加上修复，得分也接近原文；得分下降来自 LLM 改写跳。成本高于 `standard` 的链没有一条得分更低。方法、完整表格和失败的实验见 [benches/prompt-lab](./benches/prompt-lab/README.md)。另有一个 8 篇文本的测试在 [benches/rewrite-depth](./benches/rewrite-depth/README.md)。
+机器翻译只换词、保留句子结构，所以纯机器翻译的链即使加上修复，得分也接近原文；得分下降来自 LLM 改写跳。在这次测试中，成本高于“LLM 译出、LLM 译回、修复”这条链的链没有一条得分更低；下面的 0.4.0 预设会再测一次。方法、完整表格和失败的实验见 [benches/prompt-lab](./benches/prompt-lab/README.md)。另有一个 8 篇文本的测试在 [benches/rewrite-depth](./benches/rewrite-depth/README.md)。
+
+### 0.4.0 预设
+
+平均 P(AI)，来自 `desklib/ai-text-detector-v1.01`，越低越像人写的。三组数据：corpus30 是 `benches/prompt-lab` 的 30 篇文本，hb40 是 40 篇 AI 写的职场文本，aeslc30 是 30 封人写的 Enron 邮件。范围来自多次重复运行。`strong` 用 e5raid 打分器择优，所以对它来说 desklib 是留出（held-out）检测器。
+
+| 预设 | corpus30 | hb40 | aeslc30 | 相对成本 |
+| --- | --- | --- | --- | --- |
+| `light` | ~0.54 | ~0.88 | ~0.24 | 1x |
+| `standard` | 0.48-0.54 | 0.86-0.89 | 0.18-0.24 | ~1.7x |
+| `strong` | 0.37-0.41 | 0.80-0.86 | 0.15-0.17 | ~8.5x |
+
+`standard` 与 `light` 在每组数据上都落在重复运行的波动范围内。`strong` 在三组上都更低，corpus30 差距最大，hb40 差距较小。
 
 这些数据没有说明的事：
 
 - 这只是一个检测器。检测器之间会有分歧，版本之间也会变，没有任何工具能让文本稳定地检测不出。在这个检测器上低于 0.5，不代表在别的检测器上也低。
 - 语料是合成的，只有英文。LLM 跳会缩短文本，因为它们删掉了客套和表态。
-- 延迟取决于你的模型和套餐。每个预设调用数次 LLM，总计几十秒。
+- 延迟取决于你的模型和套餐。`light` 调用 3 次 LLM，`standard` 5 次，`strong` 最多 25 次，所以 `strong` 可能要数分钟。
 
 ## 横向对比
 
@@ -197,15 +219,16 @@ blader/humanizer 只要一个 skill 文件，不需要额外安装，对 AI 文�
 `~/.config/not-a-bot/config.toml`，或用 `NOT_A_BOT_CONFIG` 指定：
 
 ```toml
-rewrite_preset = "standard"     # light, standard
+rewrite_preset = "standard"     # light, standard, strong
 rewrite_llm = "opencode-cli"    # 或 "claude-cli"
+# rewrite_scorer = "benches/detector/scorer-e5raid.sh"   # strong 预设必须配置
 ```
 
-环境变量 `NOT_A_BOT_REWRITE_PRESET` 和 `NOT_A_BOT_REWRITE_LLM` 会覆盖这两项。更多见[配置文件](./docs/zh-cn/cli/02-config-files.md)和[环境变量](./docs/zh-cn/env/01-variables.md)。
+环境变量 `NOT_A_BOT_REWRITE_PRESET` 和 `NOT_A_BOT_REWRITE_LLM` 会覆盖前两项。更多见[配置文件](./docs/zh-cn/cli/02-config-files.md)和[环境变量](./docs/zh-cn/env/01-variables.md)。
 
 ## 也能翻译
 
-`nab translate` 是不需要 Key 的翻译器：28 个引擎，其中 14 个是免费网页接口（Google、Edge、Papago、搜狗等），每次三个并发竞速，输出 JSON，错误带类型。`light` 改写用的也是这些引擎。Provider、优先级和实测状态见 [docs/zh-cn/providers](./docs/zh-cn/providers/01-supported-providers.md)。
+`nab translate` 是不需要 Key 的翻译器：28 个引擎，其中 14 个是免费网页接口（Google、Edge、Papago、搜狗等），每次三个并发竞速，输出 JSON，错误带类型。改写预设不使用这些引擎，只用 LLM。Provider、优先级和实测状态见 [docs/zh-cn/providers](./docs/zh-cn/providers/01-supported-providers.md)。
 
 ## 文档
 

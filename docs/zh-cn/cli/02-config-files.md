@@ -26,7 +26,8 @@ retries = 1            # 可重试错误的额外尝试次数（超时不重试�
 race_width = 3         # 同时在飞的 Provider 数；1 为严格串行
 rewrite_pivot = "zh" # `not-a-bot rewrite --pivot auto` 的默认中转语言
 rewrite_preset = "standard" # 请求没给 chain、preset、depth、pivot 时的默认往返
-rewrite_llm = "opencode-cli" # `light`、`standard` 预设里 LLM 跳所用的引擎；或 "claude-cli"
+rewrite_llm = "opencode-cli" # 各预设里 LLM 跳所用的引擎；或 "claude-cli"
+rewrite_scorer = "benches/detector/scorer-e5raid.sh" # 检测器命令；`strong` 预设必须配置
 concurrency = 4        # 预留：批次并发
 log = "warn"
 
@@ -56,7 +57,7 @@ bin = "opencode"
 - `timeout_ms`、`retries` 是请求默认值；请求里的 `timeoutMs` 覆盖超时。
 - `race_width` 控制同时在飞的 Provider 数；`1` 恢复严格串行。`--race` 参数覆盖单次调用。
 - 请求里写 `"pivot": "auto"` 时，`rewrite_pivot` 就是默认中转语言。
-- `rewrite_preset` 在请求没给 `chain`、`preset`、`depth`、`pivot` 时决定默认往返；`rewrite_llm` 指定 `light`、`standard` 预设里 LLM 跳所用的引擎。
+- `rewrite_preset`（`light`、`standard` 或 `strong`）在请求没给 `chain`、`preset`、`depth`、`pivot` 时决定默认往返；`rewrite_llm` 指定所有预设里 LLM 跳所用的引擎；`rewrite_scorer` 是检测器命令，没有它 `strong` 会返回 `INVALID_INPUT`。0.4.0 之前的 `light` 是 Google 开头的链，见[更新日志](../CHANGELOG.md)。
 - `[provider.<name>]` 只接受 `base_url`、`model`、`region`、`instance`、`tier`、`bin`，其他键同样会被拒绝。
 
 ## `credentials.toml`

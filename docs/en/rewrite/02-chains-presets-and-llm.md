@@ -41,50 +41,98 @@ Precedence, first match wins: `--chain`, `--preset`, `--depth`, `--pivot`, then
 
 | Preset | Hops (English source) | Chain shown in output | Typical latency |
 | --- | --- | --- | --- |
-| `light` | Google machine translation to zh, a repair hop (`<llm>:fix`) that repairs the translation in zh, one LLM rewrite back to en that also repairs meaning against the original inline, then the final repair hop | `["zh","fix","en","fix"]` | several LLM calls, tens of seconds |
-| `standard` | LLM to zh, LLM back to en rewriting freely (this hop is not given the original), then the final repair hop; the first two hops "translate and rewrite like a person" | `["zh","en","fix"]` | several LLM calls, tens of seconds |
+| `light` | One round trip: LLM to zh, LLM back to en rewriting freely, then the final repair hop (`<llm>:fix`); 3 LLM calls | `["zh","en","fix"]` | tens of seconds |
+| `standard` | Two round trips: LLM to zh, LLM back to en, LLM to zh, LLM back to en, then the final repair hop; 5 LLM calls, about 1.7x the cost of `light` | `["zh","en","zh","en","fix"]` | longer than `light` |
+| `strong` | The `standard` chain run best-of-5 under a scorer, keeping the lowest-scoring run; up to 25 LLM calls, about 8.5x the cost of `light` | `["zh","en","zh","en","fix"]` (selected run) | minutes |
 
-For a Chinese source the outward language is en. `light` is the lightest
-rewrite with the highest fidelity: it makes three `rewrite_llm` calls, but only
-one is a full rewrite; the two repair hops return short edit lists. `standard`
-is the default and scored lowest with the detector.
+Every LLM hop "translates and rewrites like a person". No return hop is given
+the original; only the repair hops see it. A return hop may reorder sentences
+within a paragraph (before 0.4.0 it kept the argument order). No preset uses
+machine translation.
+
+For a Chinese source the outward language is en. `light` is the cheapest
+preset. `standard` is the default.
+
+`strong` requires a scorer (`--scorer` or config `rewrite_scorer`). Without one
+it fails with `INVALID_INPUT` before running anything, whether it is named on
+the request or set as `rewrite_preset`. When the request sets no `bestOf`, `strong`
+uses 5; an explicit `--best-of` overrides it. Selection works as in
+[best of N](#detector-score-best-of-n-and-target-score): no missing facts first,
+then the lowest score. The repo ships a scorer for it:
+
+```bash
+not-a-bot rewrite --from en --preset strong --scorer benches/detector/scorer-e5raid.sh < draft.md
+```
+
+`benches/detector/scorer-e5raid.sh` and `scorer-e5raid.cmd` read the text on
+stdin and score it with the e5-small RAID detector
+`MayZhou/e5-small-lora-ai-generated-detector`, through
+`benches/detector/holdout.py --model e5raid --stdin`, in the same venv as the
+desklib `scorer.sh`. `strong` is detector-targeted: its gains are mostly against
+the detector that selects. A second, held-out detector moves much less, and
+meaning errors are somewhat higher.
 
 Every preset ends with an LLM minimal meaning-repair hop (`<llm>:fix`). It sees
 the original and returns small JSON span edits that restore meaning lost or
 changed by earlier hops: missing or altered names, numbers, dates, amounts, IDs
 and code spans; flipped negations; changed qualifiers or certainty; changed
-actor, cause or order; dropped or invented claims. It also receives the fact
+actor, cause or order; dropped or invented claims. It checks the original
+paragraph by paragraph for dropped claims. It also receives the fact
 check's list of missing tokens. Fact edits always apply; other edits share one
 copy-back budget. It never restores a deliberately cut feeling, pledge or
 pleasantry sentence and never moves wording or structure back toward the
 original. A fix between hops works too, for example
 `--chain "google:zh,opencode-cli:fix,opencode-cli:en,opencode-cli:fix"`.
 
-Both presets need an LLM engine (`rewrite_llm`, default `opencode-cli`,
+All three presets need an LLM engine (`rewrite_llm`, default `opencode-cli`,
 alternative `claude-cli`): any other `rewrite_llm` fails with `INVALID_INPUT`.
 The humanize hops delete sentences that only express feelings, pledges or
 pleasantries.
+
+Upgrading from before 0.4.0: the old `light` (Google machine translation out, a
+fix hop, one LLM rewrite back, a final fix hop) is removed and has no alias. The
+new `light` is the old `standard` chain, and the new `standard` is the two-round-trip
+chain.
 
 No method makes text reliably undetectable, and not-a-bot does not promise it.
 The aim is prose that reads like a person wrote it, with the facts intact.
 `--depth 1-3` and `--chain` build other chains by hand; machine-translation-only
 depth paths have no repair hop unless a chain adds `<llm>:fix`. Any other preset
-name, including the removed `strong`, fails with `INVALID_INPUT`, listing
-`light, standard`.
+name fails with `INVALID_INPUT`, listing `light, standard, strong`.
 
-Measured with the real binary (30 English texts x 2 samples, desklib detector,
-source texts 0.999; `benches/prompt-lab`): `standard` scored a mean `p_ai` of
+Measured with the real binary before 0.4.0 (30 English texts x 2 samples,
+desklib detector, source texts 0.999; `benches/prompt-lab`): the chain LLM out,
+free LLM back, fix (`standard` before 0.4.0, `light` now) scored a mean `p_ai` of
 0.364 with 0.5 texts (of 30) losing a fact token and 98% of texts free of major
-meaning errors; `light` 0.489, 0, 97%. Machine translation changes words but
-keeps sentence structure, so machine-only chains stay near the source score
-even with repairs; the score drop comes from the LLM rewrite hop. No chain that
-costs more than `standard` scored lower, so there is no `strong`.
+meaning errors; Google out, fix, LLM back, fix (`light` before 0.4.0, removed)
+0.489, 0, 97%. Machine translation changes words but keeps sentence structure,
+so machine-only chains stay near the source score even with repairs; the score
+drop comes from the LLM rewrite hop. In that run no chain that cost more than the
+LLM-out, LLM-back, fix chain scored lower; the 0.4.0 table below tests that
+again.
+
+Measured for 0.4.0, mean P(AI) from `desklib/ai-text-detector-v1.01` (lower is
+more human). corpus30 is the 30 `benches/prompt-lab` texts, hb40 is 40
+AI-written workplace texts, aeslc30 is 30 human-written Enron emails. Ranges are
+across repeat runs. `strong` used the e5raid scorer as its selector, so desklib
+is a held-out detector for it.
+
+| Preset | corpus30 | hb40 | aeslc30 | Relative cost |
+| --- | --- | --- | --- | --- |
+| `light` | ~0.54 | ~0.88 | ~0.24 | 1x |
+| `standard` | 0.48-0.54 | 0.86-0.89 | 0.18-0.24 | ~1.7x |
+| `strong` | 0.37-0.41 | 0.80-0.86 | 0.15-0.17 | ~8.5x |
+
+`standard` and `light` overlap within the run-to-run range on every set.
+`strong` is lower on all three, with the largest gap on corpus30 and a small one
+on hb40.
 
 Set the default in `config.toml`:
 
 ```toml
-rewrite_preset = "standard"  # default: standard
+rewrite_preset = "standard"  # light, standard, strong; default: standard
 rewrite_llm = "claude-cli"   # default: opencode-cli
+rewrite_scorer = "benches/detector/scorer-e5raid.sh"  # required by strong
 ```
 
 Environment: `NOT_A_BOT_REWRITE_PRESET`, `NOT_A_BOT_REWRITE_LLM`.
@@ -116,7 +164,7 @@ a preset or `--provider`.
 ## What an LLM hop receives
 
 - The hop instruction: translate, and rewrite the way a person would.
-- The original text, for the return hop of `light` and for every `fix` hop. The `light` return hop first repairs meaning that the machine translation changed, with the smallest change that fixes it, then rewrites. The `standard` return hop is not given the original.
+- The original text, for every `fix` hop only. The return hops of the presets are not given the original, rewrite freely and may reorder sentences within a paragraph; the final fix hop checks the original paragraph by paragraph for dropped claims.
 - For a later LLM hop, the previous LLM hop as history.
 - The protected spans, as-is. An LLM hop gets no placeholders; the prompt lists the spans to keep, and not-a-bot checks the output afterwards. A dropped span adds a `preserve: <provider> dropped <span>` warning. Machine-translation hops still mask spans.
 
@@ -196,12 +244,13 @@ keeps every fact always beats one that lost a fact, whatever the scores. Use it 
 
 ```bash
 not-a-bot rewrite "<text>" --from en --preset standard --best-of 3 --scorer "python score.py" --format json
+not-a-bot rewrite "<text>" --from en --preset strong --scorer benches/detector/scorer-e5raid.sh --format json
 not-a-bot rewrite "<text>" --from en --target-score 0.4 --scorer "python score.py" --format json
 ```
 
 - `--scorer "<command>"` (config `rewrite_scorer`): not-a-bot writes each result to the command's stdin and reads a score from 0 to 1 (higher = more AI-like) from the last non-empty line of stdout. The command is split into words (quotes group, backslashes stay literal) and run without a shell; programs on `PATH` resolve the same way as the CLI providers, `.cmd` shims included. Each call has the `--timeout-ms` budget, but never less than 120 s, since local detectors load a model per call.
 - A scorer that fails, times out or prints something other than a number in [0, 1] adds a `scorer: run <n> (<preset>) unscored: <reason>` warning, and that run is unscored. When no run gets a score, the result is the same as without a scorer.
-- `--best-of N` (1-5, default 1) runs the planned chain N times. Selection: no missing facts first (else the fewest), then the lowest score, with unscored runs after scored ones. Above 1 it needs a scorer and fails with `INVALID_INPUT` otherwise.
+- `--best-of N` (1-5, default 1; default 5 for the `strong` preset) runs the planned chain N times. Selection: no missing facts first (else the fewest), then the lowest score, with unscored runs after scored ones. Above 1 it needs a scorer and fails with `INVALID_INPUT` otherwise; `strong` always needs one.
 - `--target-score X` (0-1, needs a scorer) tries the requested chain first, with `--best-of`, then each preset of `rewrite_ladder` (default `["light", "standard"]`) not yet tried. It stops at the first rung where the best run so far scores at or below X; otherwise it returns the best run overall with a `target score not met` warning.
 
 The response adds `score` (the selected run's score, `null` without a usable
@@ -222,8 +271,9 @@ the text is undetectable.
 
 | Situation | Choose |
 | --- | --- |
-| Humanise AI-sounding prose (lowest detector score) | `--preset standard` (default) |
-| Lightest rewrite, highest fidelity | `--preset light` |
+| Humanise AI-sounding prose | `--preset standard` (default) |
+| Cheapest rewrite, 3 LLM calls | `--preset light` |
+| Lowest detector score, and you can run a scorer | `--preset strong --scorer benches/detector/scorer-e5raid.sh` (best of 5; gains are mostly against the selecting detector) |
 | Machine translation only, no LLM | `--depth 1-3`; the score stays near the source and fact loss rises with depth |
 | Text with code or URLs | add `--preserve @code --preserve @url` to any preset |
 | Legal text, contracts, numbers someone will check | do not round-trip |

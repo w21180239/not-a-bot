@@ -45,7 +45,9 @@ not-a-bot rewrite "…" --from en --chain "opencode-cli:zh,edge:en,opencode-cli:
 | `-s, --from` | `auto` | 源语言 |
 | `--pivot` | `auto` | 中转语言 |
 | `--chain` | — | 逗号分隔的跳 `[engine:]lang`；末尾没回到源语言时自动补一跳；`<llm>:fix` 为对照原文、以小片段编辑修复语义的修复跳 |
-| `--preset` | 配置 `rewrite_preset`（`standard`） | `light`（Google 出去，修复，一次 LLM 改写回来，修复）、`standard`（LLM 出去，LLM 自由回来，修复）；每个预设都以修复跳收尾，并要求 `rewrite_llm` 是 LLM 引擎，否则 `INVALID_INPUT` |
+| `--preset` | 配置 `rewrite_preset`（`standard`） | `light`（LLM 出去，LLM 自由回来，修复；3 次 LLM 调用）、`standard`（两次这样的往返，再修复；5 次调用）、`strong`（`standard` 的链由打分器择优 best-of-5，最多 25 次调用；需要 `--scorer` 或 `rewrite_scorer`，否则 `INVALID_INPUT`）；每个预设都以修复跳收尾，并要求 `rewrite_llm` 是 LLM 引擎，否则 `INVALID_INPUT` |
+| `--scorer` | 配置 `rewrite_scorer` | 检测器命令：从 stdin 读文本，最后一个 stdout 行输出 0-1 的分数（越高越像 AI）。`strong` 必须配置；仓库附带 `benches/detector/scorer-e5raid.sh`（Windows 用 `.cmd`） |
+| `--best-of` | 1（`strong` 为 5） | 把链跑 N 次（1-5）并保留最优的一次；大于 1 时需要打分器 |
 | `--depth` | — | 1-3 跳机器翻译，依次经 zh、ja、fi（中文原文为 en、ja、fi） |
 | `-p, --provider` | `auto` | 两跳都用指定 Provider |
 | `--fallback` | 空 | 指定 Provider 之后尝试的列表 |

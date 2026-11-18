@@ -64,8 +64,8 @@ returns almost the input. They are the wrong tool for this job.
 | Anything non-Chinese | `zh` | Rewrites as much as Japanese, and is served by every provider including the Chinese-anchored ones |
 | Chinese (`zh`, `zh-TW`, `yue`) | `en` | The mirror of the same rule |
 
-`auto` implements exactly that table. It is the first hop of the `light`
-preset and the only hop of `--pivot`; `--depth` adds ja and fi after it.
+`auto` implements exactly that table. It sets the outward language of every
+preset and is the only hop of `--pivot`; `--depth` adds ja and fi after it.
 
 **Japanese is the documented alternative.** It rewrites slightly more and keeps
 more grammatical structure, which is an advantage for technical English where
@@ -121,7 +121,7 @@ Method, per text and configuration:
 python benches/rewrite-depth/measure.py --bin target/release/not-a-bot.exe --out out --configs light,standard-opencode
 ```
 
-Results (run on 2026-11-11; 10 texts, one run per configuration; preset names are those of that run):
+Results (run on 2026-11-11; 10 texts, one run per configuration; preset names are those of that run, before 0.4.0, and differ from the current presets):
 
 | Configuration | Overlap | Tells left (of 10) | Facts missing | Latency |
 | --- | --- | --- | --- | --- |
@@ -139,7 +139,7 @@ What the numbers say:
 - A third machine-translation hop costs more facts (8 against 5) than it gains in rewriting (overlap 0.480 against 0.520). The default moved from one hop to two; three hops stay available as `--depth 3`.
 - LLM hops remove the structural tells and kept every fact on this corpus.
 - Machine-translation hops placed after an LLM hop can bring a foil back: Finnish "ei ainoastaan ... vaan myös" returned as "not only ... but also". That is why the same chain without a repair hop still left one tell in some runs.
-- The repair hop cut the fact loss of that chain from 3 to 5 facts to 1 and kept most of its rewrite (overlap 0.369 and 0.396 against 0.292 and 0.307 without it). That chain with the repair hop was the earlier `strong`, which has since been removed. The current `standard` is an LLM out, a free LLM back and a meaning-repair hop; `light` is Google out, a repair hop, one LLM rewrite back and a final repair hop.
+- The repair hop cut the fact loss of that chain from 3 to 5 facts to 1 and kept most of its rewrite (overlap 0.369 and 0.396 against 0.292 and 0.307 without it). That chain with the repair hop was the earlier `strong`, a different preset from the 0.4.0 `strong` (the `standard` chain run best-of-5 under a scorer). Before 0.4.0, `standard` was an LLM out, a free LLM back and a meaning-repair hop, which is the 0.4.0 `light`; the old `light` (Google out, a repair hop, one LLM rewrite back and a final repair hop) was removed in 0.4.0. See [the 0.4.0 table](02-chains-presets-and-llm.md#presets).
 
 Caveats: ten texts and one run per configuration is a small sample; the tell
 list and the fact guard are heuristics; overlap rewards change, not quality;
