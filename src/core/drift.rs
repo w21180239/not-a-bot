@@ -445,25 +445,28 @@ fn guard_issues(original: &str, text: &str) -> Vec<String> {
                 .filter(|f| keeps_fact_missing(f))
                 .map(|f| format!("fact {f} is missing")),
         );
-        out.extend(logic_issues(&oc, &tc).into_iter().filter(|i| {
-            let group = i.split(':').next().unwrap_or("");
-            (!GROUPS.iter().any(|(g, _)| *g == group) || GUARD_GROUPS.contains(&group))
-                && !only_gained(i)
-        }));
+        let lite = std::env::var("NAB_EXP_GUARDLITE").unwrap_or_default();
+        if lite.is_empty() {
+            out.extend(logic_issues(&oc, &tc).into_iter().filter(|i| {
+                let group = i.split(':').next().unwrap_or("");
+                (!GROUPS.iter().any(|(g, _)| *g == group) || GUARD_GROUPS.contains(&group))
+                    && !only_gained(i)
+            }));
+        }
         // A lost question can drop an ask; a gained one recasts a claim
         // ("Why does it matter? Because ..."), so only losses fall back.
         let (x, y) = (oc.matches('?').count(), tc.matches('?').count());
-        if y < x {
+        if lite.is_empty() && y < x {
             out.push(format!(
                 "question marks: {x} in the original, {y} in the rewrite"
             ));
         }
         let (k, l) = (word_count(&oc) as f64, word_count(&tc) as f64);
-        if !longer && k >= 6.0 && l < k * MIN_KEEP {
+        if lite != "2" && !longer && k >= 6.0 && l < k * MIN_KEEP {
             out.push("much shorter than the original (dropped content)".into());
         }
     }
-    if longer {
+    if longer && std::env::var("NAB_EXP_GUARDLITE").as_deref() != Ok("2") {
         out.push("much longer than the original (invented content)".into());
     }
     out
