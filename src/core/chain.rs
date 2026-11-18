@@ -227,11 +227,11 @@ fn expand_preset(
             hop(&llm, Target::Source),
             fix,
         ],
-        // Experiment: a second round trip before the fix hop.
+        // Experiment: a second round trip before the fix hop; NAB_EXP_PIVOT2 picks its pivot.
         "standard" if std::env::var("NAB_EXP_TWICE").is_ok() => vec![
             hop(&llm, lang(out)),
             hop(&llm, Target::Source),
-            hop(&llm, lang(out)),
+            hop(&llm, lang(std::env::var("NAB_EXP_PIVOT2").ok().as_deref().unwrap_or(out))),
             hop(&llm, Target::Source),
             fix,
         ],
