@@ -227,6 +227,7 @@ where
     let mut candidates: Vec<Candidate> = Vec::new();
     let mut notes = Vec::new();
     let mut first_err = None;
+    let mut lens: Vec<usize> = Vec::new();
     for (rung_label, rung) in rungs {
         for _ in 0..best_of {
             match run(rung.clone()).await {
@@ -246,6 +247,7 @@ where
                         score,
                         missing_facts: out.response.missing_facts.len(),
                     });
+                    lens.push(out.response.text.chars().count());
                     runs.push(out);
                 }
                 Err(err) => {
@@ -268,7 +270,17 @@ where
         }
     }
 
-    let Some(best) = select(&candidates) else {
+    // Experiment: NAB_EXP_LENGUARD ranks only runs at least 92% as long as the longest,
+    // since a lower detector score often comes from a dropped argument.
+    let best = if std::env::var("NAB_EXP_LENGUARD").is_ok() {
+        let max = lens.iter().copied().max().unwrap_or(0);
+        (0..candidates.len())
+            .filter(|&i| lens[i] * 100 >= max * 92)
+            .min_by(|&a, &b| rank(&candidates[a], &candidates[b]))
+    } else {
+        select(&candidates)
+    };
+    let Some(best) = best else {
         return Err(first_err.unwrap_or_else(|| Error::InvalidInput("no rewrite ran".into())));
     };
     if let Some(target) = req.target_score {
