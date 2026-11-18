@@ -43,7 +43,7 @@ The three stock words are gone, and so is the closing pledge, which says nothing
 
 <table>
 <tr>
-<td align="center" width="25%"><a href="#measured-results"><b>0.999 → 0.36</b><br/><sub>mean detector score, 30 texts</sub></a></td>
+<td align="center" width="25%"><a href="#from-030-to-040"><b>0.985 → 0.39</b><br/><sub>mean detector score, 30 texts, <code>strong</code> vs 0.3.0</sub></a></td>
 <td align="center" width="25%"><a href="#measured-results"><b>98%</b><br/><sub>of texts with no major meaning error</sub></a></td>
 <td align="center" width="25%"><a href="#lint-offline-and-deterministic"><b>0</b><br/><sub>network calls for <code>nab lint</code></sub></a></td>
 <td align="center" width="25%"><a href="#install"><b>1</b><br/><sub>binary, no runtime</sub></a></td>

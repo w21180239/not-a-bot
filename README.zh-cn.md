@@ -43,7 +43,7 @@ nab rewrite --from en --format json --quiet --preserve @code < draft.txt
 
 <table>
 <tr>
-<td align="center" width="25%"><a href="#实测结果"><b>0.999 → 0.36</b><br/><sub>检测器平均得分，30 篇文本</sub></a></td>
+<td align="center" width="25%"><a href="#从-030-到-040"><b>0.985 → 0.39</b><br/><sub>检测器平均得分，30 篇文本，<code>strong</code> 对比 0.3.0</sub></a></td>
 <td align="center" width="25%"><a href="#实测结果"><b>98%</b><br/><sub>的文本没有严重语义错误</sub></a></td>
 <td align="center" width="25%"><a href="#lint离线且结果确定"><b>0</b><br/><sub><code>nab lint</code> 的网络请求数</sub></a></td>
 <td align="center" width="25%"><a href="#安装"><b>1</b><br/><sub>个二进制，无运行时依赖</sub></a></td>
