@@ -212,7 +212,7 @@ impl CliLlm {
         crate::process::resolve_on_path(wanted)
     }
 
-    fn command(&self, bin: &Path) -> tokio::process::Command {
+    fn command(&self, bin: &Path, model: &str) -> tokio::process::Command {
         let mut cmd = crate::process::command(bin);
         match self.cli {
             Cli::Claude => {
@@ -221,7 +221,7 @@ impl CliLlm {
                     "--setting-sources",
                     "",
                     "--model",
-                    &self.model,
+                    model,
                     "--tools",
                     "",
                 ])
@@ -231,17 +231,17 @@ impl CliLlm {
             }
             // The message comes from stdin: Windows caps a .cmd command line near 8 KB.
             Cli::OpenCode => {
-                cmd.args(["run", "--archived", "-m", &self.model, "--format", "json"]);
+                cmd.args(["run", "--archived", "-m", model, "--format", "json"]);
             }
         }
         cmd.current_dir(std::env::temp_dir());
         cmd
     }
 
-    async fn run(&self, bin: &Path, prompt: String, timeout_ms: u64) -> Result<String> {
+    async fn run(&self, bin: &Path, prompt: String, timeout_ms: u64, model: &str) -> Result<String> {
         use crate::process::{run_with_input, RunError};
         let asked = prompt.clone();
-        let output = match run_with_input(self.command(bin), prompt, timeout_ms).await {
+        let output = match run_with_input(self.command(bin, model), prompt, timeout_ms).await {
             Ok(out) => out,
             Err(RunError::Spawn(e)) => {
                 tracing::warn!("{}: cannot start {}: {e}", self.name(), bin.display());
@@ -327,8 +327,13 @@ impl Provider for CliLlm {
         })?;
         let prompt = build_prompt(req)?;
         let started = Instant::now();
+        // Experiment: NAB_EXP_BACKMODEL overrides the model for the voice-keeping back hop only.
+        let model = std::env::var("NAB_EXP_BACKMODEL")
+            .ok()
+            .filter(|_| voice_back(req))
+            .unwrap_or_else(|| self.model.clone());
         let text = self
-            .run(&bin, prompt, req.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS))
+            .run(&bin, prompt, req.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS), &model)
             .await?;
         Ok(TranslateResponse {
             text,
