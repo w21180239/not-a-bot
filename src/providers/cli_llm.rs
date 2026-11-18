@@ -492,6 +492,26 @@ First compare the text with the original. Wherever meaning was lost, changed or 
             )))
         }
     };
+    // Experiment: human-written samples (JSONL with "text") shown before the back hop's brief.
+    if style == "humanize" && voice_back(req) {
+        if let Some(samples) = std::env::var("NAB_EXP_SAMPLES")
+            .ok()
+            .and_then(|p| std::fs::read_to_string(p).ok())
+        {
+            let texts: Vec<String> = samples
+                .lines()
+                .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+                .filter_map(|v| v["text"].as_str().map(str::to_string))
+                .collect();
+            if !texts.is_empty() {
+                prompt.push_str("Here are short samples written by real people. Use them only as a reference for how human writing moves: sentence rhythm, plain word choice, how ideas connect. Do not copy their topic, register, words or facts.\n");
+                for t in texts {
+                    prompt.push_str(&format!("<<<\n{t}\n>>>\n"));
+                }
+                prompt.push('\n');
+            }
+        }
+    }
     prompt.push_str(&instructions);
     // Only a casual source's markers need naming.
     if style == "humanize" && !not_casual(req) {
