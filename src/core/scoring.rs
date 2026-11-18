@@ -12,6 +12,8 @@ use std::path::Path;
 use std::time::Instant;
 
 pub const MAX_BEST_OF: u8 = 5;
+/// Runs `strong` makes when the request sets no `bestOf`.
+pub const STRONG_BEST_OF: u8 = 5;
 
 #[async_trait]
 pub trait Scorer: Send + Sync {
@@ -177,7 +179,10 @@ where
     F: FnMut(RewriteRequest) -> Fut,
     Fut: Future<Output = Result<RewriteOutcome>>,
 {
-    let best_of = req.best_of.unwrap_or(1);
+    let strong = label(req, settings) == "strong";
+    let best_of = req
+        .best_of
+        .unwrap_or(if strong { STRONG_BEST_OF } else { 1 });
     if !(1..=MAX_BEST_OF).contains(&best_of) {
         return Err(Error::InvalidInput(format!(
             "bestOf must be 1-{MAX_BEST_OF}, got {best_of}"
@@ -191,6 +196,11 @@ where
         }
     }
     let Some(scorer) = scorer else {
+        if strong {
+            return Err(Error::InvalidInput(
+                "preset strong keeps the lowest-scoring of several runs and needs a scorer; pass --scorer or set rewrite_scorer (e.g. benches/detector/scorer-e5raid.sh)".into(),
+            ));
+        }
         if best_of > 1 {
             return Err(Error::InvalidInput(
                 "bestOf above 1 needs a scorer to choose between runs; pass --scorer or set rewrite_scorer".into(),
@@ -573,6 +583,68 @@ mod tests {
                 .unwrap_err();
             assert_eq!(err.code(), "INVALID_INPUT", "{best_of:?} {target:?}");
         }
+    }
+
+    #[tokio::test]
+    async fn strong_needs_a_scorer() {
+        let calls = Calls::default();
+        let err = search(
+            &req("strong"),
+            &Settings::default(),
+            None,
+            runner(calls.clone(), &[]),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(err.code(), "INVALID_INPUT");
+        assert!(err.to_string().contains("needs a scorer"));
+        assert!(calls.lock().unwrap().is_empty());
+        // A configured default of strong is held to the same rule.
+        let s = Settings {
+            rewrite_preset: Some("strong".into()),
+            ..Default::default()
+        };
+        let r: RewriteRequest = serde_json::from_str(r#"{"text":"hi"}"#).unwrap();
+        let err = search(&r, &s, None, runner(Calls::default(), &[]))
+            .await
+            .unwrap_err();
+        assert_eq!(err.code(), "INVALID_INPUT");
+    }
+
+    #[tokio::test]
+    async fn strong_defaults_to_best_of_five() {
+        let calls = Calls::default();
+        let s = scorer(&[
+            ("strong#1", 0.6),
+            ("strong#2", 0.5),
+            ("strong#3", 0.2),
+            ("strong#4", 0.7),
+            ("strong#5", 0.4),
+        ]);
+        let out = search(
+            &req("strong"),
+            &Settings::default(),
+            Some(&s),
+            runner(calls.clone(), &[]),
+        )
+        .await
+        .unwrap();
+        assert_eq!(calls.lock().unwrap().len(), 5);
+        assert_eq!(out.response.text, "strong#3");
+        assert_eq!(out.response.candidates.len(), 5);
+
+        let calls = Calls::default();
+        let mut r = req("strong");
+        r.best_of = Some(2);
+        search(
+            &r,
+            &Settings::default(),
+            Some(&s),
+            runner(calls.clone(), &[]),
+        )
+        .await
+        .unwrap();
+        assert_eq!(calls.lock().unwrap().len(), 2, "an explicit bestOf wins");
     }
 
     #[tokio::test]

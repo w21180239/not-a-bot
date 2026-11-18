@@ -40,4 +40,10 @@ nab rewrite "<text>" --from en --preset standard --scorer benches/detector/score
 
 `detect.py --batch in.jsonl [--out out.jsonl]` scores many rows (a `text` field; adds `p_ai`) in one model load.
 
+`scorer-e5raid.sh` and `scorer-e5raid.cmd` do the same with `holdout.py --model e5raid`, the e5-small RAID detector (`MayZhou/e5-small-lora-ai-generated-detector`, MIT, about 130 MB, same venv). It is the selector `--preset strong` was tuned with, which leaves desklib as a held-out check on the result. `holdout.py --batch` scores rows with one of its other detectors (`fakespot`, `radar`, `hc3`) for the same purpose.
+
+```sh
+nab rewrite --from en --preset strong --scorer benches/detector/scorer-e5raid.sh < draft.md
+```
+
 If `detector-human.jsonl` (same format) sits in a run directory, `grade.py` adds a `human-control` row. Keep human-written control texts outside the repo and commit only scores.

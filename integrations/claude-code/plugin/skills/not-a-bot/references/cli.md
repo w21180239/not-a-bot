@@ -9,7 +9,7 @@
 | A draft audited against its source, offline | `nab lint draft.txt --source source.txt --format text` |
 | Text in another language | `nab translate "<text>" -t <lang> --preserve @code --format json` |
 | The same language, rewritten by a round trip | `nab rewrite "<text>" --from <lang> --preset standard --preserve @code --format json` |
-| The same, quickly and with no subscription | `nab rewrite "<text>" --from <lang> --preset light --format json` |
+| The same, lighter and cheaper | `nab rewrite "<text>" --from <lang> --preset light --format json` |
 | Many strings | `nab batch --file jobs.ndjson --format json` (`--kind rewrite` or `--kind lint` for many rewrites or lints, `--parallel N`, optional `id` per line) |
 | What can serve a language pair | `nab providers --format json` |
 | Whether anything is broken | `nab health --format json` |
@@ -31,16 +31,17 @@ A round trip through another language that rewrites the sentences on the way. Th
 
 | Goal | Preset | Cost |
 | --- | --- | --- |
-| Humanise AI-sounding prose (default) | `--preset standard` | LLM out, free LLM back, then a meaning-repair hop, on the user's Claude or OpenCode subscription; several LLM calls, tens of seconds; lowest detector score |
-| Lightest rewrite, highest fidelity | `--preset light` | Google out, repair, one LLM rewrite back, repair; several LLM calls, tens of seconds |
+| Humanise AI-sounding prose (default) | `--preset standard` | Two round trips (LLM out, free LLM back, twice), then a meaning-repair hop; 5 LLM calls on the user's Claude or OpenCode subscription |
+| Lighter, cheaper rewrite | `--preset light` | One round trip, then the repair hop; 3 LLM calls, about 0.6x the cost of `standard` |
+| Lowest detector score, on request only | `--preset strong --scorer benches/detector/scorer-e5raid.sh` | `standard` run 5 times, keeping the run that keeps the most facts, then the lowest score; about 5x the cost of `standard`; needs a scorer, else `INVALID_INPUT` |
 
-Both presets need an LLM `rewrite_llm` (default `opencode-cli`, alternative `claude-cli`), else `INVALID_INPUT`; `claude-cli` and `opencode-cli` run the local CLI, need no API key and never join the automatic chain. Every preset ends with a fix hop: an LLM that sees the original and returns small span edits restoring lost or changed meaning (names, numbers, dates, amounts, IDs, code, negations, qualifiers, actor, cause, dropped or invented claims) and never restores deliberately cut feeling, pledge or pleasantry sentences. Measured on 30 texts x 2 samples (desklib, source 0.999): `standard` mean P(AI) 0.364, `light` 0.489; both lose almost no fact tokens (0.5 and 0 texts of 30) and 98% and 97% of texts have no major meaning error. Machine translation keeps sentence structure, so machine-only chains stay near the source score. `strong` is removed and fails with `INVALID_INPUT`. No preset makes text undetectable by AI detectors; do not promise that.
+Every preset needs an LLM `rewrite_llm` (default `opencode-cli`, alternative `claude-cli`), else `INVALID_INPUT`; `claude-cli` and `opencode-cli` run the local CLI, need no API key and never join the automatic chain. Every preset ends with a fix hop: an LLM that sees the original and returns small span edits restoring lost or changed meaning (names, numbers, dates, amounts, IDs, code, negations, qualifiers, actor, cause, dropped or invented claims) and never restores deliberately cut feeling, pledge or pleasantry sentences. Mean desklib P(AI) on 30 AI-style workplace texts, by preset: `light` about 0.54, `standard` 0.48-0.54, `strong` 0.37-0.41. `strong` is tuned against detectors: a second detector moves much less and meaning errors are somewhat more frequent, so use it only when the user asks for the lowest score. Machine translation keeps sentence structure, so machine-only chains (`--depth`, `--pivot`) stay near the source score. No preset makes text undetectable by AI detectors; do not promise that.
 
 The round trip keeps the source's register: casual or dictated text stays lowercase, unpunctuated, hedged and self-correcting; formal text stays formal; technical text stays technical. The source is classed from cheap signals and every LLM hop and the fix hop are told the class. After the last fix hop, casual sources get their casing and full-stop habits back, typographic dashes and quotes the source lacks become ASCII, and a drift guard replaces any sentence (or paragraph) whose negations, limits, quantifiers, hedges, conditions, question marks, length or facts disagree with the original by the original text, with a `drift:` warning. Read those warnings: a kept original sentence is unrewritten, not wrong.
 
 Other options: `--depth 1-3` (machine translation only, no repair hop; a third hop loses more facts than it gains), `--chain "<[engine:]lang,...>"`, `--pivot <lang>` (default: Chinese for non-Chinese text, English for Chinese text; `--pivot ja` keeps more grammar, better for precise technical English). First match wins in the order preset, depth, chain, pivot.
 
-Scoring is for tuning presets, not live requests, because a local detector loads a model on every call. Pass `--scorer "<command>"` (text on stdin, a 0-1 score on the last stdout line, higher = more AI-like), `--best-of 1-5` or `--target-score 0-1` only when the user asks for a scored run, and report the score with the detector's name. `benches/detector/` has one.
+Scoring is for tuning presets, not live requests, because a local detector loads a model on every call. Pass `--scorer "<command>"` (text on stdin, a 0-1 score on the last stdout line, higher = more AI-like), `--best-of 1-5`, `--target-score 0-1` or `--preset strong` only when the user asks for a scored run, and report the score with the detector's name. `benches/detector/` has one.
 
 ### After a round trip
 
@@ -50,7 +51,7 @@ Scoring is for tuning presets, not live requests, because a local detector loads
 
 ### Wording versus content
 
-The machine-translation chains (`light`, `--depth`, `--pivot`) rewrite wording and keep the sentences, so a stock opener, a hedge or a "not just X but Y" scaffold survives them in every language. The LLM presets rebuild the sentences. When the user wants that filler gone, prefer an LLM preset; with a machine-translation preset, delete those clauses yourself first, run the tool on the rest, and say which sentences you removed. Presenting an edited text as a straight translation hides a decision the user did not see.
+The machine-translation chains (`--depth`, `--pivot`) rewrite wording and keep the sentences, so a stock opener, a hedge or a "not just X but Y" scaffold survives them in every language. The LLM presets rebuild the sentences. When the user wants that filler gone, prefer an LLM preset; with a machine-translation preset, delete those clauses yourself first, run the tool on the rest, and say which sentences you removed. Presenting an edited text as a straight translation hides a decision the user did not see.
 
 ## Protecting what must not change
 
