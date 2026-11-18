@@ -43,11 +43,11 @@
     "README.md"
   ],
   "optionalDependencies": {
-    "not-a-bot-darwin-arm64": "0.1.0",
-    "not-a-bot-darwin-x64": "0.1.0",
-    "not-a-bot-linux-arm64": "0.1.0",
-    "not-a-bot-linux-x64": "0.1.0",
-    "not-a-bot-windows-x64": "0.1.0"
+    "not-a-bot-darwin-arm64": "0.3.0",
+    "not-a-bot-darwin-x64": "0.3.0",
+    "not-a-bot-linux-arm64": "0.3.0",
+    "not-a-bot-linux-x64": "0.3.0",
+    "not-a-bot-windows-x64": "0.3.0"
   },
   "engines": {
     "node": ">=18"
