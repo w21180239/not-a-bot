@@ -423,10 +423,7 @@ impl Engine {
                     metadata.insert(ORIGINAL_LANG_KEY.into(), detected.clone().into());
                 }
                 if fix {
-                    let missing = crate::core::facts::missing_facts(
-                        &crate::core::drift::content(&req.text),
-                        &text,
-                    );
+                    let missing = crate::core::drift::fix_facts(&req.text, &text);
                     metadata.insert(MISSING_KEY.into(), serde_json::json!(missing));
                     let terms = crate::core::drift::lost_terms(&req.text, &text);
                     metadata.insert(TERMS_KEY.into(), serde_json::json!(terms));
@@ -607,10 +604,7 @@ impl Engine {
                 metadata.insert(REGISTER_KEY.into(), register_meta.clone());
                 metadata.insert(ORIGINAL_KEY.into(), req.text.clone().into());
                 metadata.insert(ORIGINAL_LANG_KEY.into(), detected.clone().into());
-                let missing = crate::core::facts::missing_facts(
-                    &crate::core::drift::content(&req.text),
-                    &surface,
-                );
+                let missing = crate::core::drift::fix_facts(&req.text, &surface);
                 metadata.insert(MISSING_KEY.into(), serde_json::json!(missing));
                 let reasons: Vec<&str> = drift
                     .iter()

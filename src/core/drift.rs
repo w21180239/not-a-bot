@@ -211,6 +211,7 @@ pub fn issues(original: &str, text: &str) -> Vec<String> {
 /// Number of logic and fact disagreements, used by the repair to decide
 /// whether an edit moves the text back toward the original's meaning.
 pub fn drift_count(original: &str, text: &str) -> usize {
+    let doc = original;
     let original = content(original);
     let tc = strip_filler(text);
     let tc = if tc.trim().is_empty() {
@@ -218,7 +219,21 @@ pub fn drift_count(original: &str, text: &str) -> usize {
     } else {
         tc
     };
-    missing_facts(&original, text).len() + logic_issues(&original, &tc).len()
+    fix_facts(doc, text).len() + logic_issues(&original, &tc).len()
+}
+
+/// Facts of `original` (minus courtesy sentences) missing from `text`, as the fix
+/// hop sees them. NAB_EXP_FACTPOS: a capitalised word the original only uses at
+/// a sentence, line or heading start is not a fact, as in the guard.
+pub fn fix_facts(original: &str, text: &str) -> Vec<String> {
+    let facts = missing_facts(&content(original), text);
+    if std::env::var("NAB_EXP_FACTPOS").is_err() {
+        return facts;
+    }
+    facts
+        .into_iter()
+        .filter(|f| !only_at_starts(f, original))
+        .collect()
 }
 
 /// Most terms listed for the repair hop.
