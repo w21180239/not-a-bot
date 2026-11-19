@@ -226,7 +226,10 @@ pub fn drift_count(original: &str, text: &str) -> usize {
 /// hop sees them. NAB_EXP_FACTPOS: a capitalised word the original only uses at
 /// a sentence, line or heading start is not a fact, as in the guard.
 pub fn fix_facts(original: &str, text: &str) -> Vec<String> {
-    let facts = missing_facts(&content(original), text);
+    let facts: Vec<String> = missing_facts(&content(original), text)
+        .into_iter()
+        .filter(|f| !heading_cased(f, original, text))
+        .collect();
     if std::env::var("NAB_EXP_FACTPOS").is_err() {
         return facts;
     }
@@ -458,6 +461,7 @@ fn guard_issues(original: &str, text: &str) -> Vec<String> {
             missing_facts(&oc, text)
                 .into_iter()
                 .filter(|f| keeps_fact_missing(f))
+                .filter(|f| !GUARD_DOC.with(|d| heading_cased(f, &d.borrow(), text)))
                 .map(|f| format!("fact {f} is missing")),
         );
         out.extend(logic_issues(&oc, &tc).into_iter().filter(|i| {
@@ -526,6 +530,37 @@ fn keeps_fact_missing(fact: &str) -> bool {
 thread_local! {
     /// The whole original during [`guard`], so paragraph and sentence checks see every use of a word.
     static GUARD_DOC: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+}
+
+/// NAB_EXP_TITLE: a word `doc` capitalises only by position or in Title Case
+/// lines ("Plan Your Menu First") that `text` still has in lower case.
+fn heading_cased(word: &str, doc: &str, text: &str) -> bool {
+    if std::env::var("NAB_EXP_TITLE").is_err() || doc.is_empty() {
+        return false;
+    }
+    let lower = word.to_lowercase();
+    let has = |s: &str, w: &str| s.split(|c: char| !c.is_alphanumeric()).any(|x| x == w);
+    if lower == word || !word.chars().all(char::is_alphabetic) || !has(text, &lower) || !has(doc, word) {
+        return false;
+    }
+    let title = |line: &str| {
+        let long: Vec<&str> = line
+            .split(|c: char| !c.is_alphabetic())
+            .filter(|w| w.chars().count() >= 4)
+            .collect();
+        long.len() >= 2
+            && long.iter().filter(|w| w.starts_with(char::is_uppercase)).count() * 4
+                >= long.len() * 3
+    };
+    let rest: String = doc
+        .lines()
+        .filter(|l| !title(l))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let in_rest = rest
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|w| w == word);
+    !in_rest || only_at_starts(word, &rest)
 }
 
 /// A capitalised word that `doc` only ever uses to open a sentence, line,
