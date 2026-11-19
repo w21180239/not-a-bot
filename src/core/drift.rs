@@ -469,6 +469,19 @@ fn guard_issues(original: &str, text: &str) -> Vec<String> {
     out
 }
 
+/// The kind of a guard issue: "fact", "longer", "shorter", or the group name before ':'.
+fn issue_kind(issue: &str) -> &str {
+    if issue.starts_with("fact ") {
+        "fact"
+    } else if issue.starts_with("much longer") {
+        "longer"
+    } else if issue.starts_with("much shorter") {
+        "shorter"
+    } else {
+        issue.split(':').next().unwrap_or(issue)
+    }
+}
+
 /// A negation, limit or obligation the rewrite gains is how idiomatic English
 /// restates a claim ("difficult" -> "not easy", "subject to approval" -> "a
 /// manager has to approve"); a lost one can drop a condition, so only losses
@@ -628,11 +641,24 @@ fn guard_paragraph(original: &str, text: &str, warnings: &mut Vec<String>) -> St
     if found.is_empty() {
         return text.to_string();
     }
+    // NAB_EXP_KIND: a sentence or group falls back only for a kind of issue its paragraph has.
+    let kinds: Vec<&str> = found.iter().map(|i| issue_kind(i)).collect();
+    let narrow = std::env::var("NAB_EXP_KIND").is_ok();
+    let unit_issues = |o: &str, t: &str| -> Vec<String> {
+        let bad = guard_issues(o, t);
+        if narrow {
+            bad.into_iter()
+                .filter(|i| kinds.contains(&issue_kind(i)))
+                .collect()
+        } else {
+            bad
+        }
+    };
     let (os, ts) = (sentences(original), sentences(text));
     if os.len() == ts.len() && os.len() > 1 {
         let mut out = String::new();
         for (n, (o, t)) in os.iter().zip(&ts).enumerate() {
-            let bad = guard_issues(o.trim(), t.trim());
+            let bad = unit_issues(o.trim(), t.trim());
             if bad.is_empty() {
                 out.push_str(t);
             } else {
@@ -670,7 +696,7 @@ fn guard_paragraph(original: &str, text: &str, warnings: &mut Vec<String>) -> St
                 }
                 vec!["dropped from the rewrite".to_string()]
             } else {
-                guard_issues(oj.trim(), tj.trim())
+                unit_issues(oj.trim(), tj.trim())
             };
             if bad.is_empty() {
                 out.push_str(&tj);

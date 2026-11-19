@@ -50,7 +50,7 @@ fn main() {
             let same = d["final"].as_str() == Some(text.as_str());
             println!(
                 "{}",
-                json!({"id": id, "text": text, "putbacks": drift.len(), "same": same})
+                json!({"id": id, "text": text, "putbacks": drift.len(), "same": same, "drift": drift})
             );
         }
     }
