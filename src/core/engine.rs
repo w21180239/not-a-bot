@@ -591,6 +591,8 @@ impl Engine {
                 crate::core::register::restore_surface(&req.text, &habits)
             };
             let (mut guarded, mut drift) = crate::core::drift::guard(&req.text, &surface);
+            let first_drift = drift.clone();
+            let mut repaired: Option<String> = None;
             // One repair hop on what the guard would put back, then guard again.
             let passages = restored_passages(&surface, &guarded);
             let fix_spec = plan
@@ -635,6 +637,7 @@ impl Engine {
                             let (fixed, edits) =
                                 crate::core::repair::apply_edits(&surface, &req.text, proposed);
                             if edits.iter().any(|e| e.applied) {
+                                repaired = Some(fixed.clone());
                                 let (g2, d2) = crate::core::drift::guard(&req.text, &fixed);
                                 warnings.push(format!(
                                     "drift repair: {} of {} put-backs left",
@@ -651,6 +654,18 @@ impl Engine {
                     },
                     Err(err) => warnings.push(format!("drift repair: hop failed: {}", err.code())),
                 }
+            }
+            // Bench only: record the guard's inputs for offline replay.
+            if let Ok(dir) = std::env::var("NAB_EXP_DUMP") {
+                let dump = serde_json::json!({
+                    "source": req.text, "surface": surface, "drift": first_drift,
+                    "repaired": repaired, "final": guarded, "casual": casual,
+                });
+                let _ = std::fs::create_dir_all(&dir);
+                let _ = std::fs::write(
+                    std::path::Path::new(&dir).join(format!("{request_id}.json")),
+                    dump.to_string(),
+                );
             }
             warnings.extend(drift);
             guarded

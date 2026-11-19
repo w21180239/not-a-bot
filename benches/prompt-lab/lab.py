@@ -185,7 +185,9 @@ MEANING = ("You check whether a REWRITE keeps the substantive meaning of an ORIG
 def tx_call(chain, text, rep):
     """Final text of `not-a-bot rewrite --chain`, cached by binary build, chain, text and rep."""
     st = os.stat(TX_BIN)
-    k = hashlib.sha256(f"{st.st_size}:{st.st_mtime_ns}\n{chain}\n{rep}\n{text}".encode("utf-8")).hexdigest()[:32]
+    # LAB_TX_TAG separates arms that share a binary (repeat runs, env-switched candidates).
+    tag = os.environ.get("LAB_TX_TAG", "")
+    k = hashlib.sha256(f"{st.st_size}:{st.st_mtime_ns}\n{tag}\n{chain}\n{rep}\n{text}".encode("utf-8")).hexdigest()[:32]
     path = os.path.join(HERE, "cache", "tx", k + ".json")
     if os.path.exists(path):
         return json.load(open(path, encoding="utf-8"))["output"]
@@ -311,7 +313,8 @@ def words(t):
 
 
 def cmd_run(a):
-    corpus = [json.loads(l) for l in open(os.path.join(HERE, "corpus.jsonl"), encoding="utf-8") if l.strip()]
+    corpus_path = os.environ.get("LAB_CORPUS") or os.path.join(HERE, "corpus.jsonl")
+    corpus = [json.loads(l) for l in open(corpus_path, encoding="utf-8") if l.strip()]
     if a.limit:
         corpus = [corpus[i * len(corpus) // a.limit] for i in range(a.limit)]
     names = a.variants.split(",") if a.variants else list(VARIANTS)
