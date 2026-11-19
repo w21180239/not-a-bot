@@ -129,6 +129,11 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
     }
 
     let mut baseline = overlap(&current, original);
+    // NAB_EXP_BUDGET: experiment override of the meaning-edit budget.
+    let budget: f64 = std::env::var("NAB_EXP_BUDGET")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(MAX_STYLE_OVERLAP_RISE);
     let max_pinpoint = (MAX_PINPOINT_SHARE * current.split_whitespace().count() as f64) as usize;
     let mut pinpointed = 0;
     for edit in edits
@@ -150,7 +155,7 @@ pub fn apply_edits(text: &str, original: &str, edits: Vec<HopEdit>) -> (String, 
                     current = candidate;
                     baseline = overlap(&current, original);
                     edit.applied = true;
-                } else if overlap(&candidate, original) - baseline > MAX_STYLE_OVERLAP_RISE {
+                } else if overlap(&candidate, original) - baseline > budget {
                     edit.reason = Some("copies the original back".into());
                 } else {
                     current = candidate;
